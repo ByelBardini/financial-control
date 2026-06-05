@@ -1,0 +1,8 @@
+# Dependências da raiz (concurrently)
+node_modules/
+
+# Variáveis de ambiente locais
+.env
+
+# Logs
+*.log
