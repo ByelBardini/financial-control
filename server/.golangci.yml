@@ -1,0 +1,30 @@
+# golangci-lint v2 — server (Go API)
+# Set padrão (errcheck, govet, ineffassign, staticcheck, unused) + linters de
+# alto sinal alinhados ao CLAUDE.md: errorlint reforça o wrap de erro com %w.
+# Formatação (gofmt/goimports) fica nos formatters, separada dos linters.
+version: "2"
+
+run:
+  timeout: 5m
+
+linters:
+  enable:
+    - errorlint
+    - misspell
+    - unconvert
+  exclusions:
+    generated: lax
+    presets:
+      - comments
+      - common-false-positives
+      - legacy
+      - std-error-handling
+
+formatters:
+  enable:
+    - gofmt
+    - goimports
+  settings:
+    goimports:
+      local-prefixes:
+        - financial-control/server
