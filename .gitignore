@@ -6,3 +6,8 @@ node_modules/
 
 # Logs
 *.log
+
+# Artefatos de build / cache do Expo (client)
+client/dist/
+client/web-build/
+.expo/
