@@ -1,0 +1,3 @@
+# Pacotes de domínio do backend ficam aqui (ex.: internal/conta, internal/transacao).
+# Em Go os testes são co-localizados: cada pacote tem seu próprio `*_test.go`
+# ao lado do código. Ex.: internal/transacao/transacao.go + transacao_test.go
