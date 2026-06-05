@@ -13,6 +13,13 @@ Sistema de controle financeiro.
 - [Go](https://go.dev/dl/) 1.23+
 - [Docker Desktop](https://www.docker.com/products/docker-desktop/) (para o Postgres)
 
+Opcionais — só para rodar lint/segurança do server **localmente** (no CI são instalados automaticamente):
+
+```bash
+go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@latest
+go install golang.org/x/vuln/cmd/govulncheck@latest
+```
+
 ## Estrutura
 
 ```
@@ -73,6 +80,34 @@ npm run dev:mobile   # abre o Expo; escaneie o QR code com o app Expo Go
 | `npm run test:server` | Testes do backend (`go test ./...`) |
 
 Trabalhamos em **TDD** (teste primeiro: red → green → refactor) e código **componentizado** — sem monolitos.
+
+## Qualidade & CI
+
+Todo push na `main` e todo pull request rodam o pipeline em [GitHub Actions](.github/workflows/ci.yml),
+com **jobs separados e paralelos** para o server (Go) e o client (Expo):
+
+| Etapa | server (Go) | client (Expo) |
+|---|---|---|
+| Lint | `golangci-lint` (v2) | `eslint` |
+| Format | `gofmt` / `goimports` (via golangci-lint) | `prettier --check` |
+| Typecheck | — (compilado em build) | `tsc --noEmit` |
+| Testes | `go test -race ./...` | `jest` |
+| Build | `go build ./...` | `expo export --platform web` |
+| Vulnerabilidades | `govulncheck` | `npm audit --audit-level=high` |
+
+Para rodar os mesmos checks **localmente** (na raiz):
+
+| Comando | O que faz |
+|---|---|
+| `npm run ci` | Roda tudo: lint + format:check + typecheck + testes + segurança |
+| `npm run lint` | Lint do client (ESLint) e do server (golangci-lint) |
+| `npm run format` | Formata client (Prettier) e server (gofmt) in-place |
+| `npm run format:check` | Confere a formatação do client sem alterar arquivos |
+| `npm run typecheck` | Type-check do client (`tsc --noEmit`) |
+| `npm run security` | `npm audit` (client) + `govulncheck` (server) |
+
+> O lint e a verificação de vulnerabilidades do server exigem `golangci-lint` e
+> `govulncheck` instalados (veja os [opcionais](#pré-requisitos)).
 
 - **Frontend:** [jest-expo](https://docs.expo.dev/develop/unit-testing/) + [@testing-library/react-native](https://callstack.github.io/react-native-testing-library/). Testes ficam em `client/__tests__/`.
   > No RNTL v14 a função `render` é **assíncrona** — sempre use `await render(...)`.
