@@ -1,0 +1,13 @@
+version: "2"
+sql:
+  - engine: "postgresql"
+    schema: "db/migrations" # lê o schema da migration goose; a seção -- +goose Down é ignorada pelo sqlc
+    queries: "db/queries"
+    gen:
+      go:
+        package: "gen"
+        out: "internal/store/gen"
+        sql_package: "pgx/v5"
+        emit_json_tags: false # DTOs são escritos à mão (json tags batem com o contrato do client)
+        emit_interface: true
+        emit_empty_slices: true # :many devolve [] em vez de nil → JSON nunca vira null
