@@ -10,7 +10,7 @@ Sistema de controle financeiro.
 ## Pré-requisitos
 
 - [Node.js](https://nodejs.org/) 20+
-- [Go](https://go.dev/dl/) 1.23+
+- [Go](https://go.dev/dl/) 1.25+
 - [Docker Desktop](https://www.docker.com/products/docker-desktop/) (para o Postgres)
 
 Opcionais — só para rodar lint/segurança do server **localmente** (no CI são instalados automaticamente):
@@ -25,10 +25,12 @@ go install golang.org/x/vuln/cmd/govulncheck@latest
 ```
 .
 ├── client/                 # App Expo (React Native + Web)
+│   ├── src/                # components, hooks, screens, lib, types, mocks (dashboard)
 │   └── __tests__/          # testes (Jest + RNTL)
 ├── server/                 # API em Go (componentizada)
 │   ├── cmd/server/         # entrypoint (main)
 │   ├── internal/<domínio>/ # um pacote por domínio (router, health, …)
+│   ├── db/migrations/      # migrations SQL versionadas (goose)
 │   └── test/               # testes de integração/e2e
 ├── docker-compose.yml      # Postgres
 ├── .env                    # Credenciais do Postgres (lido pelo docker-compose)
@@ -40,18 +42,23 @@ go install golang.org/x/vuln/cmd/govulncheck@latest
 Na **raiz** do projeto:
 
 ```bash
-# 1. Instala o concurrently (só na primeira vez)
+# 1. Instala as ferramentas de orquestração (só na primeira vez)
 npm install
 
-# 2. Sobe o banco Postgres em segundo plano
+# 2. Cria o .env do server a partir do exemplo (credenciais de dev)
+cp server/.env.example server/.env   # PowerShell: Copy-Item server/.env.example server/.env
+
+# 3. Sobe o banco Postgres em segundo plano
 npm run db:up        # equivale a: docker compose up -d
 
-# 3. Sobe client (web) + server juntos
+# 4. Sobe client (web) + server juntos
 npm run dev
 ```
 
 - **Site (web):** http://localhost:8081 (Expo Web)
 - **API:** http://localhost:8080 — teste com http://localhost:8080/health
+- **Recarga automática:** o `npm run dev` libera as portas 8080/8081 sozinho (`kill-port`, via hooks `predev:*`) e **recarrega o server Go ao salvar** qualquer `.go` (`nodemon`); o Expo já tem hot reload nativo. O `server/.env` é carregado pelo `dotenv-cli`.
+- **Config da API no client:** o client lê `EXPO_PUBLIC_API_URL` (default `http://localhost:8080`) — embutido no bundle, então **reinicie o Expo ao mudar**; no celular físico use o IP da LAN da máquina (ex.: `http://192.168.0.10:8080`). O server aceita `CORS_ALLOW_ORIGIN` (default `*`).
 
 ### Rodar no celular
 
@@ -125,5 +132,9 @@ postgres://financial:financial@localhost:5432/financial_control
 ```
 
 O server lê essa URL pela variável `DATABASE_URL` (veja `server/.env.example`).
-A conexão do Go com o Postgres ainda não está plugada — esse é o próximo passo
-(driver `pgx` + `sqlc` para as queries + migrations).
+
+O schema é versionado por migrations com [goose](https://github.com/pressly/goose),
+em `server/db/migrations/` (veja o README de lá). A primeira migration — contas,
+categorias, transações e regras de recorrência — já existe e está aplicável. A
+conexão do Go com o Postgres ainda não está plugada — esse é o próximo passo
+(driver `pgx` + `sqlc` para as queries tipadas).

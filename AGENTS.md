@@ -3,8 +3,8 @@
 Mapa do repositório para agentes. Leia isto no início de toda tarefa, antes de abrir qualquer fonte.
 
 ## Stack
-- **server/** — Go 1.23. API HTTP com a stdlib (`net/http`, roteamento por método+path do `ServeMux`). Persistência planejada: `pgx` + `sqlc` + migrations sobre Postgres.
-- **client/** — Expo 56 (React Native 0.85, React 19, TypeScript 6). Roda iOS, Android e Web (o "site" pro PC).
+- **server/** — Go 1.25. API HTTP com a stdlib (`net/http`, roteamento por método+path do `ServeMux`). Schema via migrations (**goose**); acesso a dados com **`pgx` + `sqlc`** (plugado) servindo os endpoints REST do dashboard. CORS habilitado.
+- **client/** — Expo 56 (React Native 0.85, React 19, TypeScript 6). Roda iOS, Android e Web (o "site" pro PC). Tela **Dashboard** em `client/src/`, **interligada à API real** via React Query (chamadas isoladas em `src/api`).
 - **Postgres 16** — via `docker-compose.yml` na raiz.
 - **Orquestração** — `package.json` na raiz usa `concurrently` para subir client + server juntos.
 
@@ -13,13 +13,13 @@ Mapa do repositório para agentes. Leia isto no início de toda tarefa, antes de
 .
 ├── client/                 # App Expo (RN + Web)
 │   ├── __tests__/          # testes (Jest + RNTL)
-│   ├── AGENTS.md           # regra: ler os docs versionados do Expo v56 antes de codar
-│   └── (futuro) src/       # components, hooks, screens, api
+│   └── src/                # components, hooks, screens, lib, theme, types, mocks
 ├── server/                 # API Go — componentizada
 │   ├── cmd/server/         # entrypoint fino (main, só wiring)
-│   ├── internal/           # um pacote por domínio (router, health, …)
+│   ├── internal/           # um pacote por domínio (router, health, account, dashboard, store, config, httpx)
 │   │   └── <domínio>/      # ex: health/ → health.go + health_test.go (black-box)
-│   └── test/               # testes de integração/e2e (HTTP real)
+│   ├── db/                 # migrations (goose) + queries (sqlc) + seed.sql
+│   └── test/               # testes de integração/e2e (HTTP real; tag `integration`)
 ├── docs/context/           # docs por domínio (fonte de verdade — leia antes do código)
 ├── docker-compose.yml      # Postgres
 ├── .env                    # credenciais do Postgres (dev)
@@ -47,8 +47,8 @@ Leia o doc da área **antes** de abrir a fonte correspondente. Atualize-o após 
 ## Comandos (na raiz)
 | Comando | O que faz |
 |---|---|
-| `npm run dev` | client (web) + server Go juntos |
-| `npm run dev:server` | só a API Go (`go run ./cmd/server`) |
+| `npm run dev` | client (web) + server Go juntos (libera as portas 8080/8081 e dá hot-reload no server) |
+| `npm run dev:server` | só a API Go (nodemon hot-reload em `.go`; carrega `server/.env`) |
 | `npm run dev:client` | só o client no navegador (`expo start --web`) |
 | `npm run dev:mobile` | abre o Expo no celular (QR code) |
 | `npm test` | testes dos dois pacotes |
