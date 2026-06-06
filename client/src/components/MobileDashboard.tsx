@@ -6,19 +6,32 @@ import { BottomNav } from './BottomNav';
 import { CategorySpendSection } from './CategorySpendSection';
 import { DiagnosisCard } from './DiagnosisCard';
 import { InvestmentsSection } from './InvestmentsSection';
+import { QuerySection } from './QuerySection';
 import { TopBar } from './TopBar';
-import type { DashboardSnapshot } from '../types/dashboard';
+import {
+  useAccounts,
+  useCategories,
+  useDiagnosis,
+  useInvestments,
+  useMonthBalance,
+} from '../hooks/useDashboardQueries';
 
 type MobileDashboardProps = {
-  data: DashboardSnapshot;
   hidden: boolean;
   onToggleHidden: () => void;
 };
 
-// Pilha vertical do mobile. BottomNav fixa respeitando o safe-area; o conteúdo
+// Pilha vertical do mobile. Cada seção é uma query independente (loading/erro por
+// seção via QuerySection). BottomNav fixa respeitando o safe-area; o conteúdo
 // reserva espaço (pb) pra não ficar atrás dela.
-export function MobileDashboard({ data, hidden, onToggleHidden }: MobileDashboardProps) {
+export function MobileDashboard({ hidden, onToggleHidden }: MobileDashboardProps) {
   const insets = useSafeAreaInsets();
+  const balance = useMonthBalance();
+  const accounts = useAccounts();
+  const investments = useInvestments();
+  const categories = useCategories();
+  const diagnosis = useDiagnosis();
+
   return (
     <View className="flex-1 bg-background" style={{ paddingTop: insets.top }}>
       <TopBar hidden={hidden} onToggleHidden={onToggleHidden} />
@@ -26,13 +39,25 @@ export function MobileDashboard({ data, hidden, onToggleHidden }: MobileDashboar
         className="flex-1"
         contentContainerStyle={{ gap: 24, paddingBottom: insets.bottom + 96 }}
       >
-        <BalanceHero balance={data.balance} hidden={hidden} />
-        <AccountsSection accounts={data.accounts} hidden={hidden} />
-        <InvestmentsSection investments={data.investments} hidden={hidden} />
-        <CategorySpendSection categories={data.categories} hidden={hidden} />
-        <View className="px-container-margin">
-          <DiagnosisCard diagnosis={data.diagnosis} />
-        </View>
+        <QuerySection query={balance} label="o saldo">
+          {(data) => <BalanceHero balance={data} hidden={hidden} />}
+        </QuerySection>
+        <QuerySection query={accounts} label="as contas">
+          {(data) => <AccountsSection accounts={data} hidden={hidden} />}
+        </QuerySection>
+        <QuerySection query={investments} label="os investimentos">
+          {(data) => <InvestmentsSection investments={data} hidden={hidden} />}
+        </QuerySection>
+        <QuerySection query={categories} label="as categorias">
+          {(data) => <CategorySpendSection categories={data} hidden={hidden} />}
+        </QuerySection>
+        <QuerySection query={diagnosis} label="o diagnóstico">
+          {(data) => (
+            <View className="px-container-margin">
+              <DiagnosisCard diagnosis={data} />
+            </View>
+          )}
+        </QuerySection>
       </ScrollView>
       <View className="absolute bottom-0 left-0 right-0" style={{ paddingBottom: insets.bottom }}>
         <BottomNav />

@@ -1,19 +1,17 @@
 import { DesktopDashboard } from '../components/desktop/DesktopDashboard';
 import { MobileDashboard } from '../components/MobileDashboard';
-import { useDashboardData } from '../hooks/useDashboardData';
 import { useHideValues } from '../hooks/useHideValues';
 import { useIsDesktop } from '../hooks/useIsDesktop';
 
-// Tela só decide o layout (desktop vs mobile) e injeta dados + estado de máscara.
-// Dados via useDashboardData (seam); estado de ocultar valores compartilhado.
+// Tela só decide o layout (desktop vs mobile) e compartilha o estado de máscara.
+// Os dados são buscados por seção dentro de cada layout (React Query), não aqui.
 export function DashboardScreen() {
-  const { data } = useDashboardData();
   const { hidden, toggle } = useHideValues();
   const isDesktop = useIsDesktop();
 
   return isDesktop ? (
-    <DesktopDashboard data={data} hidden={hidden} onToggleHidden={toggle} />
+    <DesktopDashboard hidden={hidden} onToggleHidden={toggle} />
   ) : (
-    <MobileDashboard data={data} hidden={hidden} onToggleHidden={toggle} />
+    <MobileDashboard hidden={hidden} onToggleHidden={toggle} />
   );
 }
