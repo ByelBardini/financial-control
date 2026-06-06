@@ -12,4 +12,6 @@ module.exports = {
   ...expoPreset,
   transformIgnorePatterns,
   setupFilesAfterEnv: ['<rootDir>/jest.setup.ts'],
+  // __tests__/_support/ guarda helpers de teste (render com provider, mocks), não suítes.
+  testPathIgnorePatterns: ['/node_modules/', '<rootDir>/__tests__/_support/'],
 };
