@@ -47,3 +47,53 @@
 - **Sintoma:** assert de string de dinheiro falha por um espaço "invisível" diferente entre web/device/Node.
 - **Causa:** `Intl.NumberFormat('pt-BR', {style:'currency'})` usa NBSP (` `) / narrow-NBSP (` `) entre `R$` e o número, e a saída varia por engine.
 - **Correção:** normalizar dentro do `formatBRL` (`.replace(/[  ]/g, ' ')`) — nunca só tolerar no teste.
+
+## React Query nos testes: o jest não sai do processo
+- **Sintoma:** os testes passam, mas o `jest` trava no fim ("Jest did not exit…"); só sai com `--forceExit`.
+- **Causa:** um `QueryClient` mantém um timer de garbage-collection (`gcTime`, default 5 min) aberto após o teste.
+- **Correção:** nos testes, crie o client com `{ defaultOptions: { queries: { retry: false, gcTime: 0 } } }`; se o teste usa o client real do app (ex.: `App.test`), `queryClient.clear()` no `afterEach`. Ver `__tests__/_support/renderWithClient.tsx`.
+
+## Helper em `__tests__/` vira "suíte sem teste"
+- **Sintoma:** `Your test suite must contain at least one test` num arquivo de utilidades (ex.: `_support/renderWithClient.tsx`).
+- **Causa:** o `testMatch` do jest-expo pega tudo em `__tests__/`, inclusive helpers sem `it()`.
+- **Correção:** em `jest.config.js`, `testPathIgnorePatterns: ['/node_modules/', '<rootDir>/__tests__/_support/']`.
+
+## `global` não é tipado nos testes
+- **Sintoma:** `tsc` acusa `Cannot find name 'global'` ao mockar `global.fetch`.
+- **Causa:** sem `@types/node`, o `global` do Node não tem tipo no client.
+- **Correção:** use `globalThis` (padrão ES, já tipado): `globalThis.fetch = fetchMock as unknown as typeof fetch`.
+
+## sqlc lê o schema das migrations goose
+- **Sintoma:** dúvida se o sqlc vai dropar tabelas ao ler a migration (que tem Up **e** Down no mesmo arquivo).
+- **Causa:** `schema: db/migrations` aponta pro arquivo goose; o sqlc parseia o DDL.
+- **Correção:** o sqlc **ignora a seção `-- +goose Down`** (suporta goose/golang-migrate/etc.) — mas os arquivos precisam ter numeração **zero-padded** (`00001_…`) p/ ordenar lexicograficamente. Funções plpgsql entram entre `-- +goose StatementBegin`/`End`.
+
+## NUMERIC vira centavos só por cast no SQL
+- **Sintoma:** risco do sqlc gerar `pgtype.Numeric`/`float64` para dinheiro.
+- **Causa:** selecionar uma coluna `numeric` crua deixa o tipo a cargo do driver.
+- **Correção:** nas queries de leitura, converta no SQL: `(valor * 100)::bigint AS x_cents` → o sqlc devolve `int64` (centavos), nunca float. Ver `money.md`.
+
+## Expo Web não enxerga a API Go sem CORS
+- **Sintoma:** no navegador, o fetch pro `:8080` falha com erro de CORS mesmo a API respondendo.
+- **Causa:** Expo Web (`:8081`) → API (`:8080`) é cross-origin; sem `Access-Control-Allow-Origin` o browser bloqueia a leitura.
+- **Correção:** middleware `httpx.CORS` embrulhando o mux em `router.New` (origem via `CORS_ALLOW_ORIGIN`). RN nativo não tem CORS — só afeta a web.
+
+## `go run` deixa órfão segurando a porta
+- **Sintoma:** ao reiniciar o server, `listen tcp :8080: bind: ... only one usage of each socket address`.
+- **Causa:** matar o `go run` nem sempre mata o binário-filho compilado, que continua escutando a porta.
+- **Correção:** o `npm run dev` usa `nodemon` (mata a árvore no reload) + hooks `predev:*` com `kill-port 8080/8081` (rede de segurança no boot).
+
+## golangci-lint `misspell` acusa palavra em português
+- **Sintoma:** `misspell` aponta ex.: `respondendo` como erro de "responded".
+- **Causa:** o `misspell` usa dicionário em inglês e confunde palavras próximas do pt-BR.
+- **Correção:** reescreva o termo no comentário (ex.: "tratando"). Não vale desabilitar a regra.
+
+## Jest: `toHaveBeenCalledTimes` conta chamadas de testes anteriores do mesmo arquivo
+- **Sintoma:** `expect(mock).toHaveBeenCalledTimes(2)` falha com "Received number of calls: 4" mesmo o `it()` só chamando 2x.
+- **Causa:** sem `clearMocks` global no preset do jest-expo, o histórico de chamadas de um `jest.fn()`/`jest.mock(...)` acumula entre os `it()` do mesmo arquivo.
+- **Correção:** `jest.clearAllMocks()` no `beforeEach` do bloco **antes** de reconfigurar o mock (ex.: `mockResolvedValue`). Aí asserts de count viram relativos ao teste atual.
+
+## `npx jest` fora de `client/` pega um jest do cache e quebra todas as suítes
+- **Sintoma:** todas as suítes falham de uma vez com "Cannot use import statement outside a module" / "Jest encountered an unexpected token", e o stack aponta pra `.../npm-cache/_npx/.../jest-runtime`.
+- **Causa:** rodar `npx jest` com o CWD fora de `client/` (ex.: depois de um `cd server` numa chamada anterior — o diretório persiste entre comandos) não acha o jest local nem o `jest.config.js`/babel do projeto, então o npx baixa um jest avulso sem transform.
+- **Correção:** `cd client` antes (o `npm run test:client` da raiz já faz isso). Não é falha real de teste — é diretório errado.
