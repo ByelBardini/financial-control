@@ -21,5 +21,6 @@
 - **`formatBRL` normaliza o espaço do `Intl`** (NBSP ` ` / narrow-NBSP ` ` → espaço comum): a saída do `Intl` não é byte-idêntica entre Hermes (device), web e Node (jest), então normalizar garante string estável (`"R$ 42,50"`). Ver `gotchas.md`.
 
 ## Decisões em aberto
-- [ ] Escolher entre lib decimal vs inteiro-em-centavos no Go. (No client já é centavos-inteiro.)
+- [x] **Leitura:** inteiro-em-centavos no Go. As queries do `sqlc` convertem `NUMERIC`→centavos com cast no SQL (`(x*100)::bigint`), devolvendo `int64` — sem lib decimal, sem `float`. Casa com o client (centavos ponta a ponta).
+- [ ] **Escrita/mutação:** quando entrarem endpoints de escrita (inserir/editar valores), decidir entre lib decimal (ex.: `shopspring/decimal`) e inteiro-em-centavos para o caminho de gravação.
 - [ ] Definir a precisão (casas decimais) por moeda.

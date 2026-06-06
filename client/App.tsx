@@ -1,8 +1,10 @@
+import { QueryClientProvider } from '@tanstack/react-query';
 import { StatusBar } from 'expo-status-bar';
 import { useCallback } from 'react';
 import { View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import * as SplashScreen from 'expo-splash-screen';
+import { queryClient } from './src/api/queryClient';
 import { ErrorBoundary } from './src/components/ErrorBoundary';
 import { useAppFonts } from './src/hooks/useAppFonts';
 import { DashboardScreen } from './src/screens/DashboardScreen';
@@ -22,13 +24,15 @@ export default function App() {
   if (!fontsReady) return null;
 
   return (
-    <SafeAreaProvider>
-      <ErrorBoundary>
-        <View onLayout={hideSplash} className="flex-1 bg-background">
-          <DashboardScreen />
-        </View>
-        <StatusBar style="light" />
-      </ErrorBoundary>
-    </SafeAreaProvider>
+    <QueryClientProvider client={queryClient}>
+      <SafeAreaProvider>
+        <ErrorBoundary>
+          <View onLayout={hideSplash} className="flex-1 bg-background">
+            <DashboardScreen />
+          </View>
+          <StatusBar style="light" />
+        </ErrorBoundary>
+      </SafeAreaProvider>
+    </QueryClientProvider>
   );
 }

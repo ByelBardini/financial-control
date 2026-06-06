@@ -1,8 +1,9 @@
 import type { DashboardSnapshot } from '../types/dashboard';
 
-// MOCK — apagar este arquivo quando a API real chegar (src/api). Todos os
-// valores monetários em centavos (inteiro). Números coerentes: saldo
-// disponível = receitas − gastos (320000 − 191550 = 128450).
+// FIXTURE DE TESTE — não é usado em runtime (a API real vive em src/api). Serve
+// de dado injetado nos testes dos componentes apresentacionais. Todos os valores
+// monetários em centavos (inteiro); saldo disponível = receitas − gastos
+// (320000 − 191550 = 128450).
 export const dashboardSnapshot: DashboardSnapshot = {
   balance: {
     netCents: 128450,

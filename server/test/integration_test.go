@@ -12,7 +12,7 @@ import (
 )
 
 func TestHealthEndpointE2E(t *testing.T) {
-	srv := httptest.NewServer(router.New())
+	srv := httptest.NewServer(router.New(router.Deps{}))
 	defer srv.Close()
 
 	res, err := http.Get(srv.URL + "/health")

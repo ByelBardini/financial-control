@@ -8,17 +8,36 @@ import { InvestimentosPanel } from './InvestimentosPanel';
 import { SaldoHero } from './SaldoHero';
 import { SideNav } from './SideNav';
 import { TickerPanel } from './TickerPanel';
-import type { DashboardSnapshot } from '../../types/dashboard';
+import { QuerySection, QuerySection2 } from '../QuerySection';
+import {
+  useAccounts,
+  useCategories,
+  useDiagnosis,
+  useEsteMes,
+  useInvestments,
+  useInvestmentsSummary,
+  useMonthBalance,
+  useTicker,
+} from '../../hooks/useDashboardQueries';
 
 type DesktopDashboardProps = {
-  data: DashboardSnapshot;
   hidden: boolean;
   onToggleHidden: () => void;
 };
 
-// Layout enterprise: rail fixo + grid de células com bordas finas. Brilho sutil
-// (verde→roxo) no fundo, como no protótipo desktop.
-export function DesktopDashboard({ data, hidden, onToggleHidden }: DesktopDashboardProps) {
+// Layout enterprise: rail fixo + grid de células com bordas finas. Cada célula é
+// uma query independente (loading/erro por seção). Brilho sutil (verde→roxo) no
+// fundo, como no protótipo desktop.
+export function DesktopDashboard({ hidden, onToggleHidden }: DesktopDashboardProps) {
+  const balance = useMonthBalance();
+  const accounts = useAccounts();
+  const investments = useInvestments();
+  const investmentsSummary = useInvestmentsSummary();
+  const esteMes = useEsteMes();
+  const diagnosis = useDiagnosis();
+  const categories = useCategories();
+  const ticker = useTicker();
+
   return (
     <View className="flex-1 flex-row bg-surface-container-lowest">
       <LinearGradient
@@ -33,30 +52,44 @@ export function DesktopDashboard({ data, hidden, onToggleHidden }: DesktopDashbo
       <ScrollView className="flex-1" contentContainerStyle={{ flexGrow: 1 }}>
         <DesktopHeader hidden={hidden} onToggleHidden={onToggleHidden} />
         <View className="flex-1 border-t border-grid-line">
-          <SaldoHero balance={data.balance} hidden={hidden} />
+          <QuerySection query={balance} label="o saldo">
+            {(data) => <SaldoHero balance={data} hidden={hidden} />}
+          </QuerySection>
 
           <View className="flex-row border-b border-grid-line">
             <View className="flex-1 border-r border-grid-line">
-              <ContasPanel accounts={data.accounts} hidden={hidden} />
+              <QuerySection query={accounts} label="as contas">
+                {(data) => <ContasPanel accounts={data} hidden={hidden} />}
+              </QuerySection>
             </View>
             <View className="flex-1 border-r border-grid-line">
-              <InvestimentosPanel
-                investments={data.investments}
-                summary={data.investmentsSummary}
-                hidden={hidden}
-              />
+              <QuerySection2
+                queryA={investments}
+                queryB={investmentsSummary}
+                label="os investimentos"
+              >
+                {(inv, summary) => (
+                  <InvestimentosPanel investments={inv} summary={summary} hidden={hidden} />
+                )}
+              </QuerySection2>
             </View>
             <View className="flex-1">
-              <EsteMesPanel esteMes={data.esteMes} diagnosis={data.diagnosis} />
+              <QuerySection2 queryA={esteMes} queryB={diagnosis} label="o panorama do mês">
+                {(em, diag) => <EsteMesPanel esteMes={em} diagnosis={diag} />}
+              </QuerySection2>
             </View>
           </View>
 
           <View className="flex-1 flex-row">
             <View className="border-r border-grid-line" style={{ flex: 2 }}>
-              <CategoriasPanel categories={data.categories} hidden={hidden} />
+              <QuerySection query={categories} label="as categorias">
+                {(data) => <CategoriasPanel categories={data} hidden={hidden} />}
+              </QuerySection>
             </View>
             <View className="flex-1">
-              <TickerPanel ticker={data.ticker} hidden={hidden} />
+              <QuerySection query={ticker} label="o ticker">
+                {(data) => <TickerPanel ticker={data} hidden={hidden} />}
+              </QuerySection>
             </View>
           </View>
         </View>

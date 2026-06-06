@@ -3,8 +3,8 @@
 **YOU MUST** load @AGENTS.md at the start of every task before exploring or editing this repository. It defines stack, layout, the `docs/context/` domain table, and where tests run. This file adds style, test commands, and agent behavior only.
 
 ## Stack (summary — full detail in @AGENTS.md)
-- **server/** — Go 1.23 HTTP API (stdlib `net/http`). Data layer planned: `pgx` + `sqlc` + migrations.
-- **client/** — Expo 56 app (React Native 0.85 + React 19, TypeScript) — iOS, Android and Web.
+- **server/** — Go 1.25 HTTP API (stdlib `net/http`). Schema via migrations (goose); data access with `pgx` + `sqlc` serving the dashboard's REST endpoints. CORS enabled.
+- **client/** — Expo 56 app (React Native 0.85 + React 19, TypeScript) — iOS, Android and Web. Dashboard in `client/src/`, wired to the API via React Query (calls isolated in `src/api`).
 - **Postgres 16** — via `docker-compose.yml`.
 
 ## Planning
