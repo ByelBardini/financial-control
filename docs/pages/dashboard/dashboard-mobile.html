@@ -1,0 +1,385 @@
+<!doctype html>
+
+<html class="dark" lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <meta content="width=device-width, initial-scale=1.0" name="viewport" />
+    <title>Pobrify - Dashboard Mobile</title>
+    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+    <link
+      href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap"
+      rel="stylesheet"
+    />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;600;700&amp;family=Geist:wght@500;600&amp;display=swap"
+      rel="stylesheet"
+    />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap"
+      rel="stylesheet"
+    />
+    <script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            colors: {
+              "secondary-fixed-dim": "#98da27",
+              secondary: "#9ddf2e",
+              "tertiary-fixed": "#dfe2f4",
+              "surface-variant": "#333539",
+              "primary-fixed-dim": "#d0bcff",
+              "inverse-on-surface": "#2f3035",
+              "on-tertiary": "#2c303d",
+              "on-error": "#690005",
+              outline: "#958ea0",
+              "tertiary-container": "#8d90a0",
+              surface: "#111317",
+              primary: "#d0bcff",
+              "on-primary-fixed": "#23005c",
+              "surface-dim": "#111317",
+              "surface-container-lowest": "#0c0e12",
+              "secondary-container": "#83c300",
+              "on-tertiary-fixed-variant": "#424655",
+              "on-surface": "#e2e2e8",
+              error: "#ffb4ab",
+              "on-background": "#e2e2e8",
+              "surface-container-high": "#282a2e",
+              "surface-container": "#1e2024",
+              "error-container": "#93000a",
+              "on-secondary-fixed-variant": "#334f00",
+              "primary-container": "#a078ff",
+              "on-error-container": "#ffdad6",
+              "surface-container-highest": "#333539",
+              "surface-tint": "#d0bcff",
+              "tertiary-fixed-dim": "#c3c6d7",
+              "surface-container-low": "#1a1c20",
+              "on-primary-fixed-variant": "#5516be",
+              "outline-variant": "#494454",
+              "on-primary-container": "#340080",
+              "surface-bright": "#37393e",
+              background: "#111317",
+              "on-surface-variant": "#cbc3d7",
+              "on-secondary-fixed": "#121f00",
+              tertiary: "#c3c6d7",
+              "on-secondary": "#213600",
+              "secondary-fixed": "#b2f746",
+              "primary-fixed": "#e9ddff",
+              "on-secondary-container": "#304b00",
+              "on-tertiary-container": "#252937",
+              "on-primary": "#3c0091",
+              "inverse-primary": "#6d3bd7",
+              "inverse-surface": "#e2e2e8",
+              "on-tertiary-fixed": "#171b28",
+            },
+            borderRadius: {
+              DEFAULT: "0.125rem",
+              lg: "0.25rem",
+              xl: "0.5rem",
+              full: "0.75rem",
+            },
+            spacing: {
+              "stack-sm": "4px",
+              gutter: "16px",
+              base: "8px",
+              "stack-lg": "24px",
+              "container-margin": "24px",
+              "stack-md": "12px",
+            },
+            fontFamily: {
+              "headline-sm": ["Hanken Grotesk"],
+              "body-lg": ["Hanken Grotesk"],
+              "label-md": ["Geist"],
+              "display-lg": ["Hanken Grotesk"],
+              "body-md": ["Hanken Grotesk"],
+              "label-sm": ["Geist"],
+              "display-lg-mobile": ["Hanken Grotesk"],
+              "headline-md": ["Hanken Grotesk"],
+            },
+            fontSize: {
+              "headline-sm": [
+                "20px",
+                { lineHeight: "28px", fontWeight: "600" },
+              ],
+              "body-lg": ["18px", { lineHeight: "28px", fontWeight: "400" }],
+              "label-md": [
+                "14px",
+                {
+                  lineHeight: "20px",
+                  letterSpacing: "0.05em",
+                  fontWeight: "500",
+                },
+              ],
+              "display-lg": [
+                "48px",
+                {
+                  lineHeight: "56px",
+                  letterSpacing: "-0.02em",
+                  fontWeight: "700",
+                },
+              ],
+              "body-md": ["16px", { lineHeight: "24px", fontWeight: "400" }],
+              "label-sm": ["12px", { lineHeight: "16px", fontWeight: "600" }],
+              "display-lg-mobile": [
+                "36px",
+                {
+                  lineHeight: "42px",
+                  letterSpacing: "-0.02em",
+                  fontWeight: "700",
+                },
+              ],
+              "headline-md": [
+                "24px",
+                { lineHeight: "32px", fontWeight: "600" },
+              ],
+            },
+          },
+        },
+      };
+    </script>
+    <style>
+      .material-symbols-outlined {
+        font-variation-settings:
+          "FILL" 1,
+          "wght" 400,
+          "GRAD" 0,
+          "opsz" 24;
+      }
+    </style>
+    <style>
+      body {
+        min-height: max(884px, 100dvh);
+      }
+    </style>
+  </head>
+  <body class="bg-background text-on-surface font-body-md min-h-screen pb-24">
+    <!-- TopNavBar -->
+    <header
+      class="bg-background dark:bg-background border-b border-[rgba(245,247,250,0.08)] docked full-width top-0 sticky z-40"
+    >
+      <div
+        class="flex justify-between items-center px-container-margin py-stack-md w-full"
+      >
+        <h1 class="font-headline-md text-headline-md font-bold text-primary">
+          Pobrify
+        </h1>
+        <div class="flex gap-gutter">
+          <button
+            class="text-on-surface-variant hover:text-primary transition-colors cursor-pointer active:scale-95"
+          >
+            <span class="material-symbols-outlined">visibility</span>
+          </button>
+        </div>
+      </div>
+    </header>
+    <!-- Main Content -->
+    <main class="px-container-margin py-stack-lg flex flex-col gap-stack-lg">
+      <!-- Hero Section: Saldo do Mês -->
+      <section
+        class="flex flex-col gap-stack-sm pb-stack-lg border-b border-[rgba(245,247,250,0.08)]"
+      >
+        <div class="flex justify-between items-center">
+          <h2 class="font-label-md text-label-md text-on-surface-variant">
+            Saldo do Mês
+          </h2>
+          <span
+            class="bg-secondary text-[#000] px-2 py-1 rounded-full font-label-sm text-label-sm uppercase tracking-wide"
+            >Sobrevivendo</span
+          >
+        </div>
+        <div
+          class="font-display-lg-mobile text-display-lg-mobile text-primary mt-base"
+        >
+          R$ 42,50
+        </div>
+        <p class="font-label-sm text-label-sm text-on-surface-variant">
+          Vai dar pra pagar a Netflix. Talvez.
+        </p>
+      </section>
+      <!-- Contas Section -->
+      <section
+        class="flex flex-col gap-stack-md pb-stack-lg border-b border-[rgba(245,247,250,0.08)]"
+      >
+        <h3 class="font-headline-sm text-headline-sm text-on-surface">
+          Contas
+        </h3>
+        <div class="flex flex-col gap-stack-sm">
+          <div
+            class="flex justify-between items-center p-base hover:bg-surface-container-low rounded-lg transition-colors"
+          >
+            <div class="flex items-center gap-base">
+              <span class="material-symbols-outlined text-secondary"
+                >account_balance</span
+              >
+              <span class="font-body-md text-body-md">Itaú</span>
+            </div>
+            <span class="font-label-md text-label-md text-secondary"
+              >R$ 12,00</span
+            >
+          </div>
+          <div
+            class="flex justify-between items-center p-base hover:bg-surface-container-low rounded-lg transition-colors"
+          >
+            <div class="flex items-center gap-base">
+              <span class="material-symbols-outlined text-primary"
+                >credit_card</span
+              >
+              <span class="font-body-md text-body-md">Nubank</span>
+            </div>
+            <span class="font-label-md text-label-md text-primary"
+              >R$ 30,50</span
+            >
+          </div>
+        </div>
+      </section>
+      <!-- Investimentos Section -->
+      <section
+        class="flex flex-col gap-stack-md pb-stack-lg border-b border-[rgba(245,247,250,0.08)]"
+      >
+        <h3 class="font-headline-sm text-headline-sm text-on-surface">
+          Investimentos (Risos)
+        </h3>
+        <div class="flex flex-col gap-stack-sm">
+          <div
+            class="flex justify-between items-center p-base hover:bg-surface-container-low rounded-lg transition-colors"
+          >
+            <div class="flex items-center gap-base">
+              <span class="material-symbols-outlined text-secondary"
+                >currency_bitcoin</span
+              >
+              <div class="flex flex-col">
+                <span class="font-body-md text-body-md">BTC</span>
+                <span
+                  class="font-label-sm text-label-sm text-on-surface-variant"
+                  >-5.4% hoje</span
+                >
+              </div>
+            </div>
+            <span class="font-label-md text-label-md text-error">R$ 15,00</span>
+          </div>
+          <div
+            class="flex justify-between items-center p-base hover:bg-surface-container-low rounded-lg transition-colors"
+          >
+            <div class="flex items-center gap-base">
+              <span class="material-symbols-outlined text-primary"
+                >trending_up</span
+              >
+              <div class="flex flex-col">
+                <span class="font-body-md text-body-md">CDB 110% CDI</span>
+                <span
+                  class="font-label-sm text-label-sm text-on-surface-variant"
+                  >+0.01% hoje</span
+                >
+              </div>
+            </div>
+            <span class="font-label-md text-label-md text-secondary"
+              >R$ 100,00</span
+            >
+          </div>
+        </div>
+      </section>
+      <!-- Gastos por Categoria -->
+      <section class="flex flex-col gap-stack-md pb-stack-lg">
+        <h3 class="font-headline-sm text-headline-sm text-on-surface">
+          Gastos por Categoria
+        </h3>
+        <div class="flex flex-col gap-stack-md mt-base">
+          <div class="flex flex-col gap-stack-sm">
+            <div class="flex justify-between items-center">
+              <span class="font-label-sm text-label-sm text-on-surface-variant"
+                >Ifood (Essencial)</span
+              >
+              <span class="font-label-sm text-label-sm text-error"
+                >R$ 850,00</span
+              >
+            </div>
+            <div
+              class="w-full bg-surface-container-high h-2 rounded-full overflow-hidden"
+            >
+              <div class="bg-error h-full" style="width: 85%"></div>
+            </div>
+          </div>
+          <div class="flex flex-col gap-stack-sm">
+            <div class="flex justify-between items-center">
+              <span class="font-label-sm text-label-sm text-on-surface-variant"
+                >Aluguel</span
+              >
+              <span class="font-label-sm text-label-sm text-on-surface"
+                >R$ 1200,00</span
+              >
+            </div>
+            <div
+              class="w-full bg-surface-container-high h-2 rounded-full overflow-hidden"
+            >
+              <div class="bg-primary h-full" style="width: 100%"></div>
+            </div>
+          </div>
+          <div class="flex flex-col gap-stack-sm">
+            <div class="flex justify-between items-center">
+              <span class="font-label-sm text-label-sm text-on-surface-variant"
+                >Lazer (Açaí)</span
+              >
+              <span class="font-label-sm text-label-sm text-secondary"
+                >R$ 45,00</span
+              >
+            </div>
+            <div
+              class="w-full bg-surface-container-high h-2 rounded-full overflow-hidden"
+            >
+              <div class="bg-secondary h-full" style="width: 15%"></div>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+    <!-- BottomNavBar -->
+    <nav
+      class="md:hidden fixed bottom-0 left-0 w-full flex justify-around items-center px-4 py-3 bg-surface-container-lowest/80 backdrop-blur-xl border-t border-[rgba(245,247,250,0.08)] shadow-lg z-50"
+    >
+      <button
+        class="flex flex-col items-center justify-center text-secondary font-bold scale-110 active:bg-surface-container-high transition-transform duration-200 p-2 rounded-lg"
+      >
+        <span
+          class="material-symbols-outlined"
+          style="font-variation-settings: &quot;FILL&quot; 1"
+          >dashboard</span
+        >
+        <span class="font-label-sm-mobile text-label-sm-mobile mt-1"
+          >Início</span
+        >
+      </button>
+      <button
+        class="flex flex-col items-center justify-center text-on-surface-variant active:bg-surface-container-high transition-transform duration-200 p-2 rounded-lg"
+      >
+        <span class="material-symbols-outlined">receipt_long</span>
+        <span class="font-label-sm-mobile text-label-sm-mobile mt-1"
+          >Transações</span
+        >
+      </button>
+      <button
+        class="flex flex-col items-center justify-center text-on-surface-variant active:bg-surface-container-high transition-transform duration-200 p-2 rounded-lg"
+      >
+        <span class="material-symbols-outlined">account_balance_wallet</span>
+        <span class="font-label-sm-mobile text-label-sm-mobile mt-1"
+          >Contas</span
+        >
+      </button>
+      <button
+        class="flex flex-col items-center justify-center text-on-surface-variant active:bg-surface-container-high transition-transform duration-200 p-2 rounded-lg"
+      >
+        <span class="material-symbols-outlined">trending_up</span>
+        <span class="font-label-sm-mobile text-label-sm-mobile mt-1"
+          >Investimentos</span
+        >
+      </button>
+      <button
+        class="flex flex-col items-center justify-center text-on-surface-variant active:bg-surface-container-high transition-transform duration-200 p-2 rounded-lg"
+      >
+        <span class="material-symbols-outlined">settings</span>
+        <span class="font-label-sm-mobile text-label-sm-mobile mt-1"
+          >Ajustes</span
+        >
+      </button>
+    </nav>
+  </body>
+</html>

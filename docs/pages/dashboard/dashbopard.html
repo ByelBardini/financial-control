@@ -1,0 +1,730 @@
+<!doctype html>
+
+<html class="dark" lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <meta content="width=device-width, initial-scale=1.0" name="viewport" />
+    <title>Pobrify - Visão Geral</title>
+    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+    <link
+      href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;600;700&amp;family=Geist:wght@500;600&amp;display=swap"
+      rel="stylesheet"
+    />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap"
+      rel="stylesheet"
+    />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      .material-symbols-outlined {
+        font-variation-settings:
+          "FILL" 0,
+          "wght" 400,
+          "GRAD" 0,
+          "opsz" 24;
+      }
+
+      /* Custom scrollbar for sleek dark look */
+      ::-webkit-scrollbar {
+        width: 6px;
+      }
+      ::-webkit-scrollbar-track {
+        background: #0c0e12;
+      }
+      ::-webkit-scrollbar-thumb {
+        background: #282a2e;
+        border-radius: 3px;
+      }
+      ::-webkit-scrollbar-thumb:hover {
+        background: #333539;
+      }
+
+      /* Thin borders definition for Enterprise Dark look */
+      .grid-border {
+        border-color: rgba(245, 247, 250, 0.08);
+      }
+
+      /* Gradients based on prompt */
+      .bg-enterprise-gradient {
+        background:
+          radial-gradient(
+            circle at top left,
+            rgba(6, 78, 59, 0.15) 0%,
+            transparent 40%
+          ),
+          radial-gradient(
+            circle at bottom right,
+            rgba(76, 29, 149, 0.15) 0%,
+            transparent 40%
+          ),
+          #0c0e12;
+      }
+    </style>
+    <script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            colors: {
+              "surface-container-highest": "#333539",
+              "tertiary-fixed-dim": "#c3c6d7",
+              "primary-fixed": "#e9ddff",
+              tertiary: "#c3c6d7",
+              "surface-tint": "#d0bcff",
+              secondary: "#9ddf2e",
+              "on-tertiary-fixed": "#171b28",
+              "on-tertiary": "#2c303d",
+              "on-secondary-fixed": "#121f00",
+              "on-error-container": "#ffdad6",
+              "on-background": "#e2e2e8",
+              "surface-container": "#1e2024",
+              "on-tertiary-fixed-variant": "#424655",
+              "on-surface": "#e2e2e8",
+              "surface-container-low": "#1a1c20",
+              "secondary-container": "#83c300",
+              "outline-variant": "#494454",
+              background: "#111317",
+              "error-container": "#93000a",
+              "surface-bright": "#37393e",
+              "on-secondary-container": "#304b00",
+              "primary-container": "#a078ff",
+              primary: "#d0bcff",
+              "inverse-on-surface": "#2f3035",
+              "tertiary-container": "#8d90a0",
+              "inverse-surface": "#e2e2e8",
+              outline: "#958ea0",
+              "surface-dim": "#111317",
+              "on-tertiary-container": "#252937",
+              "primary-fixed-dim": "#d0bcff",
+              "inverse-primary": "#6d3bd7",
+              "tertiary-fixed": "#dfe2f4",
+              "secondary-fixed-dim": "#98da27",
+              "on-secondary": "#213600",
+              "secondary-fixed": "#b2f746",
+              "on-primary-fixed": "#23005c",
+              error: "#ffb4ab",
+              "surface-container-high": "#282a2e",
+              surface: "#111317",
+              "on-primary-fixed-variant": "#5516be",
+              "surface-variant": "#333539",
+              "on-secondary-fixed-variant": "#334f00",
+              "on-primary": "#3c0091",
+              "surface-container-lowest": "#0c0e12",
+              "on-primary-container": "#340080",
+              "on-surface-variant": "#cbc3d7",
+              "on-error": "#690005",
+            },
+            borderRadius: {
+              DEFAULT: "0.125rem",
+              lg: "0.25rem",
+              xl: "0.5rem",
+              full: "0.75rem",
+            },
+            spacing: {
+              "stack-sm": "4px",
+              "stack-md": "12px",
+              "stack-lg": "24px",
+              "container-margin": "24px",
+              base: "8px",
+              gutter: "16px",
+            },
+            fontFamily: {
+              "display-lg-mobile": ["Hanken Grotesk"],
+              "body-lg": ["Hanken Grotesk"],
+              "headline-sm": ["Hanken Grotesk"],
+              "label-sm": ["Geist"],
+              "label-md": ["Geist"],
+              "body-md": ["Hanken Grotesk"],
+              "headline-md": ["Hanken Grotesk"],
+              "display-lg": ["Hanken Grotesk"],
+            },
+            fontSize: {
+              "display-lg-mobile": [
+                "36px",
+                {
+                  lineHeight: "42px",
+                  letterSpacing: "-0.02em",
+                  fontWeight: "700",
+                },
+              ],
+              "body-lg": [
+                "18px",
+                {
+                  lineHeight: "28px",
+                  fontWeight: "400",
+                },
+              ],
+              "headline-sm": [
+                "20px",
+                {
+                  lineHeight: "28px",
+                  fontWeight: "600",
+                },
+              ],
+              "label-sm": [
+                "12px",
+                {
+                  lineHeight: "16px",
+                  fontWeight: "600",
+                },
+              ],
+              "label-md": [
+                "14px",
+                {
+                  lineHeight: "20px",
+                  letterSpacing: "0.05em",
+                  fontWeight: "500",
+                },
+              ],
+              "body-md": [
+                "16px",
+                {
+                  lineHeight: "24px",
+                  fontWeight: "400",
+                },
+              ],
+              "headline-md": [
+                "24px",
+                {
+                  lineHeight: "32px",
+                  fontWeight: "600",
+                },
+              ],
+              "display-lg": [
+                "48px",
+                {
+                  lineHeight: "56px",
+                  letterSpacing: "-0.02em",
+                  fontWeight: "700",
+                },
+              ],
+            },
+          },
+        },
+      };
+    </script>
+  </head>
+  <body
+    class="bg-enterprise-gradient text-on-surface font-body-md text-body-md antialiased min-h-screen flex overflow-hidden"
+  >
+    <!-- SideNavBar -->
+    <nav
+      class="hidden md:flex flex-col h-full p-gutter fixed left-0 top-0 w-64 border-r border-outline-variant bg-surface-container-lowest z-50"
+    >
+      <!-- Brand -->
+      <div
+        class="mb-stack-lg px-base pt-stack-sm flex items-center gap-stack-md"
+      >
+        <div
+          class="w-8 h-8 rounded-lg bg-primary-container text-on-primary-container flex items-center justify-center font-bold"
+        >
+          P
+        </div>
+        <span
+          class="font-headline-md text-headline-md font-bold text-on-background"
+          >Pobrify</span
+        >
+      </div>
+      <!-- User Profile Area -->
+      <div
+        class="mb-stack-lg p-stack-md flex items-center gap-stack-md border border-outline-variant rounded-lg bg-surface-container-low"
+      >
+        <div
+          class="w-10 h-10 rounded-full bg-surface-container-highest flex items-center justify-center font-bold text-on-surface"
+        >
+          U
+        </div>
+        <div class="flex flex-col">
+          <span class="font-label-md text-label-md text-on-surface"
+            >Gestão de Crise</span
+          >
+          <span class="font-label-sm text-label-sm text-on-surface-variant"
+            >Junho, 2025</span
+          >
+        </div>
+      </div>
+      <!-- Navigation Links -->
+      <ul class="flex flex-col gap-stack-sm flex-1">
+        <li>
+          <a
+            class="flex items-center gap-stack-md px-base py-stack-md rounded-lg font-bold bg-surface-container-highest text-primary transition-transform duration-150 scale-[0.98]"
+            href="#"
+          >
+            <span
+              class="material-symbols-outlined"
+              style="font-variation-settings: &quot;FILL&quot; 1"
+              >home</span
+            >
+            <span class="font-label-md text-label-md">Início</span>
+          </a>
+        </li>
+        <li>
+          <a
+            class="flex items-center gap-stack-md px-base py-stack-md rounded-lg font-label-md text-label-md text-on-surface-variant hover:text-on-surface hover:bg-surface-container-low transition-colors duration-200"
+            href="#"
+          >
+            <span class="material-symbols-outlined">swap_horiz</span>
+            <span>Transações</span>
+          </a>
+        </li>
+        <li>
+          <a
+            class="flex items-center gap-stack-md px-base py-stack-md rounded-lg font-label-md text-label-md text-on-surface-variant hover:text-on-surface hover:bg-surface-container-low transition-colors duration-200"
+            href="#"
+          >
+            <span class="material-symbols-outlined"
+              >account_balance_wallet</span
+            >
+            <span>Contas</span>
+          </a>
+        </li>
+        <li>
+          <a
+            class="flex items-center gap-stack-md px-base py-stack-md rounded-lg font-label-md text-label-md text-on-surface-variant hover:text-on-surface hover:bg-surface-container-low transition-colors duration-200"
+            href="#"
+          >
+            <span class="material-symbols-outlined">trending_up</span>
+            <span>Investimentos</span>
+          </a>
+        </li>
+        <li>
+          <a
+            class="flex items-center gap-stack-md px-base py-stack-md rounded-lg font-label-md text-label-md text-on-surface-variant hover:text-on-surface hover:bg-surface-container-low transition-colors duration-200 mt-auto"
+            href="#"
+          >
+            <span class="material-symbols-outlined">settings</span>
+            <span>Ajustes</span>
+          </a>
+        </li>
+      </ul>
+    </nav>
+    <!-- Main Content Area -->
+    <main class="flex-1 ml-0 md:ml-64 flex flex-col h-screen overflow-y-auto">
+      <!-- TopNavBar -->
+      <header
+        class="flex justify-between items-center w-full px-container-margin py-base bg-background/80 dark:bg-background/80 backdrop-blur-xl docked full-width top-0 sticky z-40 bg-transparent border-b grid-border"
+      >
+        <div class="flex flex-col">
+          <h1
+            class="font-headline-sm text-headline-sm font-bold text-on-surface"
+          >
+            VISÃO GERAL
+          </h1>
+          <p class="font-label-md text-label-md text-on-surface-variant">
+            Bem-vindo à sua realidade financeira.
+          </p>
+        </div>
+        <div class="flex items-center gap-stack-md">
+          <button
+            class="flex items-center gap-stack-sm px-stack-md py-base rounded-full border border-outline-variant text-on-surface-variant hover:text-primary transition-colors text-label-sm font-label-sm bg-surface-container-lowest"
+          >
+            <div class="w-2 h-2 rounded-full bg-secondary"></div>
+            Junho 2026
+          </button>
+          <button
+            class="flex items-center gap-stack-sm px-stack-md py-base rounded-full border border-outline-variant text-on-surface-variant hover:text-primary transition-colors text-label-sm font-label-sm bg-surface-container-lowest"
+          >
+            <span class="material-symbols-outlined text-[16px]"
+              >visibility_off</span
+            >
+            Ocultar Valores
+          </button>
+          <button
+            class="flex items-center gap-stack-sm px-stack-md py-base rounded-lg bg-surface-container-highest text-primary hover:text-primary transition-colors text-label-sm font-label-sm font-bold opacity-80 transition-opacity border border-primary/20"
+          >
+            <span class="material-symbols-outlined text-[16px]">add</span>
+            Nova transação
+          </button>
+        </div>
+      </header>
+      <!-- Dashboard Grid Layout - Single Pane Enterprise Dark -->
+      <div
+        class="p-container-margin grid grid-cols-1 lg:grid-cols-12 gap-0 border-t grid-border flex-1 content-start"
+      >
+        <!-- Hero Section: Saldo do Mês (Top Full Width) -->
+        <section
+          class="col-span-1 lg:col-span-12 border-b grid-border p-stack-lg relative overflow-hidden group"
+        >
+          <!-- Subtle gradient glow -->
+          <div
+            class="absolute top-0 right-0 w-1/2 h-full bg-gradient-to-l from-[rgba(157,223,46,0.03)] to-transparent pointer-events-none"
+          ></div>
+          <div
+            class="flex justify-between items-start mb-stack-lg relative z-10"
+          >
+            <div>
+              <h2
+                class="font-label-sm text-label-sm text-on-surface-variant uppercase tracking-widest mb-stack-sm"
+              >
+                SALDO DO MÊS
+              </h2>
+              <p
+                class="font-body-md text-body-md text-on-surface-variant mb-stack-md"
+              >
+                Disponível para gastar
+              </p>
+              <div class="flex items-baseline gap-stack-sm">
+                <span class="font-headline-md text-headline-md text-secondary"
+                  >R$</span
+                >
+                <span
+                  class="font-display-lg text-display-lg text-on-surface font-bold tracking-tight"
+                  >1.284,50</span
+                >
+              </div>
+            </div>
+            <!-- Status Badge -->
+            <div
+              class="bg-secondary/10 border border-secondary/30 px-stack-md py-stack-sm rounded-full flex items-center gap-stack-sm"
+            >
+              <div
+                class="w-2 h-2 rounded-full bg-secondary animate-pulse"
+              ></div>
+              <span
+                class="font-label-sm text-label-sm text-secondary font-bold tracking-widest uppercase"
+                >Sobrevivendo</span
+              >
+            </div>
+          </div>
+          <!-- Sub-metrics Row separated by subtle dividers -->
+          <div
+            class="flex flex-wrap border-t grid-border pt-stack-md mt-stack-md gap-stack-lg relative z-10"
+          >
+            <div
+              class="flex-1 min-w-[120px] border-r grid-border pr-stack-md last:border-0"
+            >
+              <span
+                class="block font-label-sm text-label-sm text-on-surface-variant mb-stack-sm"
+                >Receitas</span
+              >
+              <span class="block font-body-lg text-body-lg text-secondary"
+                >R$ 3.200,00</span
+              >
+            </div>
+            <div
+              class="flex-1 min-w-[120px] border-r grid-border pr-stack-md last:border-0"
+            >
+              <span
+                class="block font-label-sm text-label-sm text-on-surface-variant mb-stack-sm"
+                >Gastos</span
+              >
+              <span class="block font-body-lg text-body-lg text-error"
+                >R$ 1.915,50</span
+              >
+            </div>
+            <div class="flex-1 min-w-[120px]">
+              <span
+                class="block font-label-sm text-label-sm text-on-surface-variant mb-stack-sm"
+                >Investido</span
+              >
+              <span class="block font-body-lg text-body-lg text-primary"
+                >R$ 500,00</span
+              >
+            </div>
+          </div>
+        </section>
+        <!-- Middle Section: 3 Columns Layout -->
+        <!-- Column 1: Contas -->
+        <section
+          class="col-span-1 lg:col-span-4 border-r border-b grid-border p-stack-lg hover:bg-surface-container-lowest/50 transition-colors"
+        >
+          <div class="flex justify-between items-center mb-stack-lg">
+            <h3
+              class="font-label-sm text-label-sm text-on-surface-variant uppercase tracking-widest"
+            >
+              CONTAS
+            </h3>
+            <span class="font-label-md text-label-md text-on-surface font-bold"
+              >R$ 2.734,50</span
+            >
+          </div>
+          <ul class="flex flex-col gap-stack-md">
+            <li
+              class="flex justify-between items-center py-stack-sm border-b grid-border border-dashed last:border-0"
+            >
+              <div class="flex items-center gap-stack-md">
+                <div class="w-2 h-2 rounded-full bg-primary"></div>
+                <span class="font-body-md text-body-md text-on-surface"
+                  >Nubank</span
+                >
+              </div>
+              <span class="font-body-md text-body-md text-on-surface"
+                >R$ 842,20</span
+              >
+            </li>
+            <li
+              class="flex justify-between items-center py-stack-sm border-b grid-border border-dashed last:border-0"
+            >
+              <div class="flex items-center gap-stack-md">
+                <div class="w-2 h-2 rounded-full bg-[#FF7A00]"></div>
+                <span class="font-body-md text-body-md text-on-surface"
+                  >Inter</span
+                >
+              </div>
+              <span class="font-body-md text-body-md text-on-surface"
+                >R$ 320,00</span
+              >
+            </li>
+            <li
+              class="flex justify-between items-center py-stack-sm border-b grid-border border-dashed last:border-0"
+            >
+              <div class="flex items-center gap-stack-md">
+                <div class="w-2 h-2 rounded-full bg-surface-variant"></div>
+                <span class="font-body-md text-body-md text-on-surface"
+                  >Carteira</span
+                >
+              </div>
+              <span class="font-body-md text-body-md text-on-surface"
+                >R$ 122,30</span
+              >
+            </li>
+            <li
+              class="flex justify-between items-center py-stack-sm border-b grid-border border-dashed last:border-0"
+            >
+              <div class="flex items-center gap-stack-md">
+                <div class="w-2 h-2 rounded-full bg-[#F3BA2F]"></div>
+                <span class="font-body-md text-body-md text-on-surface"
+                  >Binance</span
+                >
+              </div>
+              <span class="font-body-md text-body-md text-on-surface"
+                >R$ 1.450,00</span
+              >
+            </li>
+          </ul>
+        </section>
+        <!-- Column 2: Investimentos -->
+        <section
+          class="col-span-1 lg:col-span-4 border-r border-b grid-border p-stack-lg hover:bg-surface-container-lowest/50 transition-colors"
+        >
+          <div class="flex justify-between items-start mb-stack-lg">
+            <div>
+              <h3
+                class="font-label-sm text-label-sm text-on-surface-variant uppercase tracking-widest mb-stack-sm"
+              >
+                INVESTIMENTOS
+              </h3>
+              <span
+                class="font-headline-md text-headline-md text-on-surface block"
+                >R$ 4.820,00</span
+              >
+            </div>
+            <div class="text-right">
+              <span class="font-label-sm text-label-sm text-secondary block"
+                >+R$ 312,40</span
+              >
+              <span
+                class="font-label-sm text-label-sm text-secondary/70 bg-secondary/10 px-stack-sm py-[2px] rounded-sm block mt-stack-sm"
+                >+8,48%</span
+              >
+            </div>
+          </div>
+          <div class="flex flex-col gap-stack-sm mt-stack-lg">
+            <div
+              class="flex justify-between items-center p-stack-md border grid-border rounded bg-surface-container-lowest/30"
+            >
+              <span
+                class="font-label-md text-label-md text-on-surface-variant w-12"
+                >BTC</span
+              >
+              <span
+                class="font-body-md text-body-md text-on-surface text-right flex-1"
+                >R$ 2.100,00</span
+              >
+              <span
+                class="font-label-sm text-label-sm text-secondary w-16 text-right"
+                >+6,2%</span
+              >
+            </div>
+            <div
+              class="flex justify-between items-center p-stack-md border grid-border rounded bg-surface-container-lowest/30"
+            >
+              <span
+                class="font-label-md text-label-md text-on-surface-variant w-12"
+                >CDB</span
+              >
+              <span
+                class="font-body-md text-body-md text-on-surface text-right flex-1"
+                >R$ 1.220,00</span
+              >
+              <span
+                class="font-label-sm text-label-sm text-secondary w-16 text-right"
+                >+1,4%</span
+              >
+            </div>
+          </div>
+        </section>
+        <!-- Column 3: Este Mês Summary -->
+        <section
+          class="col-span-1 lg:col-span-4 border-b grid-border p-stack-lg hover:bg-surface-container-lowest/50 transition-colors"
+        >
+          <h3
+            class="font-label-sm text-label-sm text-on-surface-variant uppercase tracking-widest mb-stack-lg"
+          >
+            ESTE MÊS
+          </h3>
+          <p
+            class="font-headline-sm text-headline-sm text-on-surface leading-tight mb-stack-lg"
+          >
+            Você gastou <span class="text-primary font-bold">59%</span> da sua
+            receita.
+          </p>
+          <div class="mb-stack-lg">
+            <div class="flex justify-between items-end mb-stack-sm">
+              <span class="font-label-sm text-label-sm text-on-surface-variant"
+                >Maior vilão</span
+              >
+              <span class="font-label-md text-label-md text-primary"
+                >Alimentação</span
+              >
+            </div>
+            <!-- Slim bar chart -->
+            <div
+              class="w-full h-2 bg-surface-container-highest rounded-full overflow-hidden flex"
+            >
+              <div class="h-full bg-primary" style="width: 59%"></div>
+            </div>
+          </div>
+          <!-- Diagnóstico Card (Integrated, not floating) -->
+          <div
+            class="border grid-border border-l-2 border-l-primary/50 bg-primary/5 p-stack-md mt-stack-lg"
+          >
+            <div class="flex items-center gap-stack-sm mb-stack-sm">
+              <span
+                class="material-symbols-outlined text-[16px] text-primary/70"
+                >medical_services</span
+              >
+              <span class="font-label-sm text-label-sm text-primary/70"
+                >Diagnóstico Pobrify</span
+              >
+            </div>
+            <p
+              class="font-body-md text-body-md text-on-surface-variant text-sm"
+            >
+              Você ainda não está falido.<br />Continue assim.
+            </p>
+          </div>
+        </section>
+        <!-- Bottom Section -->
+        <!-- Gastos por Categoria (Col 1-8) -->
+        <section
+          class="col-span-1 lg:col-span-8 border-r grid-border p-stack-lg"
+        >
+          <h3
+            class="font-label-sm text-label-sm text-on-surface-variant uppercase tracking-widest mb-stack-lg"
+          >
+            GASTOS POR CATEGORIA
+          </h3>
+          <div class="space-y-stack-md mt-stack-md max-w-2xl">
+            <!-- Category Item -->
+            <div>
+              <div class="flex justify-between items-end mb-stack-sm">
+                <span class="font-body-md text-body-md text-on-surface"
+                  >Alimentação</span
+                >
+                <span class="font-label-md text-label-md text-on-surface"
+                  >R$ 620</span
+                >
+              </div>
+              <div class="w-full h-[3px] bg-surface-container-highest flex">
+                <div class="h-full bg-primary" style="width: 70%"></div>
+              </div>
+            </div>
+            <!-- Category Item -->
+            <div>
+              <div class="flex justify-between items-end mb-stack-sm">
+                <span class="font-body-md text-body-md text-on-surface"
+                  >Transporte</span
+                >
+                <span class="font-label-md text-label-md text-on-surface"
+                  >R$ 210</span
+                >
+              </div>
+              <div class="w-full h-[3px] bg-surface-container-highest flex">
+                <div class="h-full bg-primary/70" style="width: 30%"></div>
+              </div>
+            </div>
+            <!-- Category Item -->
+            <div>
+              <div class="flex justify-between items-end mb-stack-sm">
+                <span class="font-body-md text-body-md text-on-surface"
+                  >Lazer</span
+                >
+                <span class="font-label-md text-label-md text-on-surface"
+                  >R$ 160</span
+                >
+              </div>
+              <div class="w-full h-[3px] bg-surface-container-highest flex">
+                <div class="h-full bg-primary/50" style="width: 20%"></div>
+              </div>
+            </div>
+            <!-- Category Item -->
+            <div>
+              <div class="flex justify-between items-end mb-stack-sm">
+                <span class="font-body-md text-body-md text-on-surface"
+                  >Assinaturas</span
+                >
+                <span class="font-label-md text-label-md text-on-surface"
+                  >R$ 85</span
+                >
+              </div>
+              <div class="w-full h-[3px] bg-surface-container-highest flex">
+                <div class="h-full bg-primary/30" style="width: 10%"></div>
+              </div>
+            </div>
+          </div>
+        </section>
+        <!-- Ticker (Col 9-12) -->
+        <section
+          class="col-span-1 lg:col-span-4 p-stack-lg flex flex-col justify-between"
+        >
+          <div>
+            <div class="flex justify-between items-center mb-stack-md">
+              <div class="flex items-center gap-stack-sm">
+                <div
+                  class="w-6 h-6 rounded-full bg-primary-container text-on-primary-container flex items-center justify-center font-bold text-[10px]"
+                >
+                  B
+                </div>
+                <span class="font-body-md text-body-md text-on-surface"
+                  >Bitcoin</span
+                >
+              </div>
+              <span
+                class="font-label-sm text-label-sm text-secondary bg-secondary/10 px-stack-sm py-[2px] rounded-sm"
+                >+2,4% 24h</span
+              >
+            </div>
+            <div class="mb-stack-sm">
+              <span
+                class="font-headline-md text-headline-md text-on-surface block"
+                >R$ 342.500,00</span
+              >
+              <span
+                class="font-label-sm text-label-sm text-on-surface-variant block"
+                >Sua posição: R$ 2.100,00</span
+              >
+            </div>
+          </div>
+          <!-- Abstract Bar Chart simulation for ticker -->
+          <div class="flex items-end gap-[2px] h-16 mt-stack-lg opacity-80">
+            <div class="flex-1 bg-primary/20 h-[20%]"></div>
+            <div class="flex-1 bg-primary/30 h-[25%]"></div>
+            <div class="flex-1 bg-primary/20 h-[15%]"></div>
+            <div class="flex-1 bg-primary/40 h-[30%]"></div>
+            <div class="flex-1 bg-primary/50 h-[45%]"></div>
+            <div class="flex-1 bg-primary/40 h-[35%]"></div>
+            <div class="flex-1 bg-primary/60 h-[50%]"></div>
+            <div class="flex-1 bg-primary/70 h-[65%]"></div>
+            <div class="flex-1 bg-primary/60 h-[55%]"></div>
+            <div class="flex-1 bg-primary/80 h-[80%]"></div>
+            <div class="flex-1 bg-primary h-[100%]"></div>
+          </div>
+        </section>
+      </div>
+    </main>
+  </body>
+</html>

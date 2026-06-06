@@ -16,9 +16,10 @@
 - Validação: rejeite valores negativos onde o domínio não permite; mensagem de erro inclui o valor recebido.
 
 ## TypeScript (client)
-- Não faça aritmética monetária com `number`. Trabalhe em centavos (inteiro) ou via lib decimal.
-- Formatação para exibição (R$) só na borda da UI, com `Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' })`.
+- **Decisão:** o client trabalha em **centavos (inteiro)** ponta a ponta. Sem aritmética monetária com `number`.
+- Formatação para exibição (R$) só na borda da UI, via `client/src/lib/money.ts#formatBRL(cents)`, que usa `Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' })`.
+- **`formatBRL` normaliza o espaço do `Intl`** (NBSP ` ` / narrow-NBSP ` ` → espaço comum): a saída do `Intl` não é byte-idêntica entre Hermes (device), web e Node (jest), então normalizar garante string estável (`"R$ 42,50"`). Ver `gotchas.md`.
 
 ## Decisões em aberto
-- [ ] Escolher entre lib decimal vs inteiro-em-centavos no Go.
+- [ ] Escolher entre lib decimal vs inteiro-em-centavos no Go. (No client já é centavos-inteiro.)
 - [ ] Definir a precisão (casas decimais) por moeda.
