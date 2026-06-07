@@ -10,18 +10,37 @@ package test
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"strings"
 	"testing"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 
 	"financial-control/server/internal/account"
+	"financial-control/server/internal/auth"
 	"financial-control/server/internal/dashboard"
 	"financial-control/server/internal/router"
 	"financial-control/server/internal/store"
 )
+
+// itestSecret assina os tokens nos testes de integração (bypassa o config.Load).
+const itestSecret = "integration-test-secret-0123456789"
+
+// newServer sobe o router real (com auth) sobre o store informado.
+func newServer(t *testing.T, st *store.Store) *httptest.Server {
+	t.Helper()
+	srv := httptest.NewServer(router.New(router.Deps{
+		Auth:      auth.NewService(st, auth.NewTokenIssuer(itestSecret), auth.TTLs{Default: time.Hour, Remember: time.Hour}),
+		Account:   account.NewService(st),
+		Dashboard: dashboard.NewService(st),
+	}))
+	t.Cleanup(srv.Close)
+	return srv
+}
 
 func TestDashboardEndpointsComSeed(t *testing.T) {
 	dsn := os.Getenv("DATABASE_URL")
@@ -29,7 +48,6 @@ func TestDashboardEndpointsComSeed(t *testing.T) {
 		t.Skip("DATABASE_URL não definido; pulando integração (precisa do Postgres)")
 	}
 	ctx := context.Background()
-
 	applySeed(t, ctx, dsn)
 
 	st, err := store.Open(ctx, dsn)
@@ -38,15 +56,12 @@ func TestDashboardEndpointsComSeed(t *testing.T) {
 	}
 	defer st.Close()
 
-	srv := httptest.NewServer(router.New(router.Deps{
-		Account:   account.NewService(st),
-		Dashboard: dashboard.NewService(st),
-	}))
-	defer srv.Close()
+	srv := newServer(t, st)
+	token := login(t, srv.URL, "teste@teste.com", "12345")
 
 	t.Run("summary", func(t *testing.T) {
 		var bal dashboard.MonthBalance
-		getJSON(t, srv.URL+"/dashboard/summary", &bal)
+		getJSON(t, srv.URL+"/dashboard/summary", token, &bal)
 		if bal.ReceitasCents != 320000 || bal.GastosCents != 111550 {
 			t.Fatalf("receitas/gastos = %d/%d, quero 320000/111550", bal.ReceitasCents, bal.GastosCents)
 		}
@@ -60,7 +75,7 @@ func TestDashboardEndpointsComSeed(t *testing.T) {
 
 	t.Run("categories", func(t *testing.T) {
 		var cats []dashboard.CategorySpend
-		getJSON(t, srv.URL+"/dashboard/categories", &cats)
+		getJSON(t, srv.URL+"/dashboard/categories", token, &cats)
 		if len(cats) != 3 {
 			t.Fatalf("len = %d, quero 3", len(cats))
 		}
@@ -71,7 +86,7 @@ func TestDashboardEndpointsComSeed(t *testing.T) {
 
 	t.Run("este-mes", func(t *testing.T) {
 		var em dashboard.EsteMes
-		getJSON(t, srv.URL+"/dashboard/este-mes", &em)
+		getJSON(t, srv.URL+"/dashboard/este-mes", token, &em)
 		if em.SpentPercent != 35 || em.BiggestVillain != "Alimentação" {
 			t.Errorf("esteMes = %+v, quero spentPercent 35 / villain Alimentação", em)
 		}
@@ -79,7 +94,7 @@ func TestDashboardEndpointsComSeed(t *testing.T) {
 
 	t.Run("diagnosis", func(t *testing.T) {
 		var d dashboard.Diagnosis
-		getJSON(t, srv.URL+"/dashboard/diagnosis", &d)
+		getJSON(t, srv.URL+"/dashboard/diagnosis", token, &d)
 		if d.Title != "Diagnóstico Pobrify" || d.Body == "" {
 			t.Errorf("diagnosis = %+v", d)
 		}
@@ -87,7 +102,7 @@ func TestDashboardEndpointsComSeed(t *testing.T) {
 
 	t.Run("accounts", func(t *testing.T) {
 		var accs []account.Account
-		getJSON(t, srv.URL+"/accounts", &accs)
+		getJSON(t, srv.URL+"/accounts", token, &accs)
 		if len(accs) != 3 {
 			t.Fatalf("len = %d, quero 3", len(accs))
 		}
@@ -100,12 +115,12 @@ func TestDashboardEndpointsComSeed(t *testing.T) {
 
 	t.Run("stubs-deferidos", func(t *testing.T) {
 		var inv []dashboard.Investment
-		getJSON(t, srv.URL+"/investments", &inv)
+		getJSON(t, srv.URL+"/investments", token, &inv)
 		if len(inv) != 0 {
 			t.Errorf("investments = %v, quero vazio", inv)
 		}
 		var tk dashboard.Ticker
-		getJSON(t, srv.URL+"/dashboard/ticker", &tk)
+		getJSON(t, srv.URL+"/dashboard/ticker", token, &tk)
 		if tk.Name != "Bitcoin" || tk.PriceCents != 0 {
 			t.Errorf("ticker = %+v", tk)
 		}
@@ -129,9 +144,39 @@ func applySeed(t *testing.T, ctx context.Context, dsn string) {
 	}
 }
 
-func getJSON(t *testing.T, url string, dst any) {
+// login pega um token via POST /auth/login (o caminho real do client).
+func login(t *testing.T, baseURL, email, password string) string {
 	t.Helper()
-	res, err := http.Get(url)
+	body := strings.NewReader(fmt.Sprintf(`{"email":%q,"password":%q,"rememberMe":false}`, email, password))
+	res, err := http.Post(baseURL+"/auth/login", "application/json", body)
+	if err != nil {
+		t.Fatalf("login: %v", err)
+	}
+	defer res.Body.Close()
+	if res.StatusCode != http.StatusOK {
+		t.Fatalf("login %s: status %d, quero 200", email, res.StatusCode)
+	}
+	var out struct {
+		Token string `json:"token"`
+	}
+	if err := json.NewDecoder(res.Body).Decode(&out); err != nil {
+		t.Fatalf("decode login: %v", err)
+	}
+	if out.Token == "" {
+		t.Fatal("login não devolveu token")
+	}
+	return out.Token
+}
+
+// getJSON faz um GET autenticado (Bearer) e decodifica o corpo em dst.
+func getJSON(t *testing.T, url, token string, dst any) {
+	t.Helper()
+	req, err := http.NewRequest(http.MethodGet, url, nil)
+	if err != nil {
+		t.Fatalf("montar req %s: %v", url, err)
+	}
+	req.Header.Set("Authorization", "Bearer "+token)
+	res, err := http.DefaultClient.Do(req)
 	if err != nil {
 		t.Fatalf("GET %s: %v", url, err)
 	}
