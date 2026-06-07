@@ -3,6 +3,7 @@ package httpx_test
 import (
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"financial-control/server/internal/httpx"
@@ -46,6 +47,20 @@ func TestCORSPreflightOPTIONSResponde204SemChamarInner(t *testing.T) {
 	}
 	if rec.Header().Get("Access-Control-Allow-Methods") == "" {
 		t.Fatal("faltou Access-Control-Allow-Methods no preflight")
+	}
+}
+
+func TestCORSLiberaPOSTeAuthorization(t *testing.T) {
+	// Login é POST com header Authorization nas demais rotas — o preflight precisa liberar ambos.
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodOptions, "/auth/login", nil)
+	httpx.CORS(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {})).ServeHTTP(rec, req)
+
+	if methods := rec.Header().Get("Access-Control-Allow-Methods"); !strings.Contains(methods, "POST") {
+		t.Fatalf("Allow-Methods = %q, faltou POST", methods)
+	}
+	if headers := rec.Header().Get("Access-Control-Allow-Headers"); !strings.Contains(headers, "Authorization") {
+		t.Fatalf("Allow-Headers = %q, faltou Authorization", headers)
 	}
 }
 
