@@ -14,7 +14,11 @@ export type LoginResponse = {
 
 // login bate em POST /auth/login. rememberMe controla a validade do token (o
 // server decide o `exp`: ~24h sem, ~30d com). Lança ApiError(401) em credencial inválida.
-export function login(email: string, password: string, rememberMe: boolean): Promise<LoginResponse> {
+export function login(
+  email: string,
+  password: string,
+  rememberMe: boolean,
+): Promise<LoginResponse> {
   return apiPost<LoginResponse>('/auth/login', { email, password, rememberMe });
 }
 
