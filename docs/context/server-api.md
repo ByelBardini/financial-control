@@ -4,12 +4,14 @@
 
 ## Estado atual
 - Entrypoint: `cmd/server/main.go` — monta `config` → `store` (pool pgx) → serviços → `router.New(Deps)`.
-- Config: `internal/config` lê `DATABASE_URL` (obrigatória) e `PORT` (default `8080`).
+- Config: `internal/config` lê `DATABASE_URL` (obrigatória), `JWT_SECRET` (obrigatória, ≥32 bytes), `PORT` (default `8080`) e `JWT_TTL_DEFAULT`/`JWT_TTL_REMEMBER` (defaults `24h`/`720h`).
 - Roteador: `internal/router/router.go` — `router.New(Deps)` injeta os serviços de domínio e registra as rotas.
 - Dados: `internal/store` abre o pool (`pgxpool`) e embrulha as queries geradas pelo **sqlc** (`internal/store/gen`), devolvendo tipos próprios em **centavos** (`NUMERIC` convertido via cast no SQL — nunca float).
-- Domínios: `health` (liveness), `account` (contas com saldo), `dashboard` (resumo do mês, categorias, este-mês, diagnóstico + stubs deferidos de investimentos/ticker). Helper compartilhado em `internal/httpx` (`WriteJSON`/`WriteError`).
-- Banco plugado e servindo os dados reais do dashboard. Schema em `database.md`; dados de exemplo em `server/db/seed.sql`. **Sem auth** (single-user por enquanto). **Client interligado** via React Query.
-- **CORS:** `httpx.CORS` embrulha o mux em `router.New` (headers de CORS + preflight `OPTIONS`→204). Origem em `CORS_ALLOW_ORIGIN` (default `*`, seguro para a API GET-only sem credenciais; trancar em prod) — **lida no `httpx.CORS`, não no `config.Load`** (que só carrega `DATABASE_URL`/`PORT`).
+- Domínios: `health` (liveness), `auth` (login + sessão), `account` (contas com saldo), `dashboard` (resumo do mês, categorias, este-mês, diagnóstico + stubs deferidos de investimentos/ticker). Helper compartilhado em `internal/httpx` (`WriteJSON`/`WriteError`/`CORS`).
+- **Auth real, multi-usuário (`internal/auth`):** senha com **bcrypt**; sessão por **JWT HS256 alg-pinned** (claims `sub`/`iat`/`exp`; `exp` = 24h ou 30d conforme `rememberMe`). `RequireAuth` (middleware) exige `Authorization: Bearer`, valida assinatura/expiração + `is_active` (liveness) e injeta o `userID` no contexto — **fail-closed** (qualquer falha = 401, sem chamar o handler). O `userID` vem **só do token**, nunca de input do client. Só `GET /health` e `POST /auth/login` são públicos; **toda rota de dados** (inclusive os stubs) passa pelo `RequireAuth`. Login 401 genérico (e-mail/senha/inativo indistinguíveis) + bcrypt dummy (anti-enumeração). **Rate-limit anti-força-bruta** no `POST /auth/login` (`internal/ratelimit`): token-bucket em memória por IP (`ClientIP` do `RemoteAddr`), `5` tentativas/IP recarregando em `1min`; estourado → **429** com `Retry-After`, sem tocar no handler. É single-instance (estado em memória; atrás de réplicas cada uma limita sozinha) e confia no `RemoteAddr`, não no `X-Forwarded-For` — ponha um proxy confiável na frente se for encaminhar. Usuário padrão semeado na migration `00002`: `teste@teste.com` / `12345`.
+- **Isolamento por usuário:** todo handler de dados lê o `userID` do contexto e o repassa ao service → store; as queries filtram por `user_id` (ver `database.md`). Teste de fogo em `server/test/auth_integration_test.go` (usuário A não vê dados de B).
+- Banco plugado e servindo os dados reais do dashboard. Schema em `database.md`; dados de exemplo em `server/db/seed.sql` (pertencem ao usuário padrão). **Client interligado** via React Query (token no header `Authorization`).
+- **CORS:** `httpx.CORS` embrulha o mux em `router.New` (headers de CORS + preflight `OPTIONS`→204). Métodos `GET, POST, OPTIONS` e headers `Accept, Authorization, Content-Type`. Origem em `CORS_ALLOW_ORIGIN` (default `*`; o token é Bearer no header, não cookie, então não há credencial de CORS — mas **trave a origem em prod**). Lida no `httpx.CORS`, não no `config.Load`.
 
 ## Estrutura
 ```
@@ -25,6 +27,7 @@ server/
 │   ├── store/                # pool pgx + wrapper sobre o sqlc (tipos em centavos)
 │   │   └── gen/              # código gerado pelo sqlc (não editar)
 │   ├── httpx/                # WriteJSON / WriteError
+│   ├── ratelimit/            # token-bucket por IP (freio do login) + middleware
 │   ├── health/               # liveness
 │   ├── account/              # GET /accounts (handler+service+DTO)
 │   ├── dashboard/            # GET /dashboard/* (dto+service+handlers)
@@ -48,18 +51,24 @@ server/
   - `config`: `Load()` exige `DATABASE_URL`, default `PORT=8080` e respeita override.
   - handlers (`account`/`dashboard`): JSON golden 1:1 com o contrato, lista vazia → `[]` (nunca `null`), erro do store → 500, `month` inválido/fora do intervalo (`2026-13`) → 400 com corpo `{"error":...}`.
   - `dashboard` service: net + personalidade nas **fronteiras exatas** dos limiares (50/80/100), share `percent` + pass-through fiel dos campos da categoria (`id`/`label`/`tone`/`amountCents`), `biggestVillain`, diagnóstico pelo sinal do net, stubs `[]`/zerados.
-  - `httpx.CORS`: header no GET + chama o inner, preflight `OPTIONS`→204 sem chamar o inner, origem configurável.
-- **Integração (tag `integration`, opt-in):** `go test -tags integration ./test/...` aplica `db/seed.sql` (DESTRUTIVO: `TRUNCATE`) e bate nos endpoints reais; pula se `DATABASE_URL` não estiver setada. O seed ancora as transações no mês corrente (`date_trunc('month', now())`), então o teste não fica flaky com o tempo.
+  - `httpx.CORS`: header no GET + chama o inner, preflight `OPTIONS`→204 sem chamar o inner, libera POST + Authorization, origem configurável.
+  - `auth`: token round-trip + tabela de rejeição (`expirado`/`segredo errado`/`alg:none`/**`HS384`**/**`sem subject`**/lixo); login 401 genérico **byte-idêntico** entre falhas (anti-enumeração) + 400 em corpo inválido; middleware com **tabela de parsing do header** (esquema errado/token vazio/grudado → 401; `Bearer` case-insensitive + espaços aparados → segue) e injeção do `userID`; config exige `JWT_SECRET` (≥32, **com caso de limite 31/32**) + TTLs (**inválido → erro**).
+  - `ratelimit`: token-bucket com relógio injetado — gasta o burst e nega, recarrega após a janela (parcial e total), chaves independentes, burst saneado p/ ≥1; middleware passa abaixo do limite e responde **429 + Retry-After** acima, sem chamar o next; `ClientIP` (ipv4/ipv6/sem porta); varredura (white-box) remove buckets ociosos.
+  - `router`: tabela com TODA rota de dados → 401 sem token (pega rota nova esquecida sem `RequireAuth`); `/health` e `/auth/login` públicos; **login martelado pelo mesmo IP → 429 (e outro IP é independente)**. Os fakes de `account`/`dashboard` asseram que receberam o `userID` (prova do escopo).
+- **Integração (tag `integration`, opt-in):** `go test -tags integration ./test/...` aplica `db/seed.sql` (DESTRUTIVO: `TRUNCATE`) e bate nos endpoints reais; pula se `DATABASE_URL` não estiver setada. O seed ancora as transações no mês corrente (`date_trunc('month', now())`), então o teste não fica flaky com o tempo. Os GETs vão com `Authorization: Bearer` (token via `POST /auth/login` como o usuário padrão); `auth_integration_test.go` cria um 2º usuário e prova o **isolamento A×B** (A não vê dados de B e vice-versa; sem token → 401).
 
 ## Endpoints
 Atualize esta tabela a cada endpoint novo. As views do dashboard aceitam `?month=YYYY-MM`
 (parse em `dashboard/parseMonth`; default = mês corrente pelo relógio do server; formato
 inválido → **400** `{"error":"month inválido, use o formato YYYY-MM"}`). Valores monetários
-sempre em **centavos** (inteiro). Sem auth.
+sempre em **centavos** (inteiro). **Toda rota abaixo exige `Authorization: Bearer <token>`
+(401 sem token), exceto `GET /health` e `POST /auth/login`.**
 
 | Método | Path | Descrição | Status |
 |---|---|---|---|
-| GET | `/health` | liveness check | implementado |
+| GET | `/health` | liveness check (público) | implementado |
+| POST | `/auth/login` | `{email,password,rememberMe}` → `{token,user}`; 401 genérico (público); **429** se exceder o rate-limit por IP | implementado |
+| GET | `/auth/me` | usuário da sessão atual (exige token) | implementado |
 | GET | `/accounts` | contas com saldo all-time (centavos) | implementado |
 | GET | `/dashboard/summary` | resumo do mês: net/receitas/gastos + status/quip | implementado |
 | GET | `/dashboard/categories` | gasto por categoria no mês (com `percent`) | implementado |

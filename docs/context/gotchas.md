@@ -33,6 +33,11 @@
 - **Causa:** sobrescrever o `transformIgnorePatterns` do jest-expo quebra a allowlist dele (prefixos como `expo` sem barra final). O preset já transforma todos os `react-native-*` (inclui `react-native-css-interop`); falta só liberar `nativewind`.
 - **Correção:** em `jest.config.js`, estenda o preset e injete `nativewind` na allowlist (ex.: `.replace('native-base', 'native-base|nativewind')`), em vez de reescrever o regex à mão. Não asserte estilo no jest — só texto/role.
 
+## `jest.mock` de componente RN: `_ReactNativeCSSInterop` fora de escopo
+- **Sintoma:** `ReferenceError: The module factory of jest.mock() is not allowed to reference any out-of-scope variables. Invalid variable access: _ReactNativeCSSInterop` ao mockar um componente cuja fábrica renderiza algo de `react-native` (via JSX **ou** `React.createElement`).
+- **Causa:** o babel hoista a fábrica do `jest.mock` acima dos imports; o transform do NativeWind injeta `_ReactNativeCSSInterop` em qualquer render de componente RN, e essa referência fica fora de escopo no ponto hoisted.
+- **Correção:** mova o stub pra um módulo próprio (ex.: `__tests__/_support/DashboardStub.tsx`) e `require`-o **lazy** na fábrica — `jest.mock('…/DashboardScreen', () => ({ DashboardScreen: require('../_support/DashboardStub').DashboardStub }))`. O módulo separado é compilado normalmente (interop no escopo). Mantenha o `// eslint-disable-next-line @typescript-eslint/no-require-imports` na linha do `require`.
+
 ## SDK 56: `@expo/vector-icons` e `expo-asset` não vêm automáticos
 - **Sintoma:** `Cannot find module '@expo/vector-icons'`, depois `Cannot find module 'expo-asset' from expo-font/FontLoader`.
 - **Causa:** no SDK 56 o `@expo/vector-icons` não é instalado por padrão, e ele puxa `expo-font` → `expo-asset` (que precisa existir).
@@ -62,6 +67,11 @@
 - **Sintoma:** `tsc` acusa `Cannot find name 'global'` ao mockar `global.fetch`.
 - **Causa:** sem `@types/node`, o `global` do Node não tem tipo no client.
 - **Correção:** use `globalThis` (padrão ES, já tipado): `globalThis.fetch = fetchMock as unknown as typeof fetch`.
+
+## Primeira `<Image>`: asset por `require` e geração dos ícones
+- **Sintoma:** dúvida se `<Image source={require('../../assets/x.png')}>` precisa de mock no jest; e por que o favicon não fica arredondado no navegador / o ícone iOS aparece com bordas escuras.
+- **Causa:** (a) o preset do jest-expo já mocka o `require` de assets (vira um número), então a `<Image>` renderiza sem arquivo real — não precisa mock extra; consultar uma imagem decorativa é igual a ícone decorativo (`getByTestId(id, { includeHiddenElements: true })`). (b) Cada plataforma arredonda diferente: **iOS** aplica a máscara squircle sozinho (o `icon.png` tem que ser **quadrado opaco, sem pixels transparentes/cantos** — alpha vira borda escura); **Android adaptive** mascara o `foregroundImage` (transparente) sobre o `backgroundColor`; **web** **não** arredonda o favicon, então os cantos têm que ser "queimados" no PNG.
+- **Correção:** o `BrandLogo` (`src/components/BrandLogo.tsx`) usa RN core `Image` + `require` (com `// eslint-disable-next-line @typescript-eslint/no-require-imports`). Favicon/ícone saem de `scripts/generate-app-icons.mjs` (`npm run icons`, jimp): favicon com cantos arredondados via máscara alpha (supersample p/ suavizar), `icon.png` opaco sem cantos, `android-icon-foreground.png` transparente + `adaptiveIcon.backgroundColor`. Trocar logo/cor = rerodar o script.
 
 ## sqlc lê o schema das migrations goose
 - **Sintoma:** dúvida se o sqlc vai dropar tabelas ao ler a migration (que tem Up **e** Down no mesmo arquivo).
@@ -97,3 +107,23 @@
 - **Sintoma:** todas as suítes falham de uma vez com "Cannot use import statement outside a module" / "Jest encountered an unexpected token", e o stack aponta pra `.../npm-cache/_npx/.../jest-runtime`.
 - **Causa:** rodar `npx jest` com o CWD fora de `client/` (ex.: depois de um `cd server` numa chamada anterior — o diretório persiste entre comandos) não acha o jest local nem o `jest.config.js`/babel do projeto, então o npx baixa um jest avulso sem transform.
 - **Correção:** `cd client` antes (o `npm run test:client` da raiz já faz isso). Não é falha real de teste — é diretório errado.
+
+## pgx `Exec` com args só aceita 1 statement
+- **Sintoma:** `ERROR: cannot insert multiple commands into a prepared statement (SQLSTATE 42601)` ao rodar vários `INSERT;`/`UPDATE;` num só `conn.Exec(ctx, sql, args...)`.
+- **Causa:** com argumentos, o pgx usa o **protocolo estendido** (prepared statement), que permite só um comando por chamada. O protocolo simples (`Exec` **sem** args — ex.: o `seed.sql`) aceita múltiplos statements.
+- **Correção:** um `Exec` por statement (cada um com seus args), ou um `pgx.Batch`/transação. Ver `seedUserB` em `server/test/auth_integration_test.go`.
+
+## bcrypt do pgcrypto (`crypt`) ↔ `x/crypto/bcrypt` do Go
+- **Sintoma:** dúvida se dá pra semear o hash da senha no SQL e validar no Go (ou vice-versa).
+- **Causa:** ambos implementam o bcrypt do OpenBSD. `crypt('senha', gen_salt('bf', 10))` do pgcrypto gera um hash `$2a$10$…` que o `bcrypt.CompareHashAndPassword` do Go aceita — e o inverso também.
+- **Correção:** o usuário padrão é semeado na migration `00002` via `crypt(...)`; **casar o cost com o `bcrypt.DefaultCost` do Go (10)**. O login do `teste@teste.com`/`12345` no teste de integração prova a interoperabilidade.
+
+## JWT: fixe o algoritmo na verificação (alg pinning)
+- **Sintoma:** risco de aceitar um token forjado com `alg:none` (sem assinatura) ou confusão RS/HS.
+- **Causa:** sem restringir, o `ParseWithClaims` confia no header `alg` do próprio token.
+- **Correção:** sempre `jwt.WithValidMethods([]string{"HS256"})` no parse (ver `internal/auth/token.go`); o teste `TestTokenAlgNoneRejeitado` trava isso. Segredo via env obrigatório (≥32 bytes), sem default de dev no código.
+
+## Jest: suíte grande estoura o timeout default sob paralelismo
+- **Sintoma:** suítes pesadas (dashboard + React Query) falham com "Exceeded timeout of 5000 ms" no `npm test`, mas **passam rodando isoladas** ou com `--maxWorkers=50%`.
+- **Causa:** com todas as suítes em paralelo, a contenção de CPU faz o wall-clock de testes de ~300ms passar dos 5s default. Não é bug nem vazamento de handle.
+- **Correção:** `testTimeout: 15000` no `jest.config.js` (folga sem mascarar lentidão real). Diagnóstico: rodar a suíte sozinha confirma que o código está certo.
