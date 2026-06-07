@@ -5,9 +5,10 @@ import { View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import * as SplashScreen from 'expo-splash-screen';
 import { queryClient } from './src/api/queryClient';
+import { AuthProvider } from './src/auth/AuthContext';
 import { ErrorBoundary } from './src/components/ErrorBoundary';
 import { useAppFonts } from './src/hooks/useAppFonts';
-import { DashboardScreen } from './src/screens/DashboardScreen';
+import { RootNavigator } from './src/navigation/RootNavigator';
 
 void SplashScreen.preventAutoHideAsync();
 
@@ -27,9 +28,11 @@ export default function App() {
     <QueryClientProvider client={queryClient}>
       <SafeAreaProvider>
         <ErrorBoundary>
-          <View onLayout={hideSplash} className="flex-1 bg-background">
-            <DashboardScreen />
-          </View>
+          <AuthProvider>
+            <View onLayout={hideSplash} className="flex-1 bg-background">
+              <RootNavigator />
+            </View>
+          </AuthProvider>
           <StatusBar style="light" />
         </ErrorBoundary>
       </SafeAreaProvider>

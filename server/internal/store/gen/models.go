@@ -19,6 +19,7 @@ type Account struct {
 	IsArchived     bool
 	CreatedAt      pgtype.Timestamptz
 	UpdatedAt      pgtype.Timestamptz
+	UserID         pgtype.UUID
 }
 
 type Category struct {
@@ -32,6 +33,7 @@ type Category struct {
 	IsArchived bool
 	CreatedAt  pgtype.Timestamptz
 	UpdatedAt  pgtype.Timestamptz
+	UserID     pgtype.UUID
 }
 
 type RecurringRule struct {
@@ -49,6 +51,7 @@ type RecurringRule struct {
 	IsActive       bool
 	CreatedAt      pgtype.Timestamptz
 	UpdatedAt      pgtype.Timestamptz
+	UserID         pgtype.UUID
 }
 
 type Transaction struct {
@@ -70,4 +73,15 @@ type Transaction struct {
 	TransferGroupID     pgtype.UUID
 	CreatedAt           pgtype.Timestamptz
 	UpdatedAt           pgtype.Timestamptz
+	UserID              pgtype.UUID
+}
+
+type User struct {
+	ID           pgtype.UUID
+	Email        string
+	PasswordHash string
+	Name         pgtype.Text
+	IsActive     bool
+	CreatedAt    pgtype.Timestamptz
+	UpdatedAt    pgtype.Timestamptz
 }

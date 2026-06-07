@@ -26,6 +26,11 @@
 - Funções plpgsql / statements com `;` interno: entre `-- +goose StatementBegin` / `-- +goose StatementEnd`.
 - **Leitura de dinheiro:** as queries convertem `NUMERIC`→**centavos** com cast no SQL (`(x*100)::bigint`), então o `sqlc` devolve `int64` e nunca aparece `float`/`pgtype.Numeric`. A conexão Go já está plugada (`internal/store`).
 
+## Auth / multi-usuário (migration `00002_add_users_and_user_scope.sql`)
+- **`users`** — `id` uuid, `email` (único **case-insensitive** via `CREATE UNIQUE INDEX ... (lower(email))`, sem `citext`), `password_hash` (bcrypt), `name`, `is_active`, timestamps + trigger `set_updated_at`. **Usuário padrão semeado na própria migration** (id fixo `0…01`, `teste@teste.com`/`12345`, hash via `crypt('12345', gen_salt('bf',10))` do pgcrypto — formato `$2a$` que o `x/crypto/bcrypt` do Go valida). Senha **nunca** sai do server.
+- **`user_id`** (uuid, NOT NULL, FK `users(id)` ON DELETE CASCADE) em `accounts`, `categories`, `recurring_rules`, `transactions`. Migration: add nullable → backfill no usuário padrão → SET NOT NULL. Índices `(user_id)` + compostos `(user_id, occurred_on)` e parcial `(user_id, category_id, occurred_on) WHERE direction='expense'`.
+- **Isolamento:** TODA query de dado filtra por `user_id` (nos **dois** lados de qualquer join — ex.: `ListCategorySpend` exige `t.user_id` E `c.user_id`). O `user_id` vem só do JWT (nunca de input). O `seed.sql` atribui os dados demo ao usuário padrão.
+
 ## Modelo de dados (v1 — migration `00001_init.sql`)
 - **`accounts`** — contas (banco/carteira/exchange/cartão). Saldo é **derivado**: `opening_balance + SUM(transactions.signed_amount)`; **não** há coluna de saldo cacheada (evita drift).
 - **`categories`** — customizáveis: `kind` (`expense`/`income`), `color`, `icon`, `parent_id` (subcategorias), arquiváveis.
@@ -37,4 +42,5 @@
 - Investimentos + ticker de cripto (`investidoCents`, painéis de investimento) — migration própria; os endpoints já existem como stubs zerados.
 - Transferências entre contas — campos `kind='transfer'` e `transfer_group_id` já reservados em `transactions`; lógica (dupla entrada) numa migration/serviço futuro.
 - Orçamento por categoria (`budgets`) — o `percent` do dashboard é share derivado, não armazenado.
-- Multi-usuário/`user_id` — single-user por enquanto.
+- ~~Multi-usuário/`user_id`~~ **feito** (migration `00002`): users + user_id + isolamento por usuário. Falta (follow-up `00003`): FKs compostas `(id, user_id)` pra tornar "transação apontando pra conta de outro usuário" impossível no banco (hoje é garantido por convenção + escopo em todo join + teste de integração).
+- Cadastro self-service de usuário — por enquanto só o usuário semeado + criados via SQL (sem endpoint de registro).

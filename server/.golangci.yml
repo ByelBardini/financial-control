@@ -12,6 +12,13 @@ linters:
     - errorlint
     - misspell
     - unconvert
+  settings:
+    misspell:
+      # Comentários são em português; ignora palavras pt-BR que o misspell (en_US)
+      # confunde com typos do inglês.
+      ignore-rules:
+        - validade
+        - independente
   exclusions:
     generated: lax
     presets:

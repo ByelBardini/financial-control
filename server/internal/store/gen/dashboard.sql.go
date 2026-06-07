@@ -16,9 +16,15 @@ SELECT
     (COALESCE(SUM(amount) FILTER (WHERE direction = 'income'),  0) * 100)::bigint AS receitas_cents,
     (COALESCE(SUM(amount) FILTER (WHERE direction = 'expense'), 0) * 100)::bigint AS gastos_cents
 FROM transactions
-WHERE occurred_on >= date_trunc('month', $1::date)
-  AND occurred_on <  date_trunc('month', $1::date) + interval '1 month'
+WHERE user_id = $1
+  AND occurred_on >= date_trunc('month', $2::date)
+  AND occurred_on <  date_trunc('month', $2::date) + interval '1 month'
 `
+
+type GetMonthSummaryParams struct {
+	UserID        pgtype.UUID
+	ReferenceDate pgtype.Date
+}
 
 type GetMonthSummaryRow struct {
 	ReceitasCents int64
@@ -26,8 +32,9 @@ type GetMonthSummaryRow struct {
 }
 
 // Receitas e gastos do mês de @reference_date, em centavos (bigint). Mês vazio → 0.
-func (q *Queries) GetMonthSummary(ctx context.Context, referenceDate pgtype.Date) (GetMonthSummaryRow, error) {
-	row := q.db.QueryRow(ctx, getMonthSummary, referenceDate)
+// Escopado por usuário.
+func (q *Queries) GetMonthSummary(ctx context.Context, arg GetMonthSummaryParams) (GetMonthSummaryRow, error) {
+	row := q.db.QueryRow(ctx, getMonthSummary, arg.UserID, arg.ReferenceDate)
 	var i GetMonthSummaryRow
 	err := row.Scan(&i.ReceitasCents, &i.GastosCents)
 	return i, err
@@ -40,13 +47,19 @@ SELECT
     c.tone                        AS tone,
     (SUM(t.amount) * 100)::bigint AS amount_cents
 FROM transactions t
-JOIN categories c ON c.id = t.category_id
+JOIN categories c ON c.id = t.category_id AND c.user_id = t.user_id
 WHERE t.direction = 'expense'
-  AND t.occurred_on >= date_trunc('month', $1::date)
-  AND t.occurred_on <  date_trunc('month', $1::date) + interval '1 month'
+  AND t.user_id = $1
+  AND t.occurred_on >= date_trunc('month', $2::date)
+  AND t.occurred_on <  date_trunc('month', $2::date) + interval '1 month'
 GROUP BY c.id, c.name, c.tone
 ORDER BY amount_cents DESC
 `
+
+type ListCategorySpendParams struct {
+	UserID        pgtype.UUID
+	ReferenceDate pgtype.Date
+}
 
 type ListCategorySpendRow struct {
 	ID          string
@@ -56,9 +69,10 @@ type ListCategorySpendRow struct {
 }
 
 // Gasto por categoria (apenas despesas) no mês de @reference_date, em centavos (bigint).
-// Aproveita o índice parcial idx_transactions_cat_month. Maior gasto primeiro.
-func (q *Queries) ListCategorySpend(ctx context.Context, referenceDate pgtype.Date) ([]ListCategorySpendRow, error) {
-	rows, err := q.db.Query(ctx, listCategorySpend, referenceDate)
+// Escopado por usuário nos DOIS lados do join (transação e categoria do mesmo dono).
+// Aproveita o índice parcial idx_transactions_user_cat_exp. Maior gasto primeiro.
+func (q *Queries) ListCategorySpend(ctx context.Context, arg ListCategorySpendParams) ([]ListCategorySpendRow, error) {
+	rows, err := q.db.Query(ctx, listCategorySpend, arg.UserID, arg.ReferenceDate)
 	if err != nil {
 		return nil, err
 	}

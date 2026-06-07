@@ -6,6 +6,7 @@ import (
 	"net/http"
 
 	"financial-control/server/internal/account"
+	"financial-control/server/internal/auth"
 	"financial-control/server/internal/config"
 	"financial-control/server/internal/dashboard"
 	"financial-control/server/internal/router"
@@ -25,7 +26,13 @@ func main() {
 	}
 	defer st.Close()
 
+	authSvc := auth.NewService(
+		st,
+		auth.NewTokenIssuer(cfg.JWTSecret),
+		auth.TTLs{Default: cfg.JWTTTLDefault, Remember: cfg.JWTTTLRemember},
+	)
 	deps := router.Deps{
+		Auth:      authSvc,
 		Account:   account.NewService(st),
 		Dashboard: dashboard.NewService(st),
 	}

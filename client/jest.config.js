@@ -14,4 +14,8 @@ module.exports = {
   setupFilesAfterEnv: ['<rootDir>/jest.setup.ts'],
   // __tests__/_support/ guarda helpers de teste (render com provider, mocks), não suítes.
   testPathIgnorePatterns: ['/node_modules/', '<rootDir>/__tests__/_support/'],
+  // A suíte cresceu; sob alta concorrência (todas as suítes em paralelo) as telas
+  // mais pesadas (dashboard + React Query) passavam dos 5s default por contenção de
+  // CPU, não por bug. 15s dá folga sem mascarar lentidão real.
+  testTimeout: 15000,
 };

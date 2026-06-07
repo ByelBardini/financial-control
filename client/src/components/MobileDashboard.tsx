@@ -19,12 +19,13 @@ import {
 type MobileDashboardProps = {
   hidden: boolean;
   onToggleHidden: () => void;
+  onLogout?: () => void;
 };
 
 // Pilha vertical do mobile. Cada seção é uma query independente (loading/erro por
 // seção via QuerySection). BottomNav fixa respeitando o safe-area; o conteúdo
 // reserva espaço (pb) pra não ficar atrás dela.
-export function MobileDashboard({ hidden, onToggleHidden }: MobileDashboardProps) {
+export function MobileDashboard({ hidden, onToggleHidden, onLogout }: MobileDashboardProps) {
   const insets = useSafeAreaInsets();
   const balance = useMonthBalance();
   const accounts = useAccounts();
@@ -34,7 +35,7 @@ export function MobileDashboard({ hidden, onToggleHidden }: MobileDashboardProps
 
   return (
     <View className="flex-1 bg-background" style={{ paddingTop: insets.top }}>
-      <TopBar hidden={hidden} onToggleHidden={onToggleHidden} />
+      <TopBar hidden={hidden} onToggleHidden={onToggleHidden} onLogout={onLogout} />
       <ScrollView
         className="flex-1"
         contentContainerStyle={{ gap: 24, paddingBottom: insets.bottom + 96 }}

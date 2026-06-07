@@ -11,13 +11,21 @@ import (
 )
 
 type Querier interface {
+	// Busca por e-mail case-insensitive (usa o índice único users_email_lower_key).
+	// Devolve o hash e is_active pro service decidir (mantém o 401 genérico no service).
+	FindUserByEmail(ctx context.Context, email string) (FindUserByEmailRow, error)
 	// Receitas e gastos do mês de @reference_date, em centavos (bigint). Mês vazio → 0.
-	GetMonthSummary(ctx context.Context, referenceDate pgtype.Date) (GetMonthSummaryRow, error)
+	// Escopado por usuário.
+	GetMonthSummary(ctx context.Context, arg GetMonthSummaryParams) (GetMonthSummaryRow, error)
+	// Lookup por PK pro /auth/me e pro check de liveness no middleware (is_active).
+	GetUserByID(ctx context.Context, id pgtype.UUID) (GetUserByIDRow, error)
 	// Saldo all-time (não mês): opening_balance + soma do ledger, em centavos (bigint).
-	ListAccountsWithBalance(ctx context.Context) ([]ListAccountsWithBalanceRow, error)
+	// Escopado por usuário: contas do usuário + apenas transações dele no join.
+	ListAccountsWithBalance(ctx context.Context, userID pgtype.UUID) ([]ListAccountsWithBalanceRow, error)
 	// Gasto por categoria (apenas despesas) no mês de @reference_date, em centavos (bigint).
-	// Aproveita o índice parcial idx_transactions_cat_month. Maior gasto primeiro.
-	ListCategorySpend(ctx context.Context, referenceDate pgtype.Date) ([]ListCategorySpendRow, error)
+	// Escopado por usuário nos DOIS lados do join (transação e categoria do mesmo dono).
+	// Aproveita o índice parcial idx_transactions_user_cat_exp. Maior gasto primeiro.
+	ListCategorySpend(ctx context.Context, arg ListCategorySpendParams) ([]ListCategorySpendRow, error)
 }
 
 var _ Querier = (*Queries)(nil)
