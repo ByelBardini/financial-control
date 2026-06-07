@@ -1,18 +1,25 @@
 // Package store é a fronteira de dados do server: abre o pool pgx e expõe
 // métodos de leitura tipados (valores em centavos), embrulhando o código
-// gerado pelo sqlc em internal/store/gen.
+// gerado pelo sqlc em internal/store/gen. Toda leitura de dado de usuário é
+// escopada por user_id (recebido como parâmetro, derivado do token no handler).
 package store
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"financial-control/server/internal/store/gen"
 )
+
+// ErrUserNotFound sinaliza usuário inexistente (login/lookup) sem vazar o motivo
+// pra fora do server — o service de auth o trata como 401 genérico.
+var ErrUserNotFound = errors.New("usuário não encontrado")
 
 // AccountRow é uma conta com o saldo já calculado em centavos.
 type AccountRow struct {
@@ -36,6 +43,23 @@ type CategorySpendRow struct {
 	Label       string
 	Tone        string
 	AmountCents int64
+}
+
+// UserCredentials é o usuário com o hash da senha — só pro login (FindUserByEmail).
+type UserCredentials struct {
+	ID           string
+	Email        string
+	PasswordHash string
+	IsActive     bool
+	Name         string
+}
+
+// User é o usuário sem segredo — pro /auth/me e o check de liveness (GetUserByID).
+type User struct {
+	ID       string
+	Email    string
+	IsActive bool
+	Name     string
 }
 
 // Store é dona do pool de conexões e das queries geradas.
@@ -64,9 +88,13 @@ func (s *Store) Close() {
 	s.pool.Close()
 }
 
-// ListAccountsWithBalance devolve as contas ativas com o saldo all-time (centavos).
-func (s *Store) ListAccountsWithBalance(ctx context.Context) ([]AccountRow, error) {
-	rows, err := s.q.ListAccountsWithBalance(ctx)
+// ListAccountsWithBalance devolve as contas ativas do usuário com saldo all-time (centavos).
+func (s *Store) ListAccountsWithBalance(ctx context.Context, userID string) ([]AccountRow, error) {
+	uid, err := uuidArg(userID)
+	if err != nil {
+		return nil, err
+	}
+	rows, err := s.q.ListAccountsWithBalance(ctx, uid)
 	if err != nil {
 		return nil, fmt.Errorf("store: listar contas com saldo: %w", err)
 	}
@@ -84,18 +112,26 @@ func (s *Store) ListAccountsWithBalance(ctx context.Context) ([]AccountRow, erro
 	return out, nil
 }
 
-// GetMonthSummary devolve receitas e gastos (centavos) do mês que contém month.
-func (s *Store) GetMonthSummary(ctx context.Context, month time.Time) (MonthSummaryRow, error) {
-	row, err := s.q.GetMonthSummary(ctx, dateArg(month))
+// GetMonthSummary devolve receitas e gastos (centavos) do usuário no mês de month.
+func (s *Store) GetMonthSummary(ctx context.Context, userID string, month time.Time) (MonthSummaryRow, error) {
+	uid, err := uuidArg(userID)
+	if err != nil {
+		return MonthSummaryRow{}, err
+	}
+	row, err := s.q.GetMonthSummary(ctx, gen.GetMonthSummaryParams{UserID: uid, ReferenceDate: dateArg(month)})
 	if err != nil {
 		return MonthSummaryRow{}, fmt.Errorf("store: resumo do mês: %w", err)
 	}
 	return MonthSummaryRow{ReceitasCents: row.ReceitasCents, GastosCents: row.GastosCents}, nil
 }
 
-// ListCategorySpend devolve o gasto por categoria (centavos) do mês que contém month.
-func (s *Store) ListCategorySpend(ctx context.Context, month time.Time) ([]CategorySpendRow, error) {
-	rows, err := s.q.ListCategorySpend(ctx, dateArg(month))
+// ListCategorySpend devolve o gasto por categoria (centavos) do usuário no mês de month.
+func (s *Store) ListCategorySpend(ctx context.Context, userID string, month time.Time) ([]CategorySpendRow, error) {
+	uid, err := uuidArg(userID)
+	if err != nil {
+		return nil, err
+	}
+	rows, err := s.q.ListCategorySpend(ctx, gen.ListCategorySpendParams{UserID: uid, ReferenceDate: dateArg(month)})
 	if err != nil {
 		return nil, fmt.Errorf("store: gasto por categoria: %w", err)
 	}
@@ -109,6 +145,52 @@ func (s *Store) ListCategorySpend(ctx context.Context, month time.Time) ([]Categ
 		})
 	}
 	return out, nil
+}
+
+// FindUserByEmail busca o usuário por e-mail (case-insensitive). ErrUserNotFound
+// quando não existe — pro service de auth manter o 401 genérico + bcrypt dummy.
+func (s *Store) FindUserByEmail(ctx context.Context, email string) (UserCredentials, error) {
+	row, err := s.q.FindUserByEmail(ctx, email)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return UserCredentials{}, ErrUserNotFound
+	}
+	if err != nil {
+		return UserCredentials{}, fmt.Errorf("store: buscar usuário por e-mail: %w", err)
+	}
+	return UserCredentials{
+		ID:           row.ID,
+		Email:        row.Email,
+		PasswordHash: row.PasswordHash,
+		IsActive:     row.IsActive,
+		Name:         row.Name,
+	}, nil
+}
+
+// GetUserByID busca o usuário por id. ErrUserNotFound quando não existe (ex.: token
+// de usuário já removido).
+func (s *Store) GetUserByID(ctx context.Context, userID string) (User, error) {
+	uid, err := uuidArg(userID)
+	if err != nil {
+		return User{}, err
+	}
+	row, err := s.q.GetUserByID(ctx, uid)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return User{}, ErrUserNotFound
+	}
+	if err != nil {
+		return User{}, fmt.Errorf("store: buscar usuário por id: %w", err)
+	}
+	return User{ID: row.ID, Email: row.Email, IsActive: row.IsActive, Name: row.Name}, nil
+}
+
+// uuidArg converte o user_id (string vinda do token) no pgtype.UUID das queries.
+// Erro de formato falha fechado (não vira filtro vazio que devolveria 0 linhas).
+func uuidArg(s string) (pgtype.UUID, error) {
+	var u pgtype.UUID
+	if err := u.Scan(s); err != nil {
+		return pgtype.UUID{}, fmt.Errorf("store: user_id inválido (%q): %w", s, err)
+	}
+	return u, nil
 }
 
 // dateArg converte um time.Time para o pgtype.Date esperado pelas queries de mês.

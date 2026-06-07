@@ -7,6 +7,7 @@ import (
 	"log"
 	"net/http"
 
+	"financial-control/server/internal/auth"
 	"financial-control/server/internal/httpx"
 	"financial-control/server/internal/store"
 )
@@ -23,7 +24,7 @@ type Account struct {
 
 // AccountStore é a dependência de dados do serviço de contas.
 type AccountStore interface {
-	ListAccountsWithBalance(ctx context.Context) ([]store.AccountRow, error)
+	ListAccountsWithBalance(ctx context.Context, userID string) ([]store.AccountRow, error)
 }
 
 // Service lê contas a partir do store.
@@ -38,9 +39,9 @@ func NewService(s AccountStore) *Service {
 	return &Service{store: s}
 }
 
-// List devolve todas as contas ativas com o saldo all-time já calculado.
-func (s *Service) List(ctx context.Context) ([]Account, error) {
-	rows, err := s.store.ListAccountsWithBalance(ctx)
+// List devolve as contas ativas do usuário com o saldo all-time já calculado.
+func (s *Service) List(ctx context.Context, userID string) ([]Account, error) {
+	rows, err := s.store.ListAccountsWithBalance(ctx, userID)
 	if err != nil {
 		return nil, fmt.Errorf("account: listar contas: %w", err)
 	}
@@ -63,7 +64,12 @@ func (s *Service) List(ctx context.Context) ([]Account, error) {
 //	mux.Handle("GET /accounts", account.ListHandler(svc))
 func ListHandler(svc *Service) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		accounts, err := svc.List(r.Context())
+		userID, ok := auth.UserIDFromContext(r.Context())
+		if !ok {
+			httpx.WriteError(w, http.StatusUnauthorized, "não autenticado")
+			return
+		}
+		accounts, err := svc.List(r.Context(), userID)
 		if err != nil {
 			log.Printf("GET /accounts: %v", err)
 			httpx.WriteError(w, http.StatusInternalServerError, "erro ao listar contas")

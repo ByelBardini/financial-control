@@ -14,10 +14,10 @@ const availableLabel = "Disponível para gastar"
 // diagnosisTitle é o título fixo do cartão de diagnóstico (igual ao contrato do client).
 const diagnosisTitle = "Diagnóstico Pobrify"
 
-// DashboardStore é a dependência de dados das visões do dashboard.
+// DashboardStore é a dependência de dados das visões do dashboard (escopada por usuário).
 type DashboardStore interface {
-	GetMonthSummary(ctx context.Context, month time.Time) (store.MonthSummaryRow, error)
-	ListCategorySpend(ctx context.Context, month time.Time) ([]store.CategorySpendRow, error)
+	GetMonthSummary(ctx context.Context, userID string, month time.Time) (store.MonthSummaryRow, error)
+	ListCategorySpend(ctx context.Context, userID string, month time.Time) ([]store.CategorySpendRow, error)
 }
 
 // Service monta as visões do dashboard a partir do store.
@@ -32,9 +32,9 @@ func NewService(s DashboardStore) *Service {
 	return &Service{store: s}
 }
 
-// MonthBalance devolve o resumo do mês que contém month.
-func (s *Service) MonthBalance(ctx context.Context, month time.Time) (MonthBalance, error) {
-	sum, err := s.store.GetMonthSummary(ctx, month)
+// MonthBalance devolve o resumo do mês que contém month, do usuário.
+func (s *Service) MonthBalance(ctx context.Context, userID string, month time.Time) (MonthBalance, error) {
+	sum, err := s.store.GetMonthSummary(ctx, userID, month)
 	if err != nil {
 		return MonthBalance{}, fmt.Errorf("dashboard: resumo do mês: %w", err)
 	}
@@ -50,9 +50,9 @@ func (s *Service) MonthBalance(ctx context.Context, month time.Time) (MonthBalan
 	}, nil
 }
 
-// Categories devolve o gasto por categoria do mês, com o share em percent.
-func (s *Service) Categories(ctx context.Context, month time.Time) ([]CategorySpend, error) {
-	rows, err := s.store.ListCategorySpend(ctx, month)
+// Categories devolve o gasto por categoria do mês, com o share em percent, do usuário.
+func (s *Service) Categories(ctx context.Context, userID string, month time.Time) ([]CategorySpend, error) {
+	rows, err := s.store.ListCategorySpend(ctx, userID, month)
 	if err != nil {
 		return nil, fmt.Errorf("dashboard: categorias: %w", err)
 	}
@@ -73,13 +73,13 @@ func (s *Service) Categories(ctx context.Context, month time.Time) ([]CategorySp
 	return out, nil
 }
 
-// EsteMes devolve quanto da receita foi gasta e a categoria que mais pesou.
-func (s *Service) EsteMes(ctx context.Context, month time.Time) (EsteMes, error) {
-	sum, err := s.store.GetMonthSummary(ctx, month)
+// EsteMes devolve quanto da receita foi gasta e a categoria que mais pesou, do usuário.
+func (s *Service) EsteMes(ctx context.Context, userID string, month time.Time) (EsteMes, error) {
+	sum, err := s.store.GetMonthSummary(ctx, userID, month)
 	if err != nil {
 		return EsteMes{}, fmt.Errorf("dashboard: este mês (resumo): %w", err)
 	}
-	cats, err := s.store.ListCategorySpend(ctx, month)
+	cats, err := s.store.ListCategorySpend(ctx, userID, month)
 	if err != nil {
 		return EsteMes{}, fmt.Errorf("dashboard: este mês (categorias): %w", err)
 	}
@@ -93,9 +93,9 @@ func (s *Service) EsteMes(ctx context.Context, month time.Time) (EsteMes, error)
 	}, nil
 }
 
-// Diagnosis devolve o cartão de diagnóstico do mês (texto derivado do saldo líquido).
-func (s *Service) Diagnosis(ctx context.Context, month time.Time) (Diagnosis, error) {
-	sum, err := s.store.GetMonthSummary(ctx, month)
+// Diagnosis devolve o cartão de diagnóstico do mês (texto derivado do saldo líquido), do usuário.
+func (s *Service) Diagnosis(ctx context.Context, userID string, month time.Time) (Diagnosis, error) {
+	sum, err := s.store.GetMonthSummary(ctx, userID, month)
 	if err != nil {
 		return Diagnosis{}, fmt.Errorf("dashboard: diagnóstico: %w", err)
 	}
