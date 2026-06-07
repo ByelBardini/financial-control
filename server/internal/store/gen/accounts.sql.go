@@ -7,6 +7,8 @@ package gen
 
 import (
 	"context"
+
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 const listAccountsWithBalance = `-- name: ListAccountsWithBalance :many
@@ -18,8 +20,9 @@ SELECT
     a.tone                                                                 AS tone,
     a.dot_color                                                            AS dot_color
 FROM accounts a
-LEFT JOIN transactions t ON t.account_id = a.id
+LEFT JOIN transactions t ON t.account_id = a.id AND t.user_id = a.user_id
 WHERE a.is_archived = false
+  AND a.user_id = $1
 GROUP BY a.id, a.name, a.opening_balance, a.icon, a.tone, a.dot_color
 ORDER BY a.name
 `
@@ -34,8 +37,9 @@ type ListAccountsWithBalanceRow struct {
 }
 
 // Saldo all-time (não mês): opening_balance + soma do ledger, em centavos (bigint).
-func (q *Queries) ListAccountsWithBalance(ctx context.Context) ([]ListAccountsWithBalanceRow, error) {
-	rows, err := q.db.Query(ctx, listAccountsWithBalance)
+// Escopado por usuário: contas do usuário + apenas transações dele no join.
+func (q *Queries) ListAccountsWithBalance(ctx context.Context, userID pgtype.UUID) ([]ListAccountsWithBalanceRow, error) {
+	rows, err := q.db.Query(ctx, listAccountsWithBalance, userID)
 	if err != nil {
 		return nil, err
 	}
