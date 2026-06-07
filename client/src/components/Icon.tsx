@@ -17,6 +17,8 @@ const glyphs = {
   settings: 'settings',
   medical_services: 'medical-services',
   add: 'add',
+  check: 'check',
+  logout: 'logout',
 } as const;
 
 export type IconName = keyof typeof glyphs;

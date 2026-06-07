@@ -1,6 +1,7 @@
-import { Text, View } from 'react-native';
+import { Pressable, Text, View } from 'react-native';
 import { SideNavItem } from './SideNavItem';
-import type { IconName } from '../Icon';
+import { Icon, type IconName } from '../Icon';
+import { BrandLogo } from '../BrandLogo';
 
 type NavEntry = { label: string; icon: IconName; active?: boolean };
 
@@ -12,14 +13,17 @@ const NAV_ENTRIES: NavEntry[] = [
   { label: 'Ajustes', icon: 'settings' },
 ];
 
-// Rail fixo do desktop: marca, perfil e navegação (estática).
-export function SideNav() {
+type SideNavProps = {
+  onLogout?: () => void;
+};
+
+// Rail fixo do desktop: marca, perfil e navegação (estática). Quando há sessão,
+// um botão "Sair" no rodapé do rail volta pro login.
+export function SideNav({ onLogout }: SideNavProps) {
   return (
     <View className="w-64 border-r border-outline-variant bg-surface-container-lowest p-gutter">
       <View className="mb-stack-lg flex-row items-center gap-stack-md px-base pt-stack-sm">
-        <View className="h-8 w-8 items-center justify-center rounded-lg bg-primary-container">
-          <Text className="font-hanken-bold text-on-primary-container">P</Text>
-        </View>
+        <BrandLogo size={40} />
         <Text className="font-hanken-bold text-headline-md text-on-surface">Pobrify</Text>
       </View>
 
@@ -45,6 +49,18 @@ export function SideNav() {
           />
         ))}
       </View>
+
+      {onLogout ? (
+        <Pressable
+          onPress={onLogout}
+          accessibilityRole="button"
+          accessibilityLabel="Sair"
+          className="mt-stack-lg flex-row items-center gap-stack-md rounded-lg border-t border-outline-variant px-base pt-stack-md"
+        >
+          <Icon name="logout" size={20} color="#cbc3d7" />
+          <Text className="font-geist-medium text-label-md text-on-surface-variant">Sair</Text>
+        </Pressable>
+      ) : null}
     </View>
   );
 }
