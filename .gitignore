@@ -11,3 +11,6 @@ node_modules/
 client/dist/
 client/web-build/
 .expo/
+
+# Locks do harness do Claude (não versionar)
+.claude/*.lock
