@@ -11,17 +11,22 @@ import (
 )
 
 // fakeDashStore é o fake nomeado da dependência de dados (sem banco real).
+// Captura os userIDs recebidos pra provar o escopo por usuário em cada query.
 type fakeDashStore struct {
-	summary store.MonthSummaryRow
-	cats    []store.CategorySpendRow
-	err     error
+	summary          store.MonthSummaryRow
+	cats             []store.CategorySpendRow
+	err              error
+	gotSummaryUserID string
+	gotCatsUserID    string
 }
 
-func (f *fakeDashStore) GetMonthSummary(context.Context, time.Time) (store.MonthSummaryRow, error) {
+func (f *fakeDashStore) GetMonthSummary(_ context.Context, userID string, _ time.Time) (store.MonthSummaryRow, error) {
+	f.gotSummaryUserID = userID
 	return f.summary, f.err
 }
 
-func (f *fakeDashStore) ListCategorySpend(context.Context, time.Time) ([]store.CategorySpendRow, error) {
+func (f *fakeDashStore) ListCategorySpend(_ context.Context, userID string, _ time.Time) ([]store.CategorySpendRow, error) {
+	f.gotCatsUserID = userID
 	return f.cats, f.err
 }
 
@@ -48,7 +53,7 @@ func TestMonthBalanceNetEPersonalidade(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			svc := dashboard.NewService(&fakeDashStore{summary: store.MonthSummaryRow{ReceitasCents: tc.receitas, GastosCents: tc.gastos}})
-			got, err := svc.MonthBalance(context.Background(), time.Now())
+			got, err := svc.MonthBalance(context.Background(), "u-1", time.Now())
 			if err != nil {
 				t.Fatalf("erro inesperado: %v", err)
 			}
@@ -73,7 +78,7 @@ func TestCategoriesShareEmPercent(t *testing.T) {
 		{ID: "c1", Label: "Alimentação", Tone: "primary", AmountCents: 60000},
 		{ID: "c2", Label: "Transporte", Tone: "secondary", AmountCents: 30000},
 	}})
-	got, err := svc.Categories(context.Background(), time.Now())
+	got, err := svc.Categories(context.Background(), "u-1", time.Now())
 	if err != nil {
 		t.Fatalf("erro inesperado: %v", err)
 	}
@@ -95,7 +100,7 @@ func TestCategoriesShareEmPercent(t *testing.T) {
 
 func TestCategoriesVaziaNaoQuebra(t *testing.T) {
 	svc := dashboard.NewService(&fakeDashStore{cats: []store.CategorySpendRow{}})
-	got, err := svc.Categories(context.Background(), time.Now())
+	got, err := svc.Categories(context.Background(), "u-1", time.Now())
 	if err != nil {
 		t.Fatalf("erro inesperado: %v", err)
 	}
@@ -109,7 +114,7 @@ func TestEsteMesVillainESpentPercent(t *testing.T) {
 		summary: store.MonthSummaryRow{ReceitasCents: 320000, GastosCents: 111550},
 		cats:    []store.CategorySpendRow{{Label: "Alimentação", AmountCents: 60000}},
 	})
-	got, err := svc.EsteMes(context.Background(), time.Now())
+	got, err := svc.EsteMes(context.Background(), "u-1", time.Now())
 	if err != nil {
 		t.Fatalf("erro inesperado: %v", err)
 	}
@@ -121,9 +126,19 @@ func TestEsteMesVillainESpentPercent(t *testing.T) {
 	}
 }
 
+func TestEsteMesEscopaAsDuasQueriesPorUsuario(t *testing.T) {
+	fake := &fakeDashStore{summary: store.MonthSummaryRow{ReceitasCents: 1000}, cats: []store.CategorySpendRow{{Label: "X", AmountCents: 100}}}
+	if _, err := dashboard.NewService(fake).EsteMes(context.Background(), "u-9", time.Now()); err != nil {
+		t.Fatalf("EsteMes: %v", err)
+	}
+	if fake.gotSummaryUserID != "u-9" || fake.gotCatsUserID != "u-9" {
+		t.Fatalf("EsteMes escopou summary=%q cats=%q, quero u-9 nos dois", fake.gotSummaryUserID, fake.gotCatsUserID)
+	}
+}
+
 func TestEsteMesSemCategoriasVillainVazio(t *testing.T) {
 	svc := dashboard.NewService(&fakeDashStore{summary: store.MonthSummaryRow{ReceitasCents: 1000}, cats: []store.CategorySpendRow{}})
-	got, err := svc.EsteMes(context.Background(), time.Now())
+	got, err := svc.EsteMes(context.Background(), "u-1", time.Now())
 	if err != nil {
 		t.Fatalf("erro inesperado: %v", err)
 	}
@@ -134,7 +149,7 @@ func TestEsteMesSemCategoriasVillainVazio(t *testing.T) {
 
 func TestMonthBalancePropagaErroDoStore(t *testing.T) {
 	svc := dashboard.NewService(&fakeDashStore{err: errors.New("falha no banco")})
-	if _, err := svc.MonthBalance(context.Background(), time.Now()); err == nil {
+	if _, err := svc.MonthBalance(context.Background(), "u-1", time.Now()); err == nil {
 		t.Fatal("esperava erro propagado do store")
 	}
 }
@@ -153,7 +168,7 @@ func TestDiagnosisBodyPorNet(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			svc := dashboard.NewService(&fakeDashStore{summary: store.MonthSummaryRow{ReceitasCents: tc.receitas, GastosCents: tc.gastos}})
-			got, err := svc.Diagnosis(context.Background(), time.Now())
+			got, err := svc.Diagnosis(context.Background(), "u-1", time.Now())
 			if err != nil {
 				t.Fatalf("erro inesperado: %v", err)
 			}

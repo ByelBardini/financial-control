@@ -6,15 +6,29 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"financial-control/server/internal/auth"
 	"financial-control/server/internal/dashboard"
 	"financial-control/server/internal/store"
 )
 
+// do dispara um GET já autenticado (userID no contexto, como o middleware faria).
 func do(t *testing.T, h http.Handler, target string) *httptest.ResponseRecorder {
 	t.Helper()
 	rec := httptest.NewRecorder()
-	h.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, target, nil))
+	req := httptest.NewRequest(http.MethodGet, target, nil)
+	req = req.WithContext(auth.WithUserID(req.Context(), "u-1"))
+	h.ServeHTTP(rec, req)
 	return rec
+}
+
+func TestMonthHandlerSemUsuario401(t *testing.T) {
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/dashboard/summary", nil) // sem userID no contexto
+	dashboard.SummaryHandler(dashboard.NewService(&fakeDashStore{})).ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusUnauthorized {
+		t.Fatalf("status = %d, quero 401 (sem usuário no contexto)", rec.Code)
+	}
 }
 
 func TestSummaryHandlerJSON(t *testing.T) {
