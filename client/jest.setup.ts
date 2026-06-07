@@ -19,3 +19,11 @@ jest.mock(
     // eslint-disable-next-line @typescript-eslint/no-require-imports -- fábrica do jest.mock exige require
     require('react-native-safe-area-context/jest/mock').default,
 );
+
+// Mock oficial do AsyncStorage (KV em memória) pros testes de tokenStorage/AuthContext.
+jest.mock(
+  '@react-native-async-storage/async-storage',
+  () =>
+    // eslint-disable-next-line @typescript-eslint/no-require-imports -- fábrica do jest.mock exige require
+    require('@react-native-async-storage/async-storage/jest/async-storage-mock'),
+);

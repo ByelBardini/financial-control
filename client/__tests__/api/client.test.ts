@@ -1,4 +1,4 @@
-import { apiGet, ApiError } from '../../src/api/client';
+import { apiGet, apiPost, ApiError, setAuthToken } from '../../src/api/client';
 
 // Monta um Response falso só com o que o apiGet usa (ok/status/json).
 const mockResponse = (body: unknown, init?: { ok?: boolean; status?: number }) =>
@@ -15,6 +15,7 @@ beforeEach(() => {
 });
 afterEach(() => {
   fetchMock.mockReset();
+  setAuthToken(null); // o token é estado de módulo — zera pra não vazar entre testes
 });
 
 describe('apiGet', () => {
@@ -47,5 +48,74 @@ describe('apiGet', () => {
     const err = await apiGet('/x').catch((e: unknown) => e);
     expect(err).toBeInstanceOf(ApiError);
     expect(err).toMatchObject({ status: 404, message: 'HTTP 404' });
+  });
+
+  it('cai em "HTTP <status>" quando o corpo de erro não é JSON (json lança)', async () => {
+    fetchMock.mockResolvedValue({
+      ok: false,
+      status: 502,
+      json: async () => {
+        throw new SyntaxError('Unexpected token < in JSON');
+      },
+    } as unknown as Response);
+
+    const err = await apiGet('/x').catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(ApiError);
+    expect(err).toMatchObject({ status: 502, message: 'HTTP 502' });
+  });
+
+  it('anexa Authorization: Bearer quando há token setado', async () => {
+    fetchMock.mockResolvedValue(mockResponse({}));
+    setAuthToken('tok-abc');
+
+    await apiGet('/accounts');
+
+    const headers = fetchMock.mock.calls[0][1].headers as Record<string, string>;
+    expect(headers.Authorization).toBe('Bearer tok-abc');
+  });
+
+  it('não anexa Authorization quando não há token', async () => {
+    fetchMock.mockResolvedValue(mockResponse({}));
+
+    await apiGet('/accounts');
+
+    const headers = fetchMock.mock.calls[0][1].headers as Record<string, string>;
+    expect(headers.Authorization).toBeUndefined();
+  });
+});
+
+describe('apiPost', () => {
+  it('faz POST com corpo JSON e devolve o corpo tipado', async () => {
+    fetchMock.mockResolvedValue(mockResponse({ token: 't1' }));
+
+    const data = await apiPost<{ token: string }>('/auth/login', { email: 'a@b.com' });
+
+    expect(data).toEqual({ token: 't1' });
+    const [url, init] = fetchMock.mock.calls[0];
+    expect(url).toBe('http://localhost:8080/auth/login');
+    expect(init.method).toBe('POST');
+    expect(init.body).toBe(JSON.stringify({ email: 'a@b.com' }));
+    expect((init.headers as Record<string, string>)['Content-Type']).toBe('application/json');
+  });
+
+  it('lança ApiError(401) em credencial inválida', async () => {
+    fetchMock.mockResolvedValue(
+      mockResponse({ error: 'credenciais inválidas' }, { ok: false, status: 401 }),
+    );
+
+    await expect(apiPost('/auth/login', {})).rejects.toMatchObject({
+      name: 'ApiError',
+      status: 401,
+    });
+  });
+
+  it('anexa Authorization: Bearer no POST quando há token', async () => {
+    fetchMock.mockResolvedValue(mockResponse({}));
+    setAuthToken('tok-xyz');
+
+    await apiPost('/auth/me', {});
+
+    const headers = fetchMock.mock.calls[0][1].headers as Record<string, string>;
+    expect(headers.Authorization).toBe('Bearer tok-xyz');
   });
 });

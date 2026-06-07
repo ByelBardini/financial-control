@@ -19,4 +19,17 @@ describe('TopBar', () => {
     const toggle = screen.getByRole('switch', { name: 'Mostrar valores' });
     expect(toggle).toBeChecked();
   });
+
+  it('mostra o botão Sair quando onLogout é fornecido e o dispara', async () => {
+    const onLogout = jest.fn();
+    await render(<TopBar hidden={false} onToggleHidden={jest.fn()} onLogout={onLogout} />);
+
+    await userEvent.setup().press(screen.getByRole('button', { name: 'Sair' }));
+    expect(onLogout).toHaveBeenCalledTimes(1);
+  });
+
+  it('não mostra o botão Sair sem onLogout', async () => {
+    await render(<TopBar hidden={false} onToggleHidden={jest.fn()} />);
+    expect(screen.queryByRole('button', { name: 'Sair' })).toBeNull();
+  });
 });
