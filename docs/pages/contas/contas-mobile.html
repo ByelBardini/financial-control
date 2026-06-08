@@ -1,0 +1,521 @@
+<!doctype html>
+
+<html class="dark" lang="pt-br">
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"
+      name="viewport"
+    />
+    <title>Pobrify - Monitor de Sobrevivência</title>
+    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+    <link
+      href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;600;700&amp;family=Geist:wght@400;500;600&amp;display=swap"
+      rel="stylesheet"
+    />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap"
+      rel="stylesheet"
+    />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      .material-symbols-outlined {
+        font-variation-settings:
+          "FILL" 0,
+          "wght" 400,
+          "GRAD" 0,
+          "opsz" 24;
+      }
+      body {
+        background-color: #111317;
+        color: #e2e2e8;
+        -webkit-tap-highlight-color: transparent;
+      }
+      .panic-gradient {
+        background: linear-gradient(90deg, #9ddf2e 0%, #ffb4ab 100%);
+      }
+      .glass-header {
+        background: rgba(17, 19, 23, 0.8);
+        backdrop-filter: blur(20px);
+      }
+      .custom-scrollbar::-webkit-scrollbar {
+        display: none;
+      }
+    </style>
+    <script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            colors: {
+              "surface-container": "#1e2024",
+              "on-tertiary-fixed-variant": "#424655",
+              "on-tertiary": "#2c303d",
+              "inverse-primary": "#6d3bd7",
+              surface: "#111317",
+              "on-secondary-fixed-variant": "#334f00",
+              "on-secondary-container": "#304b00",
+              primary: "#d0bcff",
+              "tertiary-container": "#8d90a0",
+              "error-container": "#93000a",
+              "on-secondary": "#213600",
+              "surface-tint": "#d0bcff",
+              "secondary-fixed": "#b2f746",
+              "on-primary-fixed-variant": "#5516be",
+              "primary-fixed-dim": "#d0bcff",
+              "primary-container": "#a078ff",
+              outline: "#958ea0",
+              "surface-container-lowest": "#0c0e12",
+              "on-primary-container": "#340080",
+              "on-primary": "#3c0091",
+              background: "#111317",
+              "surface-variant": "#333539",
+              "on-tertiary-container": "#252937",
+              "on-surface": "#e2e2e8",
+              error: "#ffb4ab",
+              "tertiary-fixed": "#dfe2f4",
+              "secondary-fixed-dim": "#98da27",
+              "on-background": "#e2e2e8",
+              "on-surface-variant": "#cbc3d7",
+              "surface-container-high": "#282a2e",
+              secondary: "#9ddf2e",
+              "surface-container-low": "#1a1c20",
+              "surface-bright": "#37393e",
+              "inverse-on-surface": "#2f3035",
+              "on-error-container": "#ffdad6",
+              "surface-dim": "#111317",
+              "outline-variant": "#494454",
+              "on-secondary-fixed": "#121f00",
+              "inverse-surface": "#e2e2e8",
+              "secondary-container": "#83c300",
+              "on-primary-fixed": "#23005c",
+              "primary-fixed": "#e9ddff",
+              "tertiary-fixed-dim": "#c3c6d7",
+              "on-tertiary-fixed": "#171b28",
+              tertiary: "#c3c6d7",
+              "surface-container-highest": "#333539",
+              "on-error": "#690005",
+            },
+            borderRadius: {
+              DEFAULT: "0.125rem",
+              lg: "0.25rem",
+              xl: "0.5rem",
+              full: "0.75rem",
+            },
+            spacing: {
+              "stack-lg": "24px",
+              base: "8px",
+              "stack-sm": "4px",
+              gutter: "16px",
+              "container-margin": "24px",
+              "stack-md": "12px",
+            },
+            fontFamily: {
+              "body-md": ["Hanken Grotesk"],
+              "label-md": ["Geist"],
+              "headline-md": ["Hanken Grotesk"],
+              "display-lg-mobile": ["Hanken Grotesk"],
+              "display-lg": ["Hanken Grotesk"],
+              "body-lg": ["Hanken Grotesk"],
+              "label-sm": ["Geist"],
+              "headline-sm": ["Hanken Grotesk"],
+            },
+            fontSize: {
+              "body-md": ["16px", { lineHeight: "24px", fontWeight: "400" }],
+              "label-md": [
+                "14px",
+                {
+                  lineHeight: "20px",
+                  letterSpacing: "0.05em",
+                  fontWeight: "500",
+                },
+              ],
+              "headline-md": [
+                "24px",
+                { lineHeight: "32px", fontWeight: "600" },
+              ],
+              "display-lg-mobile": [
+                "36px",
+                {
+                  lineHeight: "42px",
+                  letterSpacing: "-0.02em",
+                  fontWeight: "700",
+                },
+              ],
+              "display-lg": [
+                "48px",
+                {
+                  lineHeight: "56px",
+                  letterSpacing: "-0.02em",
+                  fontWeight: "700",
+                },
+              ],
+              "body-lg": ["18px", { lineHeight: "28px", fontWeight: "400" }],
+              "label-sm": ["12px", { lineHeight: "16px", fontWeight: "600" }],
+              "headline-sm": [
+                "20px",
+                { lineHeight: "28px", fontWeight: "600" },
+              ],
+            },
+          },
+        },
+      };
+    </script>
+    <style>
+      body {
+        min-height: max(884px, 100dvh);
+      }
+    </style>
+  </head>
+  <body class="font-body-md text-on-surface">
+    <!-- TopAppBar -->
+    <header
+      class="fixed top-0 w-full z-50 glass-header border-b border-white/5 h-16 flex justify-between items-center px-gutter"
+    >
+      <div class="flex items-center gap-stack-md">
+        <span class="material-symbols-outlined text-primary" data-icon="search"
+          >search</span
+        >
+        <h1
+          class="font-headline-md text-headline-md-mobile font-bold tracking-tighter text-primary"
+        >
+          Pobrify
+        </h1>
+      </div>
+      <div
+        class="w-8 h-8 rounded-full overflow-hidden border border-primary/20 bg-surface-container-high"
+      >
+        <img
+          alt="User profile photo"
+          class="w-full h-full object-cover"
+          data-alt="A professional headshot of a young adult male with a neutral expression, set against a blurred office background with cool blue and deep purple ambient lighting. The style is modern corporate photography, emphasizing high-quality skin textures and professional lighting suitable for a high-end fintech application dashboard."
+          src="https://lh3.googleusercontent.com/aida-public/AB6AXuB8Og9DccKJyN0IPhYVfziB_RghXZTYU3yzpWTBwiRSG3-t-gmw5V4F9gjkbWPtPZOKHEuIFX4K2IxlMKBrNWLpRMVghPrjMcSKY0RbfjdZX-fMvGtflN5F0JeGqD150x6S_aB3h9ssSQx47VmeKBu6xrUzXSAAzYVl5pnCQnHsluhlh3e3GxhqE_rFKd09sMB8Ko8NnEzPvEnxEuBlKEphQBa4fjI5fKF12VzvNG00-Qcf3sxgObGTCgZ0LNbNNWh0bsoundl_ia_C"
+        />
+      </div>
+    </header>
+    <main class="pt-20 pb-28 px-gutter">
+      <!-- Header Content -->
+      <section class="mb-stack-lg">
+        <div class="flex flex-col gap-1">
+          <span
+            class="font-label-sm text-label-sm text-on-surface-variant uppercase tracking-widest"
+            >Monitor de Sobrevivência</span
+          >
+          <div class="flex items-baseline gap-2">
+            <h2
+              class="font-display-lg-mobile text-display-lg-mobile text-secondary font-bold"
+            >
+              R$ 1.284,50
+            </h2>
+            <span class="font-label-md text-label-md text-on-surface-variant"
+              >Patrimônio Líquido</span
+            >
+          </div>
+        </div>
+      </section>
+      <!-- Panic Meter -->
+      <section
+        class="mb-stack-lg bg-surface-container-low p-stack-md rounded-xl border border-white/5"
+      >
+        <div class="flex justify-between items-center mb-stack-sm">
+          <span class="font-label-sm text-label-sm text-on-surface-variant"
+            >Tempo Estimado de Vida (Bancária)</span
+          >
+          <span class="font-label-sm text-label-sm text-error font-bold"
+            >Crítico</span
+          >
+        </div>
+        <div
+          class="w-full h-3 bg-surface-container-highest rounded-full overflow-hidden relative"
+        >
+          <div class="absolute inset-0 panic-gradient opacity-20"></div>
+          <div class="h-full bg-error rounded-full" style="width: 14%"></div>
+        </div>
+        <p
+          class="font-label-sm text-label-sm text-on-surface-variant mt-2 text-right"
+        >
+          4 dias restantes até a falência total.
+        </p>
+      </section>
+      <!-- Bancos -->
+      <section class="mb-stack-lg">
+        <div class="flex justify-between items-center mb-stack-md">
+          <h3 class="font-headline-sm text-headline-sm text-on-surface">
+            Bancos
+          </h3>
+          <span
+            class="material-symbols-outlined text-primary text-xl"
+            data-icon="add_circle"
+            >add_circle</span
+          >
+        </div>
+        <div class="grid grid-cols-1 gap-stack-md">
+          <!-- Nubank -->
+          <div
+            class="bg-surface-container-high p-stack-md rounded-xl border border-white/5 flex items-center justify-between"
+          >
+            <div class="flex items-center gap-stack-md">
+              <div
+                class="w-10 h-10 bg-[#820ad1] rounded-lg flex items-center justify-center font-bold text-white"
+              >
+                Nu
+              </div>
+              <div>
+                <p class="font-label-md text-label-md text-on-surface">
+                  Nubank
+                </p>
+                <p
+                  class="font-label-sm text-label-sm text-on-surface-variant italic"
+                >
+                  "Infelizmente"
+                </p>
+              </div>
+            </div>
+            <p class="font-headline-sm text-headline-sm text-on-surface">
+              R$ 42,10
+            </p>
+          </div>
+          <!-- Inter -->
+          <div
+            class="bg-surface-container-high p-stack-md rounded-xl border border-white/5 flex items-center justify-between"
+          >
+            <div class="flex items-center gap-stack-md">
+              <div
+                class="w-10 h-10 bg-[#ff7a00] rounded-lg flex items-center justify-center font-bold text-white italic"
+              >
+                i
+              </div>
+              <div>
+                <p class="font-label-md text-label-md text-on-surface">
+                  Banco Inter
+                </p>
+                <p
+                  class="font-label-sm text-label-sm text-on-surface-variant italic"
+                >
+                  "Vazio como minha alma"
+                </p>
+              </div>
+            </div>
+            <p class="font-headline-sm text-headline-sm text-on-surface">
+              R$ 0,00
+            </p>
+          </div>
+          <!-- Itaú -->
+          <div
+            class="bg-surface-container-high p-stack-md rounded-xl border border-white/5 flex items-center justify-between"
+          >
+            <div class="flex items-center gap-stack-md">
+              <div
+                class="w-10 h-10 bg-[#ec7000] rounded-lg flex items-center justify-center font-bold text-white"
+              >
+                I
+              </div>
+              <div>
+                <p class="font-label-md text-label-md text-on-surface">Itaú</p>
+                <p
+                  class="font-label-sm text-label-sm text-on-surface-variant italic"
+                >
+                  "Efeito Schrödinger"
+                </p>
+              </div>
+            </div>
+            <p class="font-headline-sm text-headline-sm text-on-surface">
+              R$ 1.150,00
+            </p>
+          </div>
+        </div>
+      </section>
+      <!-- Vales -->
+      <section class="mb-stack-lg">
+        <h3
+          class="font-headline-sm text-headline-sm text-on-surface mb-stack-md"
+        >
+          Vales (Benefícios)
+        </h3>
+        <div class="grid grid-cols-1 gap-stack-md">
+          <!-- Alelo -->
+          <div
+            class="bg-surface-container-high p-stack-md rounded-xl border border-white/5 flex items-center justify-between"
+          >
+            <div class="flex items-center gap-stack-md">
+              <div
+                class="w-10 h-10 bg-secondary-container rounded-lg flex items-center justify-center"
+              >
+                <span
+                  class="material-symbols-outlined text-on-secondary-container"
+                  data-icon="restaurant"
+                  >restaurant</span
+                >
+              </div>
+              <div>
+                <p class="font-label-md text-label-md text-on-surface">
+                  Alelo Refeição
+                </p>
+                <p
+                  class="font-label-sm text-label-sm text-on-surface-variant italic"
+                >
+                  "Socorro, cadê o RH?"
+                </p>
+              </div>
+            </div>
+            <p class="font-headline-sm text-headline-sm text-secondary">
+              R$ 92,40
+            </p>
+          </div>
+        </div>
+      </section>
+      <!-- Carteira Física -->
+      <section class="mb-stack-lg">
+        <h3
+          class="font-headline-sm text-headline-sm text-on-surface mb-stack-md"
+        >
+          Carteira Física
+        </h3>
+        <div
+          class="bg-surface-container-high p-stack-md rounded-xl border border-white/5 flex items-center justify-between"
+        >
+          <div class="flex items-center gap-stack-md">
+            <div
+              class="w-10 h-10 bg-tertiary-container rounded-lg flex items-center justify-center"
+            >
+              <span
+                class="material-symbols-outlined text-on-tertiary-container"
+                data-icon="wallet"
+                >wallet</span
+              >
+            </div>
+            <div>
+              <p class="font-label-md text-label-md text-on-surface">Espécie</p>
+              <p
+                class="font-label-sm text-label-sm text-on-surface-variant italic"
+              >
+                Lendas urbanas...
+              </p>
+            </div>
+          </div>
+          <p class="font-headline-sm text-headline-sm text-on-surface">
+            R$ 0,00
+          </p>
+        </div>
+      </section>
+      <!-- Dica de Gestão -->
+      <section
+        class="bg-primary-container/20 p-stack-md rounded-xl border border-primary/20 relative overflow-hidden"
+      >
+        <div class="flex items-start gap-stack-md relative z-10">
+          <span
+            class="material-symbols-outlined text-primary"
+            data-icon="lightbulb"
+            >lightbulb</span
+          >
+          <div>
+            <h4 class="font-label-md text-label-md text-primary font-bold">
+              Dica de Gestão Premium
+            </h4>
+            <p class="font-body-md text-body-md text-on-surface-variant mt-1">
+              Se você não abrir o aplicativo do banco, o saldo negativo não
+              existe tecnicamente.
+            </p>
+          </div>
+        </div>
+        <div class="absolute top-0 right-0 p-2 opacity-10">
+          <span
+            class="material-symbols-outlined text-[64px]"
+            data-icon="monitoring"
+            >monitoring</span
+          >
+        </div>
+      </section>
+    </main>
+    <!-- FAB -->
+    <button
+      class="fixed right-6 bottom-24 w-14 h-14 bg-primary text-on-primary rounded-full shadow-lg flex items-center justify-center active:scale-90 transition-transform duration-200 z-40"
+    >
+      <span class="material-symbols-outlined text-3xl" data-icon="add"
+        >add</span
+      >
+    </button>
+    <!-- BottomNavBar -->
+    <nav
+      class="fixed bottom-0 w-full h-20 bg-surface/90 backdrop-blur-xl border-t border-white/5 flex justify-around items-center px-2 pb-safe z-50 rounded-t-full"
+    >
+      <a
+        class="flex flex-col items-center justify-center text-on-surface-variant hover:text-on-surface transition-colors"
+        href="#"
+      >
+        <span class="material-symbols-outlined" data-icon="home">home</span>
+        <span class="font-label-sm text-label-sm">Início</span>
+      </a>
+      <a
+        class="flex flex-col items-center justify-center text-on-surface-variant hover:text-on-surface transition-colors"
+        href="#"
+      >
+        <span
+          class="material-symbols-outlined"
+          data-icon="account_balance_wallet"
+          >account_balance_wallet</span
+        >
+        <span class="font-label-sm text-label-sm">Transações</span>
+      </a>
+      <!-- Active State: Contas -->
+      <a
+        class="flex flex-col items-center justify-center bg-secondary-container text-on-secondary-container rounded-full px-4 py-1.5 active:scale-90 transition-transform duration-200"
+        href="#"
+      >
+        <span
+          class="material-symbols-outlined"
+          data-icon="payments"
+          style="font-variation-settings: &quot;FILL&quot; 1"
+          >payments</span
+        >
+        <span class="font-label-sm text-label-sm">Contas</span>
+      </a>
+      <a
+        class="flex flex-col items-center justify-center text-on-surface-variant hover:text-on-surface transition-colors"
+        href="#"
+      >
+        <span class="material-symbols-outlined" data-icon="trending_up"
+          >trending_up</span
+        >
+        <span class="font-label-sm text-label-sm">Investimentos</span>
+      </a>
+      <a
+        class="flex flex-col items-center justify-center text-on-surface-variant hover:text-on-surface transition-colors"
+        href="#"
+      >
+        <span class="material-symbols-outlined" data-icon="settings"
+          >settings</span
+        >
+        <span class="font-label-sm text-label-sm">Ajustes</span>
+      </a>
+    </nav>
+    <script>
+      // Micro-interaction for haptic-like feedback on cards
+      document
+        .querySelectorAll(".bg-surface-container-high")
+        .forEach((card) => {
+          card.addEventListener("touchstart", () => {
+            card.style.transform = "scale(0.98)";
+            card.style.transition = "transform 0.1s ease";
+          });
+          card.addEventListener("touchend", () => {
+            card.style.transform = "scale(1)";
+          });
+        });
+
+      // Simple animation for the panic meter on load
+      window.addEventListener("load", () => {
+        const meter = document.querySelector(".bg-error");
+        meter.style.width = "0%";
+        setTimeout(() => {
+          meter.style.transition =
+            "width 1.5s cubic-bezier(0.34, 1.56, 0.64, 1)";
+          meter.style.width = "14%";
+        }, 300);
+      });
+    </script>
+  </body>
+</html>
