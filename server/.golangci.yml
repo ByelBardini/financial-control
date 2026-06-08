@@ -19,6 +19,7 @@ linters:
       ignore-rules:
         - validade
         - independente
+        - convers
   exclusions:
     generated: lax
     presets:
