@@ -11,9 +11,19 @@ import (
 )
 
 type Querier interface {
+	// Soft-delete: marca a conta como arquivada (escopado por id + user_id). RETURNING
+	// vazio (ErrNoRows) quando não é do usuário ou já estava arquivada → 404 no service.
+	ArchiveAccount(ctx context.Context, arg ArchiveAccountParams) (string, error)
+	// Cria conta do usuário. Dinheiro entra em centavos (bigint) e vira NUMERIC no insert.
+	CreateAccount(ctx context.Context, arg CreateAccountParams) (string, error)
 	// Busca por e-mail case-insensitive (usa o índice único users_email_lower_key).
 	// Devolve o hash e is_active pro service decidir (mantém o 401 genérico no service).
 	FindUserByEmail(ctx context.Context, email string) (FindUserByEmailRow, error)
+	// Conta única do usuário (escopada por id + user_id) com saldo derivado em centavos.
+	// Usada pra montar a resposta após criar/editar. ErrNoRows quando não é do usuário.
+	GetAccountByIDWithBalance(ctx context.Context, arg GetAccountByIDWithBalanceParams) (GetAccountByIDWithBalanceRow, error)
+	// "Carteira Física": saldo total das contas em espécie (cash) do usuário.
+	GetCashBalance(ctx context.Context, userID pgtype.UUID) (int64, error)
 	// Receitas e gastos do mês de @reference_date, em centavos (bigint). Mês vazio → 0.
 	// Escopado por usuário.
 	GetMonthSummary(ctx context.Context, arg GetMonthSummaryParams) (GetMonthSummaryRow, error)
@@ -22,10 +32,24 @@ type Querier interface {
 	// Saldo all-time (não mês): opening_balance + soma do ledger, em centavos (bigint).
 	// Escopado por usuário: contas do usuário + apenas transações dele no join.
 	ListAccountsWithBalance(ctx context.Context, userID pgtype.UUID) ([]ListAccountsWithBalanceRow, error)
+	// Queries da tela de Contas. Saldo é derivado (opening_balance + soma do ledger),
+	// convertido p/ centavos (bigint) com cast no SQL. Tudo escopado por user_id, com
+	// o join de transações filtrado pelo mesmo dono (isolamento nos dois lados).
+	// Contas "Bancos": corrente + poupança, com saldo e campos de apresentação.
+	ListBankAccounts(ctx context.Context, userID pgtype.UUID) ([]ListBankAccountsRow, error)
 	// Gasto por categoria (apenas despesas) no mês de @reference_date, em centavos (bigint).
 	// Escopado por usuário nos DOIS lados do join (transação e categoria do mesmo dono).
 	// Aproveita o índice parcial idx_transactions_user_cat_exp. Maior gasto primeiro.
 	ListCategorySpend(ctx context.Context, arg ListCategorySpendParams) ([]ListCategorySpendRow, error)
+	// Cartões de crédito do usuário: saldo (negativo = dívida) + limite + apresentação,
+	// p/ a seção "Cartões" (por cartão) e o Raio-X (somado).
+	ListCreditAccounts(ctx context.Context, userID pgtype.UUID) ([]ListCreditAccountsRow, error)
+	// Contas "Vales": saldo atual + valor concedido (opening_balance) como baseline de 100%.
+	ListVoucherAccounts(ctx context.Context, userID pgtype.UUID) ([]ListVoucherAccountsRow, error)
+	// Atualiza os campos mutáveis da conta (escopado por id + user_id). NÃO altera o
+	// opening_balance: saldo só muda via transações, nunca por edição manual. RETURNING
+	// vazio (ErrNoRows) quando a conta não é do usuário ou já está arquivada → 404.
+	UpdateAccount(ctx context.Context, arg UpdateAccountParams) (string, error)
 }
 
 var _ Querier = (*Queries)(nil)

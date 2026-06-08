@@ -11,6 +11,130 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const archiveAccount = `-- name: ArchiveAccount :one
+UPDATE accounts SET is_archived = true
+WHERE id = $1
+  AND user_id = $2
+  AND is_archived = false
+RETURNING id::text AS id
+`
+
+type ArchiveAccountParams struct {
+	ID     pgtype.UUID
+	UserID pgtype.UUID
+}
+
+// Soft-delete: marca a conta como arquivada (escopado por id + user_id). RETURNING
+// vazio (ErrNoRows) quando não é do usuário ou já estava arquivada → 404 no service.
+func (q *Queries) ArchiveAccount(ctx context.Context, arg ArchiveAccountParams) (string, error) {
+	row := q.db.QueryRow(ctx, archiveAccount, arg.ID, arg.UserID)
+	var id string
+	err := row.Scan(&id)
+	return id, err
+}
+
+const createAccount = `-- name: CreateAccount :one
+INSERT INTO accounts (
+    user_id, name, account_type, opening_balance, icon, tone, dot_color, subtitle, credit_limit
+) VALUES (
+    $1,
+    $2,
+    $3,
+    ($4::bigint)::numeric / 100,
+    $5,
+    $6,
+    $7,
+    $8,
+    ($9::bigint)::numeric / 100
+)
+RETURNING id::text AS id
+`
+
+type CreateAccountParams struct {
+	UserID              pgtype.UUID
+	Name                string
+	AccountType         string
+	OpeningBalanceCents int64
+	Icon                string
+	Tone                string
+	DotColor            string
+	Subtitle            pgtype.Text
+	CreditLimitCents    pgtype.Int8
+}
+
+// Cria conta do usuário. Dinheiro entra em centavos (bigint) e vira NUMERIC no insert.
+func (q *Queries) CreateAccount(ctx context.Context, arg CreateAccountParams) (string, error) {
+	row := q.db.QueryRow(ctx, createAccount,
+		arg.UserID,
+		arg.Name,
+		arg.AccountType,
+		arg.OpeningBalanceCents,
+		arg.Icon,
+		arg.Tone,
+		arg.DotColor,
+		arg.Subtitle,
+		arg.CreditLimitCents,
+	)
+	var id string
+	err := row.Scan(&id)
+	return id, err
+}
+
+const getAccountByIDWithBalance = `-- name: GetAccountByIDWithBalance :one
+SELECT
+    a.id::text                                                              AS id,
+    a.name                                                                  AS name,
+    a.account_type                                                          AS account_type,
+    COALESCE(a.subtitle, '')                                                AS subtitle,
+    ((a.opening_balance + COALESCE(SUM(t.signed_amount), 0)) * 100)::bigint AS balance_cents,
+    a.icon                                                                  AS icon,
+    a.tone                                                                  AS tone,
+    a.dot_color                                                             AS dot_color,
+    (COALESCE(a.credit_limit, 0) * 100)::bigint                             AS credit_limit_cents
+FROM accounts a
+LEFT JOIN transactions t ON t.account_id = a.id AND t.user_id = a.user_id
+WHERE a.id = $1
+  AND a.user_id = $2
+  AND a.is_archived = false
+GROUP BY a.id, a.name, a.account_type, a.subtitle, a.opening_balance, a.icon, a.tone, a.dot_color, a.credit_limit
+`
+
+type GetAccountByIDWithBalanceParams struct {
+	ID     pgtype.UUID
+	UserID pgtype.UUID
+}
+
+type GetAccountByIDWithBalanceRow struct {
+	ID               string
+	Name             string
+	AccountType      string
+	Subtitle         string
+	BalanceCents     int64
+	Icon             string
+	Tone             string
+	DotColor         string
+	CreditLimitCents int64
+}
+
+// Conta única do usuário (escopada por id + user_id) com saldo derivado em centavos.
+// Usada pra montar a resposta após criar/editar. ErrNoRows quando não é do usuário.
+func (q *Queries) GetAccountByIDWithBalance(ctx context.Context, arg GetAccountByIDWithBalanceParams) (GetAccountByIDWithBalanceRow, error) {
+	row := q.db.QueryRow(ctx, getAccountByIDWithBalance, arg.ID, arg.UserID)
+	var i GetAccountByIDWithBalanceRow
+	err := row.Scan(
+		&i.ID,
+		&i.Name,
+		&i.AccountType,
+		&i.Subtitle,
+		&i.BalanceCents,
+		&i.Icon,
+		&i.Tone,
+		&i.DotColor,
+		&i.CreditLimitCents,
+	)
+	return i, err
+}
+
 const listAccountsWithBalance = `-- name: ListAccountsWithBalance :many
 SELECT
     a.id::text                                                             AS id,
@@ -63,4 +187,51 @@ func (q *Queries) ListAccountsWithBalance(ctx context.Context, userID pgtype.UUI
 		return nil, err
 	}
 	return items, nil
+}
+
+const updateAccount = `-- name: UpdateAccount :one
+UPDATE accounts SET
+    name         = $1,
+    account_type = $2,
+    icon         = $3,
+    tone         = $4,
+    dot_color    = $5,
+    subtitle     = $6,
+    credit_limit = ($7::bigint)::numeric / 100
+WHERE id = $8
+  AND user_id = $9
+  AND is_archived = false
+RETURNING id::text AS id
+`
+
+type UpdateAccountParams struct {
+	Name             string
+	AccountType      string
+	Icon             string
+	Tone             string
+	DotColor         string
+	Subtitle         pgtype.Text
+	CreditLimitCents pgtype.Int8
+	ID               pgtype.UUID
+	UserID           pgtype.UUID
+}
+
+// Atualiza os campos mutáveis da conta (escopado por id + user_id). NÃO altera o
+// opening_balance: saldo só muda via transações, nunca por edição manual. RETURNING
+// vazio (ErrNoRows) quando a conta não é do usuário ou já está arquivada → 404.
+func (q *Queries) UpdateAccount(ctx context.Context, arg UpdateAccountParams) (string, error) {
+	row := q.db.QueryRow(ctx, updateAccount,
+		arg.Name,
+		arg.AccountType,
+		arg.Icon,
+		arg.Tone,
+		arg.DotColor,
+		arg.Subtitle,
+		arg.CreditLimitCents,
+		arg.ID,
+		arg.UserID,
+	)
+	var id string
+	err := row.Scan(&id)
+	return id, err
 }

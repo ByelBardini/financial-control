@@ -20,6 +20,8 @@ type Account struct {
 	CreatedAt      pgtype.Timestamptz
 	UpdatedAt      pgtype.Timestamptz
 	UserID         pgtype.UUID
+	Subtitle       pgtype.Text
+	CreditLimit    pgtype.Numeric
 }
 
 type Category struct {

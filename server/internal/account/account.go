@@ -22,9 +22,13 @@ type Account struct {
 	DotColor     string `json:"dotColor"`
 }
 
-// AccountStore é a dependência de dados do serviço de contas.
+// AccountStore é a dependência de dados do serviço de contas (leitura + CRUD).
 type AccountStore interface {
 	ListAccountsWithBalance(ctx context.Context, userID string) ([]store.AccountRow, error)
+	CreateAccount(ctx context.Context, userID string, in store.AccountInput) (string, error)
+	UpdateAccount(ctx context.Context, userID, id string, in store.AccountInput) error
+	ArchiveAccount(ctx context.Context, userID, id string) error
+	GetAccountByID(ctx context.Context, userID, id string) (store.AccountDetail, error)
 }
 
 // Service lê contas a partir do store.

@@ -7,6 +7,7 @@ import (
 
 	"financial-control/server/internal/account"
 	"financial-control/server/internal/auth"
+	"financial-control/server/internal/contas"
 	"financial-control/server/internal/dashboard"
 	"financial-control/server/internal/health"
 	"financial-control/server/internal/httpx"
@@ -25,6 +26,7 @@ type Deps struct {
 	Auth      *auth.Service
 	Account   *account.Service
 	Dashboard *dashboard.Service
+	Contas    *contas.Service
 }
 
 // New devolve o roteador com todas as rotas registradas. Só `GET /health` e
@@ -44,7 +46,14 @@ func New(d Deps) http.Handler {
 	protected := func(h http.Handler) http.Handler { return auth.RequireAuth(d.Auth, h) }
 
 	mux.Handle("GET /auth/me", protected(auth.MeHandler(d.Auth)))
+
+	// Recurso "contas" (CRUD): leitura (lista do dashboard) + detalhe + escrita.
 	mux.Handle("GET /accounts", protected(account.ListHandler(d.Account)))
+	mux.Handle("GET /accounts/{id}", protected(account.GetHandler(d.Account)))
+	mux.Handle("POST /accounts", protected(account.CreateHandler(d.Account)))
+	mux.Handle("PATCH /accounts/{id}", protected(account.UpdateHandler(d.Account)))
+	mux.Handle("DELETE /accounts/{id}", protected(account.ArchiveHandler(d.Account)))
+
 	mux.Handle("GET /dashboard/summary", protected(dashboard.SummaryHandler(d.Dashboard)))
 	mux.Handle("GET /dashboard/categories", protected(dashboard.CategoriesHandler(d.Dashboard)))
 	mux.Handle("GET /dashboard/este-mes", protected(dashboard.EsteMesHandler(d.Dashboard)))
@@ -52,6 +61,14 @@ func New(d Deps) http.Handler {
 	mux.Handle("GET /investments", protected(dashboard.InvestmentsHandler(d.Dashboard)))
 	mux.Handle("GET /dashboard/investments-summary", protected(dashboard.InvestmentsSummaryHandler(d.Dashboard)))
 	mux.Handle("GET /dashboard/ticker", protected(dashboard.TickerHandler(d.Dashboard)))
+
+	// Views agregadas da tela de Contas.
+	mux.Handle("GET /contas/banks", protected(contas.BanksHandler(d.Contas)))
+	mux.Handle("GET /contas/cards", protected(contas.CardsHandler(d.Contas)))
+	mux.Handle("GET /contas/vouchers", protected(contas.VouchersHandler(d.Contas)))
+	mux.Handle("GET /contas/cash", protected(contas.CashHandler(d.Contas)))
+	mux.Handle("GET /contas/xray", protected(contas.XrayHandler(d.Contas)))
+	mux.Handle("GET /contas/tip", protected(contas.TipHandler(d.Contas)))
 
 	return httpx.CORS(mux)
 }
