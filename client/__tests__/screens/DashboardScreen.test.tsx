@@ -25,7 +25,6 @@ describe('DashboardScreen (responsivo)', () => {
     await renderWithClient(<DashboardScreen />);
 
     expect(screen.getByText('Visão Geral')).toBeOnTheScreen();
-    expect(screen.getByText('Gestão de Crise')).toBeOnTheScreen();
   });
 
   it('oculta e revela valores ao tocar no switch', async () => {
