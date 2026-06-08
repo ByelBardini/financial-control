@@ -22,6 +22,7 @@ import (
 
 	"financial-control/server/internal/account"
 	"financial-control/server/internal/auth"
+	"financial-control/server/internal/contas"
 	"financial-control/server/internal/dashboard"
 	"financial-control/server/internal/router"
 	"financial-control/server/internal/store"
@@ -37,6 +38,7 @@ func newServer(t *testing.T, st *store.Store) *httptest.Server {
 		Auth:      auth.NewService(st, auth.NewTokenIssuer(itestSecret), auth.TTLs{Default: time.Hour, Remember: time.Hour}),
 		Account:   account.NewService(st),
 		Dashboard: dashboard.NewService(st),
+		Contas:    contas.NewService(st),
 	}))
 	t.Cleanup(srv.Close)
 	return srv

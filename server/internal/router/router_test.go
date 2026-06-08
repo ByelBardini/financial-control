@@ -7,6 +7,7 @@ import (
 
 	"financial-control/server/internal/account"
 	"financial-control/server/internal/auth"
+	"financial-control/server/internal/contas"
 	"financial-control/server/internal/dashboard"
 	"financial-control/server/internal/router"
 )
@@ -19,6 +20,7 @@ func newTestRouter() http.Handler {
 		Auth:      authSvc,
 		Account:   account.NewService(nil),
 		Dashboard: dashboard.NewService(nil),
+		Contas:    contas.NewService(nil),
 	})
 }
 
@@ -36,12 +38,36 @@ func TestRotasDeDadosExigemToken(t *testing.T) {
 		"/dashboard/investments-summary",
 		"/dashboard/ticker",
 		"/auth/me",
+		"/accounts/a1",
+		"/contas/banks",
+		"/contas/cards",
+		"/contas/vouchers",
+		"/contas/cash",
+		"/contas/xray",
+		"/contas/tip",
 	}
 	for _, p := range dataPaths {
 		rec := httptest.NewRecorder()
 		h.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, p, nil)) // sem Authorization
 		if rec.Code != http.StatusUnauthorized {
 			t.Errorf("GET %s sem token = %d, quero 401", p, rec.Code)
+		}
+	}
+}
+
+// As rotas de escrita de conta (CRUD) também exigem token.
+func TestRotasDeEscritaExigemToken(t *testing.T) {
+	h := newTestRouter()
+	cases := []struct{ method, path string }{
+		{http.MethodPost, "/accounts"},
+		{http.MethodPatch, "/accounts/a1"},
+		{http.MethodDelete, "/accounts/a1"},
+	}
+	for _, c := range cases {
+		rec := httptest.NewRecorder()
+		h.ServeHTTP(rec, httptest.NewRequest(c.method, c.path, nil)) // sem Authorization
+		if rec.Code != http.StatusUnauthorized {
+			t.Errorf("%s %s sem token = %d, quero 401", c.method, c.path, rec.Code)
 		}
 	}
 }

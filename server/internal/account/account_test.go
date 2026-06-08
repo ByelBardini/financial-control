@@ -13,16 +13,51 @@ import (
 )
 
 // fakeAccountStore é o fake nomeado da dependência de dados (sem banco real).
-// Captura o userID recebido pra provar que o handler escopa por usuário.
+// Captura o userID/id/input recebidos pra provar escopo por usuário e mapeamento.
 type fakeAccountStore struct {
 	rows      []store.AccountRow
 	err       error
 	gotUserID string
+
+	// CRUD
+	detail     store.AccountDetail // devolvido por GetAccountByID (resposta de create/update)
+	newID      string
+	createErr  error
+	updateErr  error
+	archiveErr error
+	getErr     error
+	gotID      string
+	gotInput   store.AccountInput
 }
 
 func (f *fakeAccountStore) ListAccountsWithBalance(_ context.Context, userID string) ([]store.AccountRow, error) {
 	f.gotUserID = userID
 	return f.rows, f.err
+}
+
+func (f *fakeAccountStore) CreateAccount(_ context.Context, userID string, in store.AccountInput) (string, error) {
+	f.gotUserID = userID
+	f.gotInput = in
+	return f.newID, f.createErr
+}
+
+func (f *fakeAccountStore) UpdateAccount(_ context.Context, userID, id string, in store.AccountInput) error {
+	f.gotUserID = userID
+	f.gotID = id
+	f.gotInput = in
+	return f.updateErr
+}
+
+func (f *fakeAccountStore) ArchiveAccount(_ context.Context, userID, id string) error {
+	f.gotUserID = userID
+	f.gotID = id
+	return f.archiveErr
+}
+
+func (f *fakeAccountStore) GetAccountByID(_ context.Context, userID, id string) (store.AccountDetail, error) {
+	f.gotUserID = userID
+	f.gotID = id
+	return f.detail, f.getErr
 }
 
 // authed cria um GET já autenticado (userID no contexto, como o middleware faria).
