@@ -64,6 +64,18 @@ func TestCORSLiberaPOSTeAuthorization(t *testing.T) {
 	}
 }
 
+func TestCORSLiberaPatchEDelete(t *testing.T) {
+	// O CRUD de contas usa PATCH e DELETE — o preflight precisa liberá-los.
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodOptions, "/accounts/a1", nil)
+	httpx.CORS(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {})).ServeHTTP(rec, req)
+
+	methods := rec.Header().Get("Access-Control-Allow-Methods")
+	if !strings.Contains(methods, "PATCH") || !strings.Contains(methods, "DELETE") {
+		t.Fatalf("Allow-Methods = %q, faltou PATCH/DELETE", methods)
+	}
+}
+
 func TestCORSRespeitaOrigemConfigurada(t *testing.T) {
 	t.Setenv("CORS_ALLOW_ORIGIN", "http://localhost:8081")
 

@@ -19,8 +19,9 @@
 - **Decisão:** o client trabalha em **centavos (inteiro)** ponta a ponta. Sem aritmética monetária com `number`.
 - Formatação para exibição (R$) só na borda da UI, via `client/src/lib/money.ts#formatBRL(cents)`, que usa `Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' })`.
 - **`formatBRL` normaliza o espaço do `Intl`** (NBSP ` ` / narrow-NBSP ` ` → espaço comum): a saída do `Intl` não é byte-idêntica entre Hermes (device), web e Node (jest), então normalizar garante string estável (`"R$ 42,50"`). Ver `gotchas.md`.
+- **Entrada monetária (`MoneyField`): máscara de centavos.** O `"R$"` é prefixo fixo do campo e cada dígito entra pela **direita** (`1`→`0,01`, `10`→`0,10`, `100`→`1,00`) — nunca se digita o separador. `client/src/lib/money.ts#digitsToCents(text)` lê só os dígitos → centavos (inteiro); `formatCentsInput(cents)` reformata pra exibição (`"1.234,56"`, vazio quando 0). O componente reformata o texto a cada tecla a partir do valor acumulado. Usado em saldo inicial e limite de crédito (sempre ≥ 0). **Cartão não tem saldo inicial** (só limite): o saldo do cartão é a fatura, derivada das transações — o form esconde "Saldo inicial" p/ `credit_card` e o server rejeita `openingBalanceCents != 0`.
 
 ## Decisões em aberto
 - [x] **Leitura:** inteiro-em-centavos no Go. As queries do `sqlc` convertem `NUMERIC`→centavos com cast no SQL (`(x*100)::bigint`), devolvendo `int64` — sem lib decimal, sem `float`. Casa com o client (centavos ponta a ponta).
-- [ ] **Escrita/mutação:** quando entrarem endpoints de escrita (inserir/editar valores), decidir entre lib decimal (ex.: `shopspring/decimal`) e inteiro-em-centavos para o caminho de gravação.
+- [x] **Escrita/mutação:** **inteiro-em-centavos** também na gravação (consistente com a leitura e o client). Os endpoints de escrita de conta (`POST`/`PATCH /accounts`, em `account/crud.go`) recebem `*Cents` (`int64`); o SQL converte centavos→NUMERIC na borda (`(@x_cents::bigint)::numeric / 100`), espelhando o cast inverso da leitura. Sem lib decimal, sem `float`. Valores opcionais (ex.: `creditLimitCents`) são `*int64` (nil = NULL).
 - [ ] Definir a precisão (casas decimais) por moeda.

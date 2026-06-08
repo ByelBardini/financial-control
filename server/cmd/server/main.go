@@ -8,6 +8,7 @@ import (
 	"financial-control/server/internal/account"
 	"financial-control/server/internal/auth"
 	"financial-control/server/internal/config"
+	"financial-control/server/internal/contas"
 	"financial-control/server/internal/dashboard"
 	"financial-control/server/internal/router"
 	"financial-control/server/internal/store"
@@ -35,6 +36,7 @@ func main() {
 		Auth:      authSvc,
 		Account:   account.NewService(st),
 		Dashboard: dashboard.NewService(st),
+		Contas:    contas.NewService(st),
 	}
 
 	addr := ":" + cfg.Port

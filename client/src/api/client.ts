@@ -58,3 +58,29 @@ export async function apiPost<T>(path: string, body: unknown): Promise<T> {
   if (!res.ok) return throwApiError(res);
   return (await res.json()) as T;
 }
+
+// PATCH tipado com corpo JSON; anexa o Bearer (se houver). Usado p/ editar conta.
+//
+//   const acc = await apiPatch<Account>('/accounts/123', changes);
+export async function apiPatch<T>(path: string, body: unknown): Promise<T> {
+  const res = await fetch(`${API_BASE_URL}${path}`, {
+    method: 'PATCH',
+    headers: { Accept: 'application/json', 'Content-Type': 'application/json', ...authHeaders() },
+    body: JSON.stringify(body),
+  });
+
+  if (!res.ok) return throwApiError(res);
+  return (await res.json()) as T;
+}
+
+// DELETE; anexa o Bearer (se houver). Resposta é 204 sem corpo — não parseia JSON.
+//
+//   await apiDelete('/accounts/123');
+export async function apiDelete(path: string): Promise<void> {
+  const res = await fetch(`${API_BASE_URL}${path}`, {
+    method: 'DELETE',
+    headers: { Accept: 'application/json', ...authHeaders() },
+  });
+
+  if (!res.ok) return throwApiError(res);
+}

@@ -17,8 +17,18 @@ const glyphs = {
   settings: 'settings',
   medical_services: 'medical-services',
   add: 'add',
+  add_circle: 'add-circle',
   check: 'check',
+  close: 'close',
   logout: 'logout',
+  restaurant: 'restaurant',
+  shopping_basket: 'shopping-basket',
+  fastfood: 'fastfood',
+  savings: 'savings',
+  wallet: 'wallet',
+  payments: 'payments',
+  corporate_fare: 'corporate-fare',
+  lightbulb: 'lightbulb',
 } as const;
 
 export type IconName = keyof typeof glyphs;

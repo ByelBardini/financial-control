@@ -1,4 +1,5 @@
-import { Pressable, Text, View } from 'react-native';
+import { Text, View } from 'react-native';
+import { HideValuesToggle } from '../HideValuesToggle';
 import { Icon } from '../Icon';
 
 type DesktopHeaderProps = {
@@ -27,19 +28,7 @@ export function DesktopHeader({ hidden, onToggleHidden }: DesktopHeaderProps) {
           </Text>
         </View>
 
-        <Pressable
-          onPress={onToggleHidden}
-          accessibilityRole="switch"
-          accessibilityState={{ checked: hidden }}
-          accessibilityLabel={hidden ? 'Mostrar valores' : 'Ocultar valores'}
-          hitSlop={8}
-          className="flex-row items-center gap-stack-sm rounded-full border border-outline-variant bg-surface-container-lowest px-stack-md py-base"
-        >
-          <Icon name={hidden ? 'visibility_off' : 'visibility'} size={16} color="#cbc3d7" />
-          <Text className="font-geist-medium text-label-sm text-on-surface-variant">
-            {hidden ? 'Mostrar Valores' : 'Ocultar Valores'}
-          </Text>
-        </Pressable>
+        <HideValuesToggle hidden={hidden} onToggleHidden={onToggleHidden} />
 
         <View className="flex-row items-center gap-stack-sm rounded-lg bg-surface-container-highest px-stack-md py-base">
           <Icon name="add" size={16} color="#d0bcff" />

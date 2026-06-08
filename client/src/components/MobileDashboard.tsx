@@ -15,17 +15,26 @@ import {
   useInvestments,
   useMonthBalance,
 } from '../hooks/useDashboardQueries';
+import type { AppRoute } from '../navigation/routes';
 
 type MobileDashboardProps = {
   hidden: boolean;
   onToggleHidden: () => void;
+  route?: AppRoute;
+  onNavigate?: (route: AppRoute) => void;
   onLogout?: () => void;
 };
 
 // Pilha vertical do mobile. Cada seção é uma query independente (loading/erro por
 // seção via QuerySection). BottomNav fixa respeitando o safe-area; o conteúdo
 // reserva espaço (pb) pra não ficar atrás dela.
-export function MobileDashboard({ hidden, onToggleHidden, onLogout }: MobileDashboardProps) {
+export function MobileDashboard({
+  hidden,
+  onToggleHidden,
+  route = 'dashboard',
+  onNavigate,
+  onLogout,
+}: MobileDashboardProps) {
   const insets = useSafeAreaInsets();
   const balance = useMonthBalance();
   const accounts = useAccounts();
@@ -61,7 +70,7 @@ export function MobileDashboard({ hidden, onToggleHidden, onLogout }: MobileDash
         </QuerySection>
       </ScrollView>
       <View className="absolute bottom-0 left-0 right-0" style={{ paddingBottom: insets.bottom }}>
-        <BottomNav />
+        <BottomNav currentRoute={route} onNavigate={onNavigate} />
       </View>
     </View>
   );

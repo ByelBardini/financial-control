@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"time"
 
+	"financial-control/server/internal/pct"
 	"financial-control/server/internal/store"
 )
 
@@ -38,7 +39,7 @@ func (s *Service) MonthBalance(ctx context.Context, userID string, month time.Ti
 	if err != nil {
 		return MonthBalance{}, fmt.Errorf("dashboard: resumo do mês: %w", err)
 	}
-	label, quip := statusFor(pctInt(sum.GastosCents, sum.ReceitasCents))
+	label, quip := statusFor(pct.Round(sum.GastosCents, sum.ReceitasCents))
 	return MonthBalance{
 		NetCents:       sum.ReceitasCents - sum.GastosCents,
 		AvailableLabel: availableLabel,
@@ -66,7 +67,7 @@ func (s *Service) Categories(ctx context.Context, userID string, month time.Time
 			ID:          r.ID,
 			Label:       r.Label,
 			AmountCents: r.AmountCents,
-			Percent:     pctInt(r.AmountCents, total),
+			Percent:     pct.Round(r.AmountCents, total),
 			Tone:        r.Tone,
 		})
 	}
@@ -88,7 +89,7 @@ func (s *Service) EsteMes(ctx context.Context, userID string, month time.Time) (
 		villain = cats[0].Label // já vem ordenado por gasto desc
 	}
 	return EsteMes{
-		SpentPercent:   pctInt(sum.GastosCents, sum.ReceitasCents),
+		SpentPercent:   pct.Round(sum.GastosCents, sum.ReceitasCents),
 		BiggestVillain: villain,
 	}, nil
 }
@@ -123,14 +124,6 @@ func diagnosisBody(netCents int64) string {
 	default:
 		return "O vermelho bateu. Hora de cortar o delivery."
 	}
-}
-
-// pctInt devolve round(part/whole*100) como inteiro 0..100, seguro contra divisão por zero.
-func pctInt(part, whole int64) int {
-	if whole <= 0 {
-		return 0
-	}
-	return int((part*100 + whole/2) / whole)
 }
 
 // statusFor mapeia o percentual gasto da receita para a personalidade "Pobrify".

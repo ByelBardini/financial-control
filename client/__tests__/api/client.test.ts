@@ -1,4 +1,4 @@
-import { apiGet, apiPost, ApiError, setAuthToken } from '../../src/api/client';
+import { apiDelete, apiGet, apiPatch, apiPost, ApiError, setAuthToken } from '../../src/api/client';
 
 // Monta um Response falso só com o que o apiGet usa (ok/status/json).
 const mockResponse = (body: unknown, init?: { ok?: boolean; status?: number }) =>
@@ -117,5 +117,58 @@ describe('apiPost', () => {
 
     const headers = fetchMock.mock.calls[0][1].headers as Record<string, string>;
     expect(headers.Authorization).toBe('Bearer tok-xyz');
+  });
+});
+
+describe('apiPatch', () => {
+  it('faz PATCH com corpo JSON e devolve o corpo tipado', async () => {
+    fetchMock.mockResolvedValue(mockResponse({ id: 'a1', name: 'X' }));
+
+    const data = await apiPatch<{ id: string; name: string }>('/accounts/a1', { name: 'X' });
+
+    expect(data).toEqual({ id: 'a1', name: 'X' });
+    const [url, init] = fetchMock.mock.calls[0];
+    expect(url).toBe('http://localhost:8080/accounts/a1');
+    expect(init.method).toBe('PATCH');
+    expect(init.body).toBe(JSON.stringify({ name: 'X' }));
+    expect((init.headers as Record<string, string>)['Content-Type']).toBe('application/json');
+  });
+
+  it('lança ApiError(404) quando a conta não existe', async () => {
+    fetchMock.mockResolvedValue(
+      mockResponse({ error: 'não encontrada' }, { ok: false, status: 404 }),
+    );
+
+    await expect(apiPatch('/accounts/x', {})).rejects.toMatchObject({
+      name: 'ApiError',
+      status: 404,
+    });
+  });
+});
+
+describe('apiDelete', () => {
+  it('faz DELETE e resolve sem corpo (204)', async () => {
+    fetchMock.mockResolvedValue({ ok: true, status: 204 } as unknown as Response);
+
+    await expect(apiDelete('/accounts/a1')).resolves.toBeUndefined();
+    const [url, init] = fetchMock.mock.calls[0];
+    expect(url).toBe('http://localhost:8080/accounts/a1');
+    expect(init.method).toBe('DELETE');
+  });
+
+  it('anexa Authorization: Bearer no DELETE quando há token', async () => {
+    fetchMock.mockResolvedValue({ ok: true, status: 204 } as unknown as Response);
+    setAuthToken('tok-del');
+
+    await apiDelete('/accounts/a1');
+
+    const headers = fetchMock.mock.calls[0][1].headers as Record<string, string>;
+    expect(headers.Authorization).toBe('Bearer tok-del');
+  });
+
+  it('lança ApiError em falha', async () => {
+    fetchMock.mockResolvedValue(mockResponse({ error: 'nope' }, { ok: false, status: 404 }));
+
+    await expect(apiDelete('/accounts/x')).rejects.toMatchObject({ name: 'ApiError', status: 404 });
   });
 });

@@ -14,7 +14,7 @@
 
 ## Pastas
 - `server/db/migrations/` — migrations versionadas (`00001_init.sql`, …). O `sqlc` lê o schema daqui.
-- `server/db/queries/` — SQL das queries do `sqlc` (`accounts.sql`, `dashboard.sql`).
+- `server/db/queries/` — SQL das queries do `sqlc` (`accounts.sql` [leitura + CRUD], `dashboard.sql`, `contas.sql` [views da tela de Contas], `users.sql`).
 - `server/db/seed.sql` — dados de exemplo (rodado à mão, **não** é migration goose; faz `TRUNCATE` + insert ancorado no mês corrente).
 
 ## Convenções
@@ -32,7 +32,7 @@
 - **Isolamento:** TODA query de dado filtra por `user_id` (nos **dois** lados de qualquer join — ex.: `ListCategorySpend` exige `t.user_id` E `c.user_id`). O `user_id` vem só do JWT (nunca de input). O `seed.sql` atribui os dados demo ao usuário padrão.
 
 ## Modelo de dados (v1 — migration `00001_init.sql`)
-- **`accounts`** — contas (banco/carteira/exchange/cartão). Saldo é **derivado**: `opening_balance + SUM(transactions.signed_amount)`; **não** há coluna de saldo cacheada (evita drift).
+- **`accounts`** — contas. Saldo é **derivado**: `opening_balance + SUM(transactions.signed_amount)`; **não** há coluna de saldo cacheada (evita drift). `account_type` (CHECK): `checking`/`savings`/`cash`/`exchange`/`credit_card`/**`voucher`** (este último + as colunas `subtitle` e `credit_limit` vieram na migration **`00003`**, para a tela de Contas). `dot_color` é a cor de marca (= `brandColor` no client); `credit_limit` (NUMERIC, nullable) só faz sentido p/ `credit_card` — alimenta a seção **Cartões** (`/contas/cards`, por cartão) e o agregado do **Raio-X** (`ListCreditAccounts` projeta `id/icon/dot_color` além de saldo/limite; sem mudança de schema); `subtitle` é o texto "Conta Corrente • Final 4022". `is_archived=true` = soft-delete (o DELETE de conta arquiva).
 - **`categories`** — customizáveis: `kind` (`expense`/`income`), `color`, `icon`, `parent_id` (subcategorias), arquiváveis.
 - **`recurring_rules`** — regras de recorrência (frequência + intervalo + início, fim opcional). Geram ocorrências em `transactions`. Individual = transação sem regra; temporária = regra com `end_date` **ou** `max_occurrences` (mutuamente exclusivos); permanente = sem fim.
 - **`transactions`** — tabela única com `direction` (`income`/`expense`). `signed_amount` é coluna gerada (`+amount`/`-amount`). `occurred_on` (date) é a chave de competência que o dashboard agrupa por mês. **Parcelamento** (`kind='installment'`): cada parcela é uma linha com `purchase_group_id`, `installment_number/total` e `purchase_total_amount` (CHECK garante coerência tudo-ou-nada).

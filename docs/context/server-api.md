@@ -7,11 +7,11 @@
 - Config: `internal/config` lê `DATABASE_URL` (obrigatória), `JWT_SECRET` (obrigatória, ≥32 bytes), `PORT` (default `8080`) e `JWT_TTL_DEFAULT`/`JWT_TTL_REMEMBER` (defaults `24h`/`720h`).
 - Roteador: `internal/router/router.go` — `router.New(Deps)` injeta os serviços de domínio e registra as rotas.
 - Dados: `internal/store` abre o pool (`pgxpool`) e embrulha as queries geradas pelo **sqlc** (`internal/store/gen`), devolvendo tipos próprios em **centavos** (`NUMERIC` convertido via cast no SQL — nunca float).
-- Domínios: `health` (liveness), `auth` (login + sessão), `account` (contas com saldo), `dashboard` (resumo do mês, categorias, este-mês, diagnóstico + stubs deferidos de investimentos/ticker). Helper compartilhado em `internal/httpx` (`WriteJSON`/`WriteError`/`CORS`).
+- Domínios: `health` (liveness), `auth` (login + sessão), `account` (contas com saldo + **CRUD**: create/update/archive em `account/crud.go`), `dashboard` (resumo do mês, categorias, este-mês, diagnóstico + stubs deferidos de investimentos/ticker), `contas` (views agregadas da tela de Contas: banks/cards/vouchers/cash/xray/tip, agrupando `accounts` por tipo + personalidade derivada). Helper compartilhado em `internal/httpx` (`WriteJSON`/`WriteError`/`CORS` — CORS libera `GET, POST, PATCH, DELETE, OPTIONS`).
 - **Auth real, multi-usuário (`internal/auth`):** senha com **bcrypt**; sessão por **JWT HS256 alg-pinned** (claims `sub`/`iat`/`exp`; `exp` = 24h ou 30d conforme `rememberMe`). `RequireAuth` (middleware) exige `Authorization: Bearer`, valida assinatura/expiração + `is_active` (liveness) e injeta o `userID` no contexto — **fail-closed** (qualquer falha = 401, sem chamar o handler). O `userID` vem **só do token**, nunca de input do client. Só `GET /health` e `POST /auth/login` são públicos; **toda rota de dados** (inclusive os stubs) passa pelo `RequireAuth`. Login 401 genérico (e-mail/senha/inativo indistinguíveis) + bcrypt dummy (anti-enumeração). **Rate-limit anti-força-bruta** no `POST /auth/login` (`internal/ratelimit`): token-bucket em memória por IP (`ClientIP` do `RemoteAddr`), `5` tentativas/IP recarregando em `1min`; estourado → **429** com `Retry-After`, sem tocar no handler. É single-instance (estado em memória; atrás de réplicas cada uma limita sozinha) e confia no `RemoteAddr`, não no `X-Forwarded-For` — ponha um proxy confiável na frente se for encaminhar. Usuário padrão semeado na migration `00002`: `teste@teste.com` / `12345`.
 - **Isolamento por usuário:** todo handler de dados lê o `userID` do contexto e o repassa ao service → store; as queries filtram por `user_id` (ver `database.md`). Teste de fogo em `server/test/auth_integration_test.go` (usuário A não vê dados de B).
 - Banco plugado e servindo os dados reais do dashboard. Schema em `database.md`; dados de exemplo em `server/db/seed.sql` (pertencem ao usuário padrão). **Client interligado** via React Query (token no header `Authorization`).
-- **CORS:** `httpx.CORS` embrulha o mux em `router.New` (headers de CORS + preflight `OPTIONS`→204). Métodos `GET, POST, OPTIONS` e headers `Accept, Authorization, Content-Type`. Origem em `CORS_ALLOW_ORIGIN` (default `*`; o token é Bearer no header, não cookie, então não há credencial de CORS — mas **trave a origem em prod**). Lida no `httpx.CORS`, não no `config.Load`.
+- **CORS:** `httpx.CORS` embrulha o mux em `router.New` (headers de CORS + preflight `OPTIONS`→204). Métodos `GET, POST, PATCH, DELETE, OPTIONS` e headers `Accept, Authorization, Content-Type`. Origem em `CORS_ALLOW_ORIGIN` (default `*`; o token é Bearer no header, não cookie, então não há credencial de CORS — mas **trave a origem em prod**). Lida no `httpx.CORS`, não no `config.Load`.
 
 ## Estrutura
 ```
@@ -29,8 +29,9 @@ server/
 │   ├── httpx/                # WriteJSON / WriteError
 │   ├── ratelimit/            # token-bucket por IP (freio do login) + middleware
 │   ├── health/               # liveness
-│   ├── account/              # GET /accounts (handler+service+DTO)
+│   ├── account/              # GET /accounts + CRUD (account.go + crud.go)
 │   ├── dashboard/            # GET /dashboard/* (dto+service+handlers)
+│   ├── contas/               # GET /contas/* (dto+personality+service+handlers)
 │   └── router/router.go      # router.New(Deps) → http.Handler
 └── test/                     # integração/e2e (HTTP real; tag `integration` para os que usam DB)
 ```
@@ -70,28 +71,51 @@ sempre em **centavos** (inteiro). **Toda rota abaixo exige `Authorization: Beare
 | POST | `/auth/login` | `{email,password,rememberMe}` → `{token,user}`; 401 genérico (público); **429** se exceder o rate-limit por IP | implementado |
 | GET | `/auth/me` | usuário da sessão atual (exige token) | implementado |
 | GET | `/accounts` | contas com saldo all-time (centavos) | implementado |
+| GET | `/accounts/{id}` | conta única (escopada por id+user) → **200** `AccountDetail`; **404** se não existe — usado pra pré-preencher a edição | implementado |
+| POST | `/accounts` | cria conta (body em centavos, **com** `openingBalanceCents` — exceto **`credit_card`**, que exige `openingBalanceCents = 0`: cartão não tem saldo, só fatura) → **201** + recurso; **400** se inválido | implementado |
+| PATCH | `/accounts/{id}` | edita conta (**sem** saldo — `opening_balance` nunca muda na edição) → **200** + recurso; **404** se não existe | implementado |
+| DELETE | `/accounts/{id}` | arquiva conta (soft-delete) → **204**; **404** se não existe | implementado |
 | GET | `/dashboard/summary` | resumo do mês: net/receitas/gastos + status/quip | implementado |
 | GET | `/dashboard/categories` | gasto por categoria no mês (com `percent`) | implementado |
 | GET | `/dashboard/este-mes` | `spentPercent` + maior vilão | implementado |
 | GET | `/dashboard/diagnosis` | cartão de diagnóstico (texto derivado do net) | implementado |
+| GET | `/contas/banks` | contas de banco (checking/savings) + nota derivada | implementado |
+| GET | `/contas/cards` | cartões de crédito (por item): fatura/limite/disponível/% usado + nota derivada | implementado |
+| GET | `/contas/vouchers` | vales (voucher) + % restante/status derivados | implementado |
+| GET | `/contas/cash` | carteira física (cash) + confiança/quip derivados | implementado |
+| GET | `/contas/xray` | "Raio-X de Pobreza": dívida/limite (cartões) + Panic Meter | implementado |
+| GET | `/contas/tip` | "Dica de Gestão" (texto fixo derivado) | implementado |
 | GET | `/investments` | lista de investimentos | stub deferido (`[]`) |
 | GET | `/dashboard/investments-summary` | resumo da carteira | stub deferido (zerado) |
 | GET | `/dashboard/ticker` | cotação destacada (cripto) | stub deferido (zerado) |
 
-> Os textos de personalidade (`statusLabel`/`quip`/`diagnosis`) são computados no
-> `dashboard/service.go` por regrinhas de limiar marcadas como PLACEHOLDER — ajustáveis.
+> Os textos de personalidade (`statusLabel`/`quip`/`diagnosis` no dashboard; `note`/
+> `noteTone`/`status`/`quip`/labels do panic/`tip` em **contas**) são computados nos
+> respectivos `service.go`/`personality.go` por regrinhas de limiar marcadas PLACEHOLDER.
+> O CRUD de `/accounts` mora em `account/crud.go` (escrita em **centavos** → NUMERIC no SQL;
+> validação inválida → **400** com o valor ofensivo).
 >
 > **Limitação conhecida (decisão de produto pendente):** `pctInt` devolve 0 quando `whole <= 0`,
 > então com **receita 0** o `spentPercent` é sempre 0 → o status nunca chega em "No vermelho" por
 > mais que se gaste (cai em "No vácuo"). O teste em `service_test.go` fixa esse comportamento atual.
 
 ## DTOs (resposta JSON)
-Tags `json` 1:1 com `client/src/types/dashboard.ts`; definidos em `account/account.go` e
-`dashboard/dto.go`. Valores `*Cents`/monetários são **int64 em centavos**.
+Tags `json` 1:1 com `client/src/types/dashboard.ts` e `client/src/types/contas.ts`;
+definidos em `account/account.go`, `account/crud.go`, `dashboard/dto.go` e `contas/dto.go`.
+Valores `*Cents`/monetários são **int64 em centavos**.
 
 | DTO | Endpoint | Campos |
 |---|---|---|
 | `Account[]` | `/accounts` | `id`, `name`, `balanceCents`, `icon`, `tone`, `dotColor` |
+| `CreateAccountInput` (req) | `POST /accounts` | `name`, `accountType`, `openingBalanceCents` (**0 obrigatório p/ `credit_card`** — `!= 0` → 400 citando "saldo inicial"), `icon`, `tone`, `dotColor`, `subtitle?`, `creditLimitCents?` |
+| `UpdateAccountInput` (req) | `PATCH /accounts/{id}` | igual ao Create **menos `openingBalanceCents`** (saldo nunca editável) |
+| `AccountDetail` | `GET/POST/PATCH /accounts` | `id`, `name`, `accountType`, `subtitle`, `balanceCents`, `icon`, `tone`, `dotColor`, `creditLimitCents` |
+| `BankAccount[]` | `/contas/banks` | `id`, `name`, `subtitle`, `balanceCents`, `icon`, `brandColor` (= dot_color), `note`, `noteTone` |
+| `CreditCard[]` | `/contas/cards` | `id`, `name`, `invoiceCents` (fatura = saldo negativo), `limitCents`, `availableCents` (= limite − fatura, ≥ 0), `usedPercent` (0..100), `icon`, `brandColor` (= dot_color), `note`, `noteTone` |
+| `Voucher[]` | `/contas/vouchers` | `id`, `name`, `valueCents`, `icon`, `status` (`ativo`/`estavel`/`critico`), `remainingPercent`, `note`, `noteTone` |
+| `CashWallet` | `/contas/cash` | `balanceCents`, `quip`, `confidenceLabel`, `confidencePercent` |
+| `PovertyXray` | `/contas/xray` | `title`, `rows[]` (`label`/`cents`/`tone`), `panic` (`percent`/`levelLabel`/`levelTone`/`lowLabel`/`highLabel`/`note`) |
+| `ManagementTip` | `/contas/tip` | `title`, `body` |
 | `MonthBalance` | `/dashboard/summary` | `netCents`, `availableLabel`, `statusLabel`, `quip`, `receitasCents`, `gastosCents`, `investidoCents` (= 0 até investimentos entrarem) |
 | `CategorySpend[]` | `/dashboard/categories` | `id`, `label`, `amountCents`, `percent` (share 0..100), `tone` |
 | `EsteMes` | `/dashboard/este-mes` | `spentPercent`, `biggestVillain` (categoria de maior gasto no mês) |
