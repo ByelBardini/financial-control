@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useAuth } from '../auth/AuthContext';
+import { AuthenticatedApp } from './AuthenticatedApp';
 import { CreateAccountScreen } from '../screens/CreateAccountScreen';
-import { DashboardScreen } from '../screens/DashboardScreen';
 import { LoginScreen } from '../screens/LoginScreen';
 
 // Gate de sessão (é aqui + no 401 do server que mora "não dá pra entrar sem
@@ -16,7 +16,7 @@ export function RootNavigator() {
   }
 
   if (status === 'authenticated') {
-    return <DashboardScreen onLogout={signOut} />;
+    return <AuthenticatedApp onLogout={signOut} />;
   }
 
   if (authView === 'createAccount') {

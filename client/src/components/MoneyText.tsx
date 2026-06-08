@@ -1,8 +1,6 @@
 import { Text } from 'react-native';
-import { formatBRL } from '../lib/money';
+import { formatBRL, MONEY_MASK } from '../lib/money';
 import type { Tone } from '../types/dashboard';
-
-const MASK = 'R$ ••••';
 
 const toneClass: Record<Tone, string> = {
   primary: 'text-primary',
@@ -34,7 +32,7 @@ export function MoneyText({
       accessibilityLabel={hidden ? 'valor oculto' : undefined}
       className={`${toneClass[tone]} ${className}`}
     >
-      {hidden ? MASK : formatBRL(cents)}
+      {hidden ? MONEY_MASK : formatBRL(cents)}
     </Text>
   );
 }

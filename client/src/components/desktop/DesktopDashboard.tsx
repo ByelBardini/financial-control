@@ -19,17 +19,26 @@ import {
   useMonthBalance,
   useTicker,
 } from '../../hooks/useDashboardQueries';
+import type { AppRoute } from '../../navigation/routes';
 
 type DesktopDashboardProps = {
   hidden: boolean;
   onToggleHidden: () => void;
+  route?: AppRoute;
+  onNavigate?: (route: AppRoute) => void;
   onLogout?: () => void;
 };
 
 // Layout enterprise: rail fixo + grid de células com bordas finas. Cada célula é
 // uma query independente (loading/erro por seção). Brilho sutil (verde→roxo) no
 // fundo, como no protótipo desktop.
-export function DesktopDashboard({ hidden, onToggleHidden, onLogout }: DesktopDashboardProps) {
+export function DesktopDashboard({
+  hidden,
+  onToggleHidden,
+  route = 'dashboard',
+  onNavigate,
+  onLogout,
+}: DesktopDashboardProps) {
   const balance = useMonthBalance();
   const accounts = useAccounts();
   const investments = useInvestments();
@@ -49,7 +58,7 @@ export function DesktopDashboard({ hidden, onToggleHidden, onLogout }: DesktopDa
         style={StyleSheet.absoluteFill}
         pointerEvents="none"
       />
-      <SideNav onLogout={onLogout} />
+      <SideNav currentRoute={route} onNavigate={onNavigate} onLogout={onLogout} />
       <ScrollView className="flex-1" contentContainerStyle={{ flexGrow: 1 }}>
         <DesktopHeader hidden={hidden} onToggleHidden={onToggleHidden} />
         <View className="flex-1 border-t border-grid-line">
