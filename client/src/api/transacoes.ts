@@ -1,19 +1,14 @@
-import { transacoesSnapshot } from '../mocks/transacoesSnapshot';
+import { apiGet } from './client';
 import type { CashflowSummary, FutureDebt, Recurrence, Transaction } from '../types/transacoes';
 
-// Views da tela de Transações. Ainda SEM backend: cada função resolve a fatia do
-// fixture (Promise.resolve), mantendo o mesmo contrato assíncrono de api/contas — os
-// hooks/QuerySection não enxergam diferença. Flip pro server depois = trocar o corpo
-// por apiGet('/transacoes/...'), sem tocar nos hooks nem nas telas.
+// Views da tela de Transações, ligadas à API real (mesmo padrão de src/api/contas). O
+// backend (domínio transacoes) deriva labels/tag/colapso/notas — o client só renderiza.
+// O CRUD de transação vive em /transactions (sem consumidor no client ainda).
 
-export const getCashflowSummary = (): Promise<CashflowSummary> =>
-  Promise.resolve(transacoesSnapshot.summary);
+export const getCashflowSummary = () => apiGet<CashflowSummary>('/transacoes/summary');
 
-export const getTransactions = (): Promise<Transaction[]> =>
-  Promise.resolve(transacoesSnapshot.transactions);
+export const getTransactions = () => apiGet<Transaction[]>('/transacoes/list');
 
-export const getRecurrences = (): Promise<Recurrence[]> =>
-  Promise.resolve(transacoesSnapshot.recurrences);
+export const getRecurrences = () => apiGet<Recurrence[]>('/transacoes/recurrences');
 
-export const getFutureDebts = (): Promise<FutureDebt[]> =>
-  Promise.resolve(transacoesSnapshot.debts);
+export const getFutureDebts = () => apiGet<FutureDebt[]>('/transacoes/debts');

@@ -39,6 +39,9 @@ const glyphs = {
   expand_more: 'expand-more',
   chevron_left: 'chevron-left',
   chevron_right: 'chevron-right',
+  directions_car: 'directions-car',
+  sports_esports: 'sports-esports',
+  category: 'category',
 } as const;
 
 export type IconName = keyof typeof glyphs;
