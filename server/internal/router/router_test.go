@@ -10,6 +10,7 @@ import (
 	"financial-control/server/internal/contas"
 	"financial-control/server/internal/dashboard"
 	"financial-control/server/internal/router"
+	"financial-control/server/internal/transacoes"
 )
 
 // newTestRouter monta o router com serviços "vazios". Sem token o RequireAuth
@@ -17,10 +18,11 @@ import (
 func newTestRouter() http.Handler {
 	authSvc := auth.NewService(nil, auth.NewTokenIssuer("router-test-secret-0123456789-01"), auth.TTLs{})
 	return router.New(router.Deps{
-		Auth:      authSvc,
-		Account:   account.NewService(nil),
-		Dashboard: dashboard.NewService(nil),
-		Contas:    contas.NewService(nil),
+		Auth:       authSvc,
+		Account:    account.NewService(nil),
+		Dashboard:  dashboard.NewService(nil),
+		Contas:     contas.NewService(nil),
+		Transacoes: transacoes.NewService(nil),
 	})
 }
 
@@ -45,6 +47,11 @@ func TestRotasDeDadosExigemToken(t *testing.T) {
 		"/contas/cash",
 		"/contas/xray",
 		"/contas/tip",
+		"/transacoes/summary",
+		"/transacoes/list",
+		"/transacoes/recurrences",
+		"/transacoes/debts",
+		"/transactions/t1",
 	}
 	for _, p := range dataPaths {
 		rec := httptest.NewRecorder()
@@ -62,6 +69,9 @@ func TestRotasDeEscritaExigemToken(t *testing.T) {
 		{http.MethodPost, "/accounts"},
 		{http.MethodPatch, "/accounts/a1"},
 		{http.MethodDelete, "/accounts/a1"},
+		{http.MethodPost, "/transactions"},
+		{http.MethodPatch, "/transactions/t1"},
+		{http.MethodDelete, "/transactions/t1"},
 	}
 	for _, c := range cases {
 		rec := httptest.NewRecorder()
