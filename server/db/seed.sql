@@ -41,6 +41,14 @@ INSERT INTO transactions
   ('a0000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000001', 'c0000000-0000-0000-0000-000000000004', 'Fone (2/3)', 'installment', 'expense', 100.00, date_trunc('month', now())::date + 9,
    'd0000000-0000-0000-0000-000000000001', 2, 3, 300.00);
 
+-- Regras de recorrência (alimentam /transacoes/recurrences) — do usuário padrão.
+-- Uma receita (Salário) e duas assinaturas (Netflix/Gympass) na categoria Lazer.
+INSERT INTO recurring_rules
+  (account_id, user_id, category_id, description, direction, amount, frequency, start_date) VALUES
+  ('a0000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000001', 'c0000000-0000-0000-0000-000000000001', 'Salário Base', 'income',  3200.00, 'monthly', date_trunc('month', now())::date),
+  ('a0000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000001', 'c0000000-0000-0000-0000-000000000004', 'Netflix',      'expense',   55.90, 'monthly', date_trunc('month', now())::date),
+  ('a0000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000001', 'c0000000-0000-0000-0000-000000000004', 'Gympass',      'expense',  120.00, 'monthly', date_trunc('month', now())::date);
+
 COMMIT;
 
 -- Resumo esperado no mês corrente (usuário padrão):

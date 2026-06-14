@@ -16,6 +16,13 @@ type Querier interface {
 	ArchiveAccount(ctx context.Context, arg ArchiveAccountParams) (string, error)
 	// Cria conta do usuário. Dinheiro entra em centavos (bigint) e vira NUMERIC no insert.
 	CreateAccount(ctx context.Context, arg CreateAccountParams) (string, error)
+	// Cria uma transação 'standard' do usuário. Só insere se a conta (e a categoria, se
+	// informada) pertencem ao usuário — impede anexar transação à conta de outro dono.
+	// 0 linhas (ErrNoRows no store) → conta/categoria inválida. Centavos → NUMERIC na borda.
+	CreateTransaction(ctx context.Context, arg CreateTransactionParams) (string, error)
+	// Exclui (hard delete — transação não tem soft-delete) escopada por id + user_id.
+	// RETURNING vazio (ErrNoRows → 404) quando não é do usuário.
+	DeleteTransaction(ctx context.Context, arg DeleteTransactionParams) (string, error)
 	// Busca por e-mail case-insensitive (usa o índice único users_email_lower_key).
 	// Devolve o hash e is_active pro service decidir (mantém o 401 genérico no service).
 	FindUserByEmail(ctx context.Context, email string) (FindUserByEmailRow, error)
@@ -27,11 +34,17 @@ type Querier interface {
 	// Receitas e gastos do mês de @reference_date, em centavos (bigint). Mês vazio → 0.
 	// Escopado por usuário.
 	GetMonthSummary(ctx context.Context, arg GetMonthSummaryParams) (GetMonthSummaryRow, error)
+	// Transação única do usuário (escopada por id + user_id) com conta/categoria juntadas,
+	// em centavos. Usada pra montar a resposta após criar/editar e pra pré-preencher a edição.
+	GetTransactionByID(ctx context.Context, arg GetTransactionByIDParams) (GetTransactionByIDRow, error)
 	// Lookup por PK pro /auth/me e pro check de liveness no middleware (is_active).
 	GetUserByID(ctx context.Context, id pgtype.UUID) (GetUserByIDRow, error)
 	// Saldo all-time (não mês): opening_balance + soma do ledger, em centavos (bigint).
 	// Escopado por usuário: contas do usuário + apenas transações dele no join.
 	ListAccountsWithBalance(ctx context.Context, userID pgtype.UUID) ([]ListAccountsWithBalanceRow, error)
+	// Regras de recorrência ativas do usuário, com a categoria juntada (nome + ícone).
+	// Receitas (income) antes das despesas; maior valor primeiro.
+	ListActiveRecurringRules(ctx context.Context, userID pgtype.UUID) ([]ListActiveRecurringRulesRow, error)
 	// Queries da tela de Contas. Saldo é derivado (opening_balance + soma do ledger),
 	// convertido p/ centavos (bigint) com cast no SQL. Tudo escopado por user_id, com
 	// o join de transações filtrado pelo mesmo dono (isolamento nos dois lados).
@@ -44,12 +57,27 @@ type Querier interface {
 	// Cartões de crédito do usuário: saldo (negativo = dívida) + limite + apresentação,
 	// p/ a seção "Cartões" (por cartão) e o Raio-X (somado).
 	ListCreditAccounts(ctx context.Context, userID pgtype.UUID) ([]ListCreditAccountsRow, error)
+	// Compras parceladas (kind='installment') do usuário agrupadas por purchase_group_id:
+	// progresso (parcelas lançadas / total), valor da parcela e ícone da categoria. Em
+	// centavos. COALESCE em tudo p/ o sqlc gerar tipos não-nulos. Mais recentes primeiro.
+	ListInstallmentDebts(ctx context.Context, userID pgtype.UUID) ([]ListInstallmentDebtsRow, error)
+	// Queries da tela de Transações. Valores em centavos (bigint) com cast no SQL.
+	// Tudo escopado por user_id, com os joins filtrados pelo mesmo dono (isolamento nos
+	// dois lados). Personalidade (tag/colapso/notas) e labels de data são derivados em Go;
+	// aqui só sai dado real.
+	// Log de transações recentes do usuário, com conta e categoria juntadas (categoria
+	// pode ser nula → COALESCE). Mais recentes primeiro; limite vindo do service.
+	ListRecentTransactions(ctx context.Context, arg ListRecentTransactionsParams) ([]ListRecentTransactionsRow, error)
 	// Contas "Vales": saldo atual + valor concedido (opening_balance) como baseline de 100%.
 	ListVoucherAccounts(ctx context.Context, userID pgtype.UUID) ([]ListVoucherAccountsRow, error)
 	// Atualiza os campos mutáveis da conta (escopado por id + user_id). NÃO altera o
 	// opening_balance: saldo só muda via transações, nunca por edição manual. RETURNING
 	// vazio (ErrNoRows) quando a conta não é do usuário ou já está arquivada → 404.
 	UpdateAccount(ctx context.Context, arg UpdateAccountParams) (string, error)
+	// Edita os campos mutáveis de uma transação 'standard' (escopada por id + user_id). Não
+	// troca de conta. A categoria nova precisa ser do usuário. RETURNING vazio (ErrNoRows →
+	// 404) quando a transação não é do usuário. Centavos → NUMERIC; direction flipa o signed_amount.
+	UpdateTransaction(ctx context.Context, arg UpdateTransactionParams) (string, error)
 }
 
 var _ Querier = (*Queries)(nil)
