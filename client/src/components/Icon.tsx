@@ -29,6 +29,16 @@ const glyphs = {
   payments: 'payments',
   corporate_fare: 'corporate-fare',
   lightbulb: 'lightbulb',
+  search: 'search',
+  local_gas_station: 'local-gas-station',
+  family_restroom: 'family-restroom',
+  subscriptions: 'subscriptions',
+  fitness_center: 'fitness-center',
+  smartphone: 'smartphone',
+  event_repeat: 'event-repeat',
+  expand_more: 'expand-more',
+  chevron_left: 'chevron-left',
+  chevron_right: 'chevron-right',
 } as const;
 
 export type IconName = keyof typeof glyphs;
