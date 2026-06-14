@@ -3,10 +3,13 @@ import { render } from '@testing-library/react-native';
 import type { ReactElement } from 'react';
 import * as api from '../../src/api/dashboard';
 import * as contasApi from '../../src/api/contas';
+import * as transacoesApi from '../../src/api/transacoes';
 import { dashboardSnapshot } from '../../src/mocks/dashboardSnapshot';
 import { contasSnapshot } from '../../src/mocks/contasSnapshot';
+import { transacoesSnapshot } from '../../src/mocks/transacoesSnapshot';
 import type { DashboardSnapshot } from '../../src/types/dashboard';
 import type { ContasSnapshot } from '../../src/types/contas';
+import type { TransacoesSnapshot } from '../../src/types/transacoes';
 
 // Faz cada função de src/api/dashboard resolver a fatia correspondente do snapshot.
 // Requer `jest.mock('../../src/api/dashboard')` no topo do arquivo de teste.
@@ -30,6 +33,15 @@ export function mockContasApi(snapshot: ContasSnapshot = contasSnapshot) {
   jest.mocked(contasApi.getCashWallet).mockResolvedValue(snapshot.cash);
   jest.mocked(contasApi.getPovertyXray).mockResolvedValue(snapshot.xray);
   jest.mocked(contasApi.getManagementTip).mockResolvedValue(snapshot.tip);
+}
+
+// Idem para src/api/transacoes (cada view resolve a fatia correspondente do snapshot).
+// Requer `jest.mock('../../src/api/transacoes')` no topo do arquivo de teste.
+export function mockTransacoesApi(snapshot: TransacoesSnapshot = transacoesSnapshot) {
+  jest.mocked(transacoesApi.getCashflowSummary).mockResolvedValue(snapshot.summary);
+  jest.mocked(transacoesApi.getTransactions).mockResolvedValue(snapshot.transactions);
+  jest.mocked(transacoesApi.getRecurrences).mockResolvedValue(snapshot.recurrences);
+  jest.mocked(transacoesApi.getFutureDebts).mockResolvedValue(snapshot.debts);
 }
 
 // Renderiza ui dentro de um QueryClient de teste (retry off, gcTime 0 pra não
