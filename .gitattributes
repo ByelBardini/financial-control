@@ -1,0 +1,16 @@
+# Normaliza fins de linha: LF no repositório, conversão automática no checkout.
+* text=auto eol=lf
+
+# Scripts shell sempre LF.
+*.sh text eol=lf
+
+# Arquivos binários — nunca normalizar.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.ttf binary
+*.otf binary
+*.woff binary
+*.woff2 binary
