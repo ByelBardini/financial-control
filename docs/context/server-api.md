@@ -7,7 +7,7 @@
 - Config: `internal/config` lê `DATABASE_URL` (obrigatória), `JWT_SECRET` (obrigatória, ≥32 bytes), `PORT` (default `8080`) e `JWT_TTL_DEFAULT`/`JWT_TTL_REMEMBER` (defaults `24h`/`720h`).
 - Roteador: `internal/router/router.go` — `router.New(Deps)` injeta os serviços de domínio e registra as rotas.
 - Dados: `internal/store` abre o pool (`pgxpool`) e embrulha as queries geradas pelo **sqlc** (`internal/store/gen`), devolvendo tipos próprios em **centavos** (`NUMERIC` convertido via cast no SQL — nunca float).
-- Domínios: `health` (liveness), `auth` (login + sessão), `account` (contas com saldo + **CRUD**: create/update/archive em `account/crud.go`), `dashboard` (resumo do mês, categorias, este-mês, diagnóstico + stubs deferidos de investimentos/ticker), `contas` (views agregadas da tela de Contas: banks/cards/vouchers/cash/xray/tip, agrupando `accounts` por tipo + personalidade derivada). Helper compartilhado em `internal/httpx` (`WriteJSON`/`WriteError`/`CORS` — CORS libera `GET, POST, PATCH, DELETE, OPTIONS`).
+- Domínios: `health` (liveness), `auth` (login + sessão), `account` (contas com saldo + **CRUD**: create/update/archive em `account/crud.go`), `dashboard` (resumo do mês, categorias, este-mês, diagnóstico + stubs deferidos de investimentos/ticker), `contas` (views agregadas da tela de Contas: banks/cards/vouchers/cash/xray/tip, agrupando `accounts` por tipo + personalidade derivada), `transacoes` (views da tela de Transações: summary/list/recurrences/debts sobre `transactions`/`recurring_rules` + **CRUD** de transação `standard` em `/transactions`; labels/tag/colapso derivados em `personality.go`). Helper compartilhado em `internal/httpx` (`WriteJSON`/`WriteError`/`CORS` — CORS libera `GET, POST, PATCH, DELETE, OPTIONS`).
 - **Auth real, multi-usuário (`internal/auth`):** senha com **bcrypt**; sessão por **JWT HS256 alg-pinned** (claims `sub`/`iat`/`exp`; `exp` = 24h ou 30d conforme `rememberMe`). `RequireAuth` (middleware) exige `Authorization: Bearer`, valida assinatura/expiração + `is_active` (liveness) e injeta o `userID` no contexto — **fail-closed** (qualquer falha = 401, sem chamar o handler). O `userID` vem **só do token**, nunca de input do client. Só `GET /health` e `POST /auth/login` são públicos; **toda rota de dados** (inclusive os stubs) passa pelo `RequireAuth`. Login 401 genérico (e-mail/senha/inativo indistinguíveis) + bcrypt dummy (anti-enumeração). **Rate-limit anti-força-bruta** no `POST /auth/login` (`internal/ratelimit`): token-bucket em memória por IP (`ClientIP` do `RemoteAddr`), `5` tentativas/IP recarregando em `1min`; estourado → **429** com `Retry-After`, sem tocar no handler. É single-instance (estado em memória; atrás de réplicas cada uma limita sozinha) e confia no `RemoteAddr`, não no `X-Forwarded-For` — ponha um proxy confiável na frente se for encaminhar. Usuário padrão semeado na migration `00002`: `teste@teste.com` / `12345`.
 - **Isolamento por usuário:** todo handler de dados lê o `userID` do contexto e o repassa ao service → store; as queries filtram por `user_id` (ver `database.md`). Teste de fogo em `server/test/auth_integration_test.go` (usuário A não vê dados de B).
 - Banco plugado e servindo os dados reais do dashboard. Schema em `database.md`; dados de exemplo em `server/db/seed.sql` (pertencem ao usuário padrão). **Client interligado** via React Query (token no header `Authorization`).
@@ -85,23 +85,35 @@ sempre em **centavos** (inteiro). **Toda rota abaixo exige `Authorization: Beare
 | GET | `/contas/cash` | carteira física (cash) + confiança/quip derivados | implementado |
 | GET | `/contas/xray` | "Raio-X de Pobreza": dívida/limite (cartões) + Panic Meter | implementado |
 | GET | `/contas/tip` | "Dica de Gestão" (texto fixo derivado) | implementado |
+| GET | `/transacoes/summary` | fluxo de caixa do mês (inflow/outflow/net + barra + "Previsão de Colapso"); aceita `?month=YYYY-MM` | implementado |
+| GET | `/transacoes/list` | log de transações recentes (conta/categoria + labels/tag/sentido derivados); `LIMIT` 50 | implementado |
+| GET | `/transacoes/recurrences` | recorrências ativas (`recurring_rules`) — receitas + assinaturas | implementado |
+| GET | `/transacoes/debts` | compras parceladas agregadas por `purchase_group_id` (progresso + ironia) | implementado |
+| POST | `/transactions` | cria transação `standard` (body em centavos; `direction` inflow/outflow → income/expense) → **201** + recurso; **400** inválido **ou** conta/categoria não-própria | implementado |
+| GET | `/transactions/{id}` | transação única (escopada por id+user) → **200** `TransactionDetail`; **404** | implementado |
+| PATCH | `/transactions/{id}` | edita (sem trocar de conta) → **200** + recurso; **404** | implementado |
+| DELETE | `/transactions/{id}` | exclui (**hard delete** — transação não tem soft-delete) → **204**; **404** | implementado |
 | GET | `/investments` | lista de investimentos | stub deferido (`[]`) |
 | GET | `/dashboard/investments-summary` | resumo da carteira | stub deferido (zerado) |
 | GET | `/dashboard/ticker` | cotação destacada (cripto) | stub deferido (zerado) |
 
 > Os textos de personalidade (`statusLabel`/`quip`/`diagnosis` no dashboard; `note`/
-> `noteTone`/`status`/`quip`/labels do panic/`tip` em **contas**) são computados nos
-> respectivos `service.go`/`personality.go` por regrinhas de limiar marcadas PLACEHOLDER.
-> O CRUD de `/accounts` mora em `account/crud.go` (escrita em **centavos** → NUMERIC no SQL;
-> validação inválida → **400** com o valor ofensivo).
+> `noteTone`/`status`/`quip`/labels do panic/`tip` em **contas**; `tag`/`tagTone`/`collapse`
+> (Previsão de Colapso) + notas de dívida e os `dateLabel`/`timeLabel` em **transacoes**) são
+> computados nos respectivos `service.go`/`personality.go` por regrinhas de limiar/formatação
+> marcadas PLACEHOLDER. O CRUD de `/accounts` e `/transactions` mora em `*/crud.go` (escrita em
+> **centavos** → NUMERIC no SQL; validação inválida → **400** com o valor ofensivo). Em
+> `transacoes`, `direction` do client (inflow/outflow) é mapeado pro banco (income/expense), e a
+> criação só grava se a conta/categoria do corpo é do usuário (isolamento no próprio INSERT).
 >
 > **Limitação conhecida (decisão de produto pendente):** `pctInt` devolve 0 quando `whole <= 0`,
 > então com **receita 0** o `spentPercent` é sempre 0 → o status nunca chega em "No vermelho" por
 > mais que se gaste (cai em "No vácuo"). O teste em `service_test.go` fixa esse comportamento atual.
 
 ## DTOs (resposta JSON)
-Tags `json` 1:1 com `client/src/types/dashboard.ts` e `client/src/types/contas.ts`;
-definidos em `account/account.go`, `account/crud.go`, `dashboard/dto.go` e `contas/dto.go`.
+Tags `json` 1:1 com `client/src/types/dashboard.ts`, `contas.ts` e `transacoes.ts`;
+definidos em `account/account.go`, `account/crud.go`, `dashboard/dto.go`, `contas/dto.go`,
+`transacoes/dto.go` e `transacoes/crud.go`.
 Valores `*Cents`/monetários são **int64 em centavos**.
 
 | DTO | Endpoint | Campos |
@@ -120,6 +132,13 @@ Valores `*Cents`/monetários são **int64 em centavos**.
 | `CategorySpend[]` | `/dashboard/categories` | `id`, `label`, `amountCents`, `percent` (share 0..100), `tone` |
 | `EsteMes` | `/dashboard/este-mes` | `spentPercent`, `biggestVillain` (categoria de maior gasto no mês) |
 | `Diagnosis` | `/dashboard/diagnosis` | `title`, `body` |
+| `CashflowSummary` | `/transacoes/summary` | `inflowCents`, `outflowCents`, `netBurnCents`, `burnPercent` (0..100), `collapse` (`PanicMeter`: `percent`/`levelLabel`/`levelTone`/`lowLabel`/`highLabel`/`note`) |
+| `Transaction[]` | `/transacoes/list` | `id`, `dateLabel` ("12 OUT"), `timeLabel` ("12/10"), `title`, `accountLabel`, `category`, `tag`, `tagTone`, `amountCents`, `direction` (inflow/outflow), `icon` |
+| `Recurrence[]` | `/transacoes/recurrences` | `id`, `name`, `category`, `amountCents`, `direction`, `icon` |
+| `FutureDebt[]` | `/transacoes/debts` | `id`, `label`, `installmentLabel` ("Parcela X/Y"), `amountCents`, `percent`, `tone`, `icon`, `note` |
+| `CreateTransactionInput` (req) | `POST /transactions` | `accountId`, `categoryId?`, `description`, `direction` (inflow/outflow), `amountCents` (> 0), `occurredOn` (`YYYY-MM-DD`) |
+| `UpdateTransactionInput` (req) | `PATCH /transactions/{id}` | igual ao Create **menos `accountId`** (não troca de conta) |
+| `TransactionDetail` | `GET/POST/PATCH /transactions` | `id`, `accountId`, `categoryId`, `description`, `direction` (inflow/outflow), `amountCents`, `occurredOn`, `accountLabel`, `category`, `icon` |
 | `Investment[]` | `/investments` | `id`, `name`, `valueCents`, `dailyChangePct`, `icon` — **stub `[]`** |
 | `InvestmentsSummary` | `/dashboard/investments-summary` | `totalCents`, `changeCents`, `changePct` — **stub zerado** |
 | `Ticker` | `/dashboard/ticker` | `name`, `symbol`, `changePct24h`, `priceCents`, `positionCents` — **stub** com `name:"Bitcoin"`/`symbol:"B"`, resto zerado |
