@@ -50,6 +50,8 @@ type Querier interface {
 	// o join de transações filtrado pelo mesmo dono (isolamento nos dois lados).
 	// Contas "Bancos": corrente + poupança, com saldo e campos de apresentação.
 	ListBankAccounts(ctx context.Context, userID pgtype.UUID) ([]ListBankAccountsRow, error)
+	// Categorias ativas do usuário — alimenta o filtro de categoria da tela de Transações.
+	ListCategories(ctx context.Context, userID pgtype.UUID) ([]ListCategoriesRow, error)
 	// Gasto por categoria (apenas despesas) no mês de @reference_date, em centavos (bigint).
 	// Escopado por usuário nos DOIS lados do join (transação e categoria do mesmo dono).
 	// Aproveita o índice parcial idx_transactions_user_cat_exp. Maior gasto primeiro.
@@ -65,9 +67,10 @@ type Querier interface {
 	// Tudo escopado por user_id, com os joins filtrados pelo mesmo dono (isolamento nos
 	// dois lados). Personalidade (tag/colapso/notas) e labels de data são derivados em Go;
 	// aqui só sai dado real.
-	// Log de transações recentes do usuário, com conta e categoria juntadas (categoria
-	// pode ser nula → COALESCE). Mais recentes primeiro; limite vindo do service.
-	ListRecentTransactions(ctx context.Context, arg ListRecentTransactionsParams) ([]ListRecentTransactionsRow, error)
+	// Log de transações do usuário com filtros opcionais (período via @since/@until, categorias
+	// — OR entre elas — e busca ILIKE por descrição/categoria) + paginação. total_count (window)
+	// traz o total do filtro numa query só. Categoria pode ser nula → COALESCE. Recentes primeiro.
+	ListTransactionsFiltered(ctx context.Context, arg ListTransactionsFilteredParams) ([]ListTransactionsFilteredRow, error)
 	// Contas "Vales": saldo atual + valor concedido (opening_balance) como baseline de 100%.
 	ListVoucherAccounts(ctx context.Context, userID pgtype.UUID) ([]ListVoucherAccountsRow, error)
 	// Atualiza os campos mutáveis da conta (escopado por id + user_id). NÃO altera o

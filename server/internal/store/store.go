@@ -119,6 +119,26 @@ type InstallmentDebtRow struct {
 	CategoryIcon     string
 }
 
+// TransactionFilter são os filtros + paginação do log de transações. Since/Until nil = sem
+// recorte de tempo daquele lado; CategoryIDs vazio = todas as categorias (filtro OR entre
+// as informadas); Query "" = sem busca.
+type TransactionFilter struct {
+	Since       *time.Time
+	Until       *time.Time
+	CategoryIDs []string
+	Query       string
+	Limit       int
+	Offset      int
+}
+
+// CategoryRow é uma categoria do usuário (id + apresentação) p/ o filtro de categoria.
+type CategoryRow struct {
+	ID   string
+	Name string
+	Icon string
+	Kind string
+}
+
 // TransactionInput são os campos graváveis de uma transação 'standard'. Direction em
 // income/expense (mapeado no domínio a partir de inflow/outflow); dinheiro em centavos;
 // CategoryID nil = sem categoria; OccurredOn é a data de competência (sem hora).
@@ -359,22 +379,30 @@ func (s *Store) ListCreditAccounts(ctx context.Context, userID string) ([]Credit
 	return out, nil
 }
 
-// recentTransactionsLimit limita o log de transações recentes (a tela mostra os últimos).
-const recentTransactionsLimit = 50
-
-// ListRecentTransactions devolve as transações recentes do usuário (centavos), com conta
-// e categoria juntadas, mais recentes primeiro.
-func (s *Store) ListRecentTransactions(ctx context.Context, userID string) ([]TransactionRow, error) {
+// ListTransactionsFiltered devolve uma página de transações do usuário (centavos) com os
+// filtros aplicados, mais o total que casou o filtro (do COUNT window, lido da 1ª linha;
+// 0 linhas → total 0). Categoria malformada é ignorada (vira "sem filtro"), não erra.
+func (s *Store) ListTransactionsFiltered(ctx context.Context, userID string, f TransactionFilter) ([]TransactionRow, int, error) {
 	uid, err := uuidArg(userID)
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
-	rows, err := s.q.ListRecentTransactions(ctx, gen.ListRecentTransactionsParams{UserID: uid, Lim: recentTransactionsLimit})
+	rows, err := s.q.ListTransactionsFiltered(ctx, gen.ListTransactionsFilteredParams{
+		UserID:      uid,
+		Since:       dateArgN(f.Since),
+		Until:       dateArgN(f.Until),
+		CategoryIds: uuidSlice(f.CategoryIDs),
+		Q:           f.Query,
+		Lim:         int32(f.Limit),
+		Off:         int32(f.Offset),
+	})
 	if err != nil {
-		return nil, fmt.Errorf("store: listar transações: %w", err)
+		return nil, 0, fmt.Errorf("store: listar transações filtradas: %w", err)
 	}
 	out := make([]TransactionRow, 0, len(rows))
+	total := 0
 	for _, r := range rows {
+		total = int(r.TotalCount)
 		out = append(out, TransactionRow{
 			ID:           r.ID,
 			OccurredOn:   r.OccurredOn.Time,
@@ -385,6 +413,23 @@ func (s *Store) ListRecentTransactions(ctx context.Context, userID string) ([]Tr
 			Direction:    r.Direction,
 			AmountCents:  r.AmountCents,
 		})
+	}
+	return out, total, nil
+}
+
+// ListCategories devolve as categorias ativas do usuário (alimenta o filtro de categoria).
+func (s *Store) ListCategories(ctx context.Context, userID string) ([]CategoryRow, error) {
+	uid, err := uuidArg(userID)
+	if err != nil {
+		return nil, err
+	}
+	rows, err := s.q.ListCategories(ctx, uid)
+	if err != nil {
+		return nil, fmt.Errorf("store: listar categorias: %w", err)
+	}
+	out := make([]CategoryRow, 0, len(rows))
+	for _, r := range rows {
+		out = append(out, CategoryRow{ID: r.ID, Name: r.Name, Icon: r.Icon, Kind: r.Kind})
 	}
 	return out, nil
 }
@@ -712,9 +757,30 @@ func uuidArgN(s *string) (pgtype.UUID, error) {
 	return uuidArg(*s)
 }
 
+// uuidSlice converte ids (strings do client) em []pgtype.UUID, descartando os malformados.
+// Usado no filtro multi-categoria (`= ANY`): id inválido simplesmente não entra na lista.
+func uuidSlice(ids []string) []pgtype.UUID {
+	out := make([]pgtype.UUID, 0, len(ids))
+	for _, id := range ids {
+		if u, err := uuidArg(id); err == nil {
+			out = append(out, u)
+		}
+	}
+	return out
+}
+
 // dateArg converte um time.Time para o pgtype.Date esperado pelas queries de mês.
 func dateArg(t time.Time) pgtype.Date {
 	return pgtype.Date{Time: t, Valid: true}
+}
+
+// dateArgN converte um *time.Time opcional no pgtype.Date das queries (nil = NULL),
+// usado pelo filtro de período (Since) do log de transações.
+func dateArgN(t *time.Time) pgtype.Date {
+	if t == nil {
+		return pgtype.Date{}
+	}
+	return pgtype.Date{Time: *t, Valid: true}
 }
 
 // textArg converte um *string opcional no pgtype.Text das queries (nil = NULL no banco).

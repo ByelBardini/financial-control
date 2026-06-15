@@ -19,6 +19,24 @@ type Transaction struct {
 	Icon         string `json:"icon"`
 }
 
+// TransactionPage é uma página do log de transações + metadados de paginação. Items
+// nunca é null (json `[]`). Page é 1-based; PageCount = ceil(Total/PageSize).
+type TransactionPage struct {
+	Items     []Transaction `json:"items"`
+	Page      int           `json:"page"`
+	PageSize  int           `json:"pageSize"`
+	Total     int           `json:"total"`
+	PageCount int           `json:"pageCount"`
+}
+
+// Category é uma categoria do usuário (id + apresentação) — alimenta o filtro de categoria.
+type Category struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
+	Icon string `json:"icon"`
+	Kind string `json:"kind"`
+}
+
 // PanicMeter é o medidor (posição 0..100 + rótulos). Mesma forma da de contas, mas
 // local ao domínio — domínios não compartilham DTO.
 type PanicMeter struct {

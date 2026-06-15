@@ -3,9 +3,10 @@
 -- dois lados). Personalidade (tag/colapso/notas) e labels de data são derivados em Go;
 -- aqui só sai dado real.
 
--- name: ListRecentTransactions :many
--- Log de transações recentes do usuário, com conta e categoria juntadas (categoria
--- pode ser nula → COALESCE). Mais recentes primeiro; limite vindo do service.
+-- name: ListTransactionsFiltered :many
+-- Log de transações do usuário com filtros opcionais (período via @since/@until, categorias
+-- — OR entre elas — e busca ILIKE por descrição/categoria) + paginação. total_count (window)
+-- traz o total do filtro numa query só. Categoria pode ser nula → COALESCE. Recentes primeiro.
 SELECT
     t.id::text                   AS id,
     t.occurred_on                AS occurred_on,
@@ -14,13 +15,37 @@ SELECT
     COALESCE(c.name, '')         AS category_name,
     COALESCE(c.icon, 'payments') AS category_icon,
     t.direction                  AS direction,
-    (t.amount * 100)::bigint     AS amount_cents
+    (t.amount * 100)::bigint     AS amount_cents,
+    COUNT(*) OVER()::bigint      AS total_count
 FROM transactions t
 JOIN accounts a ON a.id = t.account_id AND a.user_id = t.user_id
 LEFT JOIN categories c ON c.id = t.category_id AND c.user_id = t.user_id
 WHERE t.user_id = sqlc.arg(user_id)
+  AND (sqlc.narg(since)::date IS NULL OR t.occurred_on >= sqlc.narg(since))
+  AND (sqlc.narg(until)::date IS NULL OR t.occurred_on <= sqlc.narg(until))
+  AND (
+    cardinality(sqlc.arg(category_ids)::uuid[]) = 0
+    OR t.category_id = ANY(sqlc.arg(category_ids)::uuid[])
+  )
+  AND (
+    sqlc.arg(q)::text = ''
+    OR t.description ILIKE '%' || sqlc.arg(q) || '%'
+    OR COALESCE(c.name, '') ILIKE '%' || sqlc.arg(q) || '%'
+  )
 ORDER BY t.occurred_on DESC, t.booked_at DESC
-LIMIT sqlc.arg(lim);
+LIMIT sqlc.arg(lim) OFFSET sqlc.arg(off);
+
+-- name: ListCategories :many
+-- Categorias ativas do usuário — alimenta o filtro de categoria da tela de Transações.
+SELECT
+    c.id::text AS id,
+    c.name     AS name,
+    c.icon     AS icon,
+    c.kind     AS kind
+FROM categories c
+WHERE c.user_id = sqlc.arg(user_id)
+  AND c.is_archived = false
+ORDER BY c.name;
 
 -- name: ListActiveRecurringRules :many
 -- Regras de recorrência ativas do usuário, com a categoria juntada (nome + ícone).

@@ -4,6 +4,7 @@ import (
 	"context"
 	"log"
 	"net/http"
+	"strconv"
 	"time"
 
 	"financial-control/server/internal/auth"
@@ -62,10 +63,48 @@ func listHandler(label string, fn func(context.Context, string) (any, error)) ht
 	})
 }
 
-// ListHandler responde GET /transacoes/list com o log de transações recentes.
+// ListHandler responde GET /transacoes/list com uma página filtrada do log. Aceita
+// ?period=30d|3m|6m|1y|custom (default 30d), ?from=&to= (YYYY-MM-DD, p/ custom), ?category=<id>
+// (repetível → OR), ?q=<busca>, ?page=N (1-based; default/inválido → 1). Filtros são lenientes
+// (period/data desconhecidos caem no default 30d / sem teto; categoria inválida é ignorada).
 func ListHandler(svc *Service) http.Handler {
-	return listHandler("as transações", func(ctx context.Context, userID string) (any, error) {
-		return svc.Transactions(ctx, userID)
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		userID, ok := auth.UserIDFromContext(r.Context())
+		if !ok {
+			httpx.WriteError(w, http.StatusUnauthorized, "não autenticado")
+			return
+		}
+		qs := r.URL.Query()
+		query := TransactionQuery{
+			Period:      qs.Get("period"),
+			CategoryIDs: qs["category"], // repetível: ?category=c1&category=c2
+			Query:       qs.Get("q"),
+			From:        qs.Get("from"),
+			To:          qs.Get("to"),
+			Page:        atoiOr(qs.Get("page"), 1),
+		}
+		out, err := svc.Transactions(r.Context(), userID, query)
+		if err != nil {
+			log.Printf("GET /transacoes/list: %v", err)
+			httpx.WriteError(w, http.StatusInternalServerError, "erro ao montar as transações")
+			return
+		}
+		httpx.WriteJSON(w, http.StatusOK, out)
+	})
+}
+
+// atoiOr lê um inteiro do texto; vazio ou inválido devolve def (params de query lenientes).
+func atoiOr(s string, def int) int {
+	if n, err := strconv.Atoi(s); err == nil {
+		return n
+	}
+	return def
+}
+
+// CategoriesHandler responde GET /categories com as categorias ativas do usuário.
+func CategoriesHandler(svc *Service) http.Handler {
+	return listHandler("as categorias", func(ctx context.Context, userID string) (any, error) {
+		return svc.Categories(ctx, userID)
 	})
 }
 

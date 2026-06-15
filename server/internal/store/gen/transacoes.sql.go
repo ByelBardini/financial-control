@@ -191,6 +191,51 @@ func (q *Queries) ListActiveRecurringRules(ctx context.Context, userID pgtype.UU
 	return items, nil
 }
 
+const listCategories = `-- name: ListCategories :many
+SELECT
+    c.id::text AS id,
+    c.name     AS name,
+    c.icon     AS icon,
+    c.kind     AS kind
+FROM categories c
+WHERE c.user_id = $1
+  AND c.is_archived = false
+ORDER BY c.name
+`
+
+type ListCategoriesRow struct {
+	ID   string
+	Name string
+	Icon string
+	Kind string
+}
+
+// Categorias ativas do usuário — alimenta o filtro de categoria da tela de Transações.
+func (q *Queries) ListCategories(ctx context.Context, userID pgtype.UUID) ([]ListCategoriesRow, error) {
+	rows, err := q.db.Query(ctx, listCategories, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListCategoriesRow{}
+	for rows.Next() {
+		var i ListCategoriesRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Name,
+			&i.Icon,
+			&i.Kind,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listInstallmentDebts = `-- name: ListInstallmentDebts :many
 SELECT
     COALESCE(t.purchase_group_id::text, '')::text AS group_id,
@@ -246,7 +291,7 @@ func (q *Queries) ListInstallmentDebts(ctx context.Context, userID pgtype.UUID) 
 	return items, nil
 }
 
-const listRecentTransactions = `-- name: ListRecentTransactions :many
+const listTransactionsFiltered = `-- name: ListTransactionsFiltered :many
 
 SELECT
     t.id::text                   AS id,
@@ -256,21 +301,38 @@ SELECT
     COALESCE(c.name, '')         AS category_name,
     COALESCE(c.icon, 'payments') AS category_icon,
     t.direction                  AS direction,
-    (t.amount * 100)::bigint     AS amount_cents
+    (t.amount * 100)::bigint     AS amount_cents,
+    COUNT(*) OVER()::bigint      AS total_count
 FROM transactions t
 JOIN accounts a ON a.id = t.account_id AND a.user_id = t.user_id
 LEFT JOIN categories c ON c.id = t.category_id AND c.user_id = t.user_id
 WHERE t.user_id = $1
+  AND ($2::date IS NULL OR t.occurred_on >= $2)
+  AND ($3::date IS NULL OR t.occurred_on <= $3)
+  AND (
+    cardinality($4::uuid[]) = 0
+    OR t.category_id = ANY($4::uuid[])
+  )
+  AND (
+    $5::text = ''
+    OR t.description ILIKE '%' || $5 || '%'
+    OR COALESCE(c.name, '') ILIKE '%' || $5 || '%'
+  )
 ORDER BY t.occurred_on DESC, t.booked_at DESC
-LIMIT $2
+LIMIT $7 OFFSET $6
 `
 
-type ListRecentTransactionsParams struct {
-	UserID pgtype.UUID
-	Lim    int32
+type ListTransactionsFilteredParams struct {
+	UserID      pgtype.UUID
+	Since       pgtype.Date
+	Until       pgtype.Date
+	CategoryIds []pgtype.UUID
+	Q           string
+	Off         int32
+	Lim         int32
 }
 
-type ListRecentTransactionsRow struct {
+type ListTransactionsFilteredRow struct {
 	ID           string
 	OccurredOn   pgtype.Date
 	Description  string
@@ -279,23 +341,33 @@ type ListRecentTransactionsRow struct {
 	CategoryIcon string
 	Direction    string
 	AmountCents  int64
+	TotalCount   int64
 }
 
 // Queries da tela de Transações. Valores em centavos (bigint) com cast no SQL.
 // Tudo escopado por user_id, com os joins filtrados pelo mesmo dono (isolamento nos
 // dois lados). Personalidade (tag/colapso/notas) e labels de data são derivados em Go;
 // aqui só sai dado real.
-// Log de transações recentes do usuário, com conta e categoria juntadas (categoria
-// pode ser nula → COALESCE). Mais recentes primeiro; limite vindo do service.
-func (q *Queries) ListRecentTransactions(ctx context.Context, arg ListRecentTransactionsParams) ([]ListRecentTransactionsRow, error) {
-	rows, err := q.db.Query(ctx, listRecentTransactions, arg.UserID, arg.Lim)
+// Log de transações do usuário com filtros opcionais (período via @since/@until, categorias
+// — OR entre elas — e busca ILIKE por descrição/categoria) + paginação. total_count (window)
+// traz o total do filtro numa query só. Categoria pode ser nula → COALESCE. Recentes primeiro.
+func (q *Queries) ListTransactionsFiltered(ctx context.Context, arg ListTransactionsFilteredParams) ([]ListTransactionsFilteredRow, error) {
+	rows, err := q.db.Query(ctx, listTransactionsFiltered,
+		arg.UserID,
+		arg.Since,
+		arg.Until,
+		arg.CategoryIds,
+		arg.Q,
+		arg.Off,
+		arg.Lim,
+	)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	items := []ListRecentTransactionsRow{}
+	items := []ListTransactionsFilteredRow{}
 	for rows.Next() {
-		var i ListRecentTransactionsRow
+		var i ListTransactionsFilteredRow
 		if err := rows.Scan(
 			&i.ID,
 			&i.OccurredOn,
@@ -305,6 +377,7 @@ func (q *Queries) ListRecentTransactions(ctx context.Context, arg ListRecentTran
 			&i.CategoryIcon,
 			&i.Direction,
 			&i.AmountCents,
+			&i.TotalCount,
 		); err != nil {
 			return nil, err
 		}

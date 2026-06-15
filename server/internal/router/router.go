@@ -77,6 +77,7 @@ func New(d Deps) http.Handler {
 	mux.Handle("GET /transacoes/list", protected(transacoes.ListHandler(d.Transacoes)))
 	mux.Handle("GET /transacoes/recurrences", protected(transacoes.RecurrencesHandler(d.Transacoes)))
 	mux.Handle("GET /transacoes/debts", protected(transacoes.DebtsHandler(d.Transacoes)))
+	mux.Handle("GET /categories", protected(transacoes.CategoriesHandler(d.Transacoes)))
 
 	// Recurso "transações" (CRUD): saldo é derivado, então a escrita reflete no mês/saldo.
 	mux.Handle("POST /transactions", protected(transacoes.CreateHandler(d.Transacoes)))
