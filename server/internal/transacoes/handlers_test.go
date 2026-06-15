@@ -66,21 +66,66 @@ func TestSummaryHandlerErroDoStore(t *testing.T) {
 	}
 }
 
-func TestListHandlerJSON(t *testing.T) {
+func TestListHandlerEnvelopeJSON(t *testing.T) {
 	occurred := time.Date(2026, 6, 12, 0, 0, 0, 0, time.UTC)
-	svc := transacoes.NewService(&fakeStore{txns: []store.TransactionRow{
+	svc := transacoes.NewService(&fakeStore{total: 1, txns: []store.TransactionRow{
 		{ID: "t1", OccurredOn: occurred, Description: "iFood", AccountName: "Nubank", CategoryName: "Alimentação", CategoryIcon: "fastfood", Direction: "expense", AmountCents: 8990},
 	}})
 	rec := do(t, transacoes.ListHandler(svc), "/transacoes/list")
-	const want = `[{"id":"t1","dateLabel":"12 JUN","timeLabel":"12/06","title":"iFood","accountLabel":"Nubank","category":"Alimentação","tag":"Sobrevivência","tagTone":"error","amountCents":8990,"direction":"outflow","icon":"fastfood"}]` + "\n"
+	const want = `{"items":[{"id":"t1","dateLabel":"12 JUN","timeLabel":"12/06","title":"iFood","accountLabel":"Nubank","category":"Alimentação","tag":"Sobrevivência","tagTone":"error","amountCents":8990,"direction":"outflow","icon":"fastfood"}],"page":1,"pageSize":10,"total":1,"pageCount":1}` + "\n"
 	if got := rec.Body.String(); got != want {
 		t.Fatalf("body =\n%q\nquero\n%q", got, want)
 	}
 }
 
-func TestListHandlerListaVazia(t *testing.T) {
+func TestListHandlerVazioEnvelope(t *testing.T) {
 	svc := transacoes.NewService(&fakeStore{})
 	rec := do(t, transacoes.ListHandler(svc), "/transacoes/list")
+	const want = `{"items":[],"page":1,"pageSize":10,"total":0,"pageCount":0}` + "\n"
+	if got := rec.Body.String(); got != want {
+		t.Fatalf("body = %q, quero %q", got, want)
+	}
+}
+
+func TestListHandlerParseiaFiltros(t *testing.T) {
+	fake := &fakeStore{}
+	svc := transacoes.NewService(fake)
+	rec := do(t, transacoes.ListHandler(svc),
+		"/transacoes/list?period=custom&category=c1&category=c2&q=mercado&from=2026-01-10&to=2026-02-20&page=3")
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, quero 200", rec.Code)
+	}
+	if len(fake.gotFilter.CategoryIDs) != 2 || fake.gotFilter.CategoryIDs[0] != "c1" || fake.gotFilter.CategoryIDs[1] != "c2" {
+		t.Errorf("categoryIDs = %v, quero [c1 c2] (category repetível)", fake.gotFilter.CategoryIDs)
+	}
+	if fake.gotFilter.Query != "mercado" {
+		t.Errorf("q = %q, quero mercado", fake.gotFilter.Query)
+	}
+	if fake.gotFilter.Since == nil || fake.gotFilter.Since.Format("2006-01-02") != "2026-01-10" {
+		t.Errorf("custom from = %v, quero 2026-01-10", fake.gotFilter.Since)
+	}
+	if fake.gotFilter.Until == nil || fake.gotFilter.Until.Format("2006-01-02") != "2026-02-20" {
+		t.Errorf("custom to = %v, quero 2026-02-20", fake.gotFilter.Until)
+	}
+	if fake.gotFilter.Offset != 2*fake.gotFilter.Limit { // page 3 → offset 2*pageSize
+		t.Errorf("page=3: offset = %d, quero %d", fake.gotFilter.Offset, 2*fake.gotFilter.Limit)
+	}
+}
+
+func TestCategoriesHandlerJSON(t *testing.T) {
+	svc := transacoes.NewService(&fakeStore{cats: []store.CategoryRow{
+		{ID: "c1", Name: "Alimentação", Icon: "restaurant", Kind: "expense"},
+	}})
+	rec := do(t, transacoes.CategoriesHandler(svc), "/categories")
+	const want = `[{"id":"c1","name":"Alimentação","icon":"restaurant","kind":"expense"}]` + "\n"
+	if got := rec.Body.String(); got != want {
+		t.Fatalf("body =\n%q\nquero\n%q", got, want)
+	}
+}
+
+func TestCategoriesHandlerListaVazia(t *testing.T) {
+	svc := transacoes.NewService(&fakeStore{})
+	rec := do(t, transacoes.CategoriesHandler(svc), "/categories")
 	if got := rec.Body.String(); got != "[]\n" {
 		t.Fatalf("body = %q, quero %q", got, "[]\n")
 	}

@@ -15,6 +15,9 @@ import (
 type fakeStore struct {
 	summary   store.MonthSummaryRow
 	txns      []store.TransactionRow
+	total     int
+	gotFilter store.TransactionFilter
+	cats      []store.CategoryRow
 	rules     []store.RecurringRuleRow
 	debts     []store.InstallmentDebtRow
 	err       error
@@ -36,9 +39,15 @@ func (f *fakeStore) GetMonthSummary(_ context.Context, userID string, _ time.Tim
 	return f.summary, f.err
 }
 
-func (f *fakeStore) ListRecentTransactions(_ context.Context, userID string) ([]store.TransactionRow, error) {
+func (f *fakeStore) ListTransactionsFiltered(_ context.Context, userID string, filter store.TransactionFilter) ([]store.TransactionRow, int, error) {
 	f.gotUserID = userID
-	return f.txns, f.err
+	f.gotFilter = filter
+	return f.txns, f.total, f.err
+}
+
+func (f *fakeStore) ListCategories(_ context.Context, userID string) ([]store.CategoryRow, error) {
+	f.gotUserID = userID
+	return f.cats, f.err
 }
 
 func (f *fakeStore) ListRecurringRules(_ context.Context, userID string) ([]store.RecurringRuleRow, error) {
@@ -98,27 +107,97 @@ func TestCashflowSummaryMapeiaEDerivaColapso(t *testing.T) {
 
 func TestTransactionsMapeiaLabelsTagESentido(t *testing.T) {
 	occurred := time.Date(2026, 6, 12, 0, 0, 0, 0, time.UTC)
-	fake := &fakeStore{txns: []store.TransactionRow{
+	fake := &fakeStore{total: 2, txns: []store.TransactionRow{
 		{ID: "t1", OccurredOn: occurred, Description: "iFood", AccountName: "Nubank", CategoryName: "Alimentação", CategoryIcon: "fastfood", Direction: "expense", AmountCents: 8990},
 		{ID: "t2", OccurredOn: occurred, Description: "Salário", AccountName: "Nubank", CategoryName: "Salário", CategoryIcon: "payments", Direction: "income", AmountCents: 320000},
 	}}
-	got, err := transacoes.NewService(fake).Transactions(context.Background(), "u-9")
+	got, err := transacoes.NewService(fake).Transactions(context.Background(), "u-9", transacoes.TransactionQuery{})
 	if err != nil {
 		t.Fatalf("erro inesperado: %v", err)
 	}
 	if fake.gotUserID != "u-9" {
 		t.Errorf("escopo: userID = %q, quero u-9", fake.gotUserID)
 	}
+	if got.Page != 1 || got.Total != 2 || got.PageCount != 1 {
+		t.Errorf("paginação = {page %d, total %d, pageCount %d}, quero {1,2,1}", got.Page, got.Total, got.PageCount)
+	}
 	want0 := transacoes.Transaction{
 		ID: "t1", DateLabel: "12 JUN", TimeLabel: "12/06", Title: "iFood", AccountLabel: "Nubank",
 		Category: "Alimentação", Tag: "Sobrevivência", TagTone: "error", AmountCents: 8990,
 		Direction: "outflow", Icon: "fastfood",
 	}
-	if got[0] != want0 {
-		t.Errorf("got[0] = %+v\nquero    %+v", got[0], want0)
+	if got.Items[0] != want0 {
+		t.Errorf("items[0] = %+v\nquero      %+v", got.Items[0], want0)
 	}
-	if got[1].Direction != "inflow" || got[1].Tag != "Inflow Esperado" || got[1].TagTone != "secondary" {
-		t.Errorf("receita = {%q,%q,%q}, quero {inflow,Inflow Esperado,secondary}", got[1].Direction, got[1].Tag, got[1].TagTone)
+	if got.Items[1].Direction != "inflow" || got.Items[1].Tag != "Inflow Esperado" || got.Items[1].TagTone != "secondary" {
+		t.Errorf("receita = {%q,%q,%q}, quero {inflow,Inflow Esperado,secondary}", got.Items[1].Direction, got.Items[1].Tag, got.Items[1].TagTone)
+	}
+}
+
+func TestTransactionsPeriodoEPaginacao(t *testing.T) {
+	now := time.Now()
+
+	// Default "30d": recorta ~30 dias (sem teto) e a página 2 desloca pelo pageSize; as
+	// categorias são repassadas (OR no server).
+	fake := &fakeStore{total: 25}
+	got, err := transacoes.NewService(fake).Transactions(context.Background(), "u-1",
+		transacoes.TransactionQuery{Period: "30d", Page: 2, CategoryIDs: []string{"c1", "c2"}})
+	if err != nil {
+		t.Fatalf("erro inesperado: %v", err)
+	}
+	if fake.gotFilter.Since == nil || fake.gotFilter.Until != nil {
+		t.Fatalf("30d: since/until = %v/%v, quero {não-nil, nil}", fake.gotFilter.Since, fake.gotFilter.Until)
+	}
+	if d := now.Sub(*fake.gotFilter.Since).Hours() / 24; d < 29 || d > 31 {
+		t.Errorf("30d: since ~%.0f dias atrás, quero ~30", d)
+	}
+	if len(fake.gotFilter.CategoryIDs) != 2 || fake.gotFilter.CategoryIDs[0] != "c1" {
+		t.Errorf("categoryIDs = %v, quero [c1 c2]", fake.gotFilter.CategoryIDs)
+	}
+	if fake.gotFilter.Offset != fake.gotFilter.Limit { // página 2 → offset = pageSize
+		t.Errorf("página 2: offset = %d, quero limit %d", fake.gotFilter.Offset, fake.gotFilter.Limit)
+	}
+	if got.PageCount != 3 || got.Page != 2 { // 25/10 = 3
+		t.Errorf("paginação = {page %d, pageCount %d}, quero {2,3}", got.Page, got.PageCount)
+	}
+
+	// "3m" recua bem mais que "30d".
+	threeM := &fakeStore{}
+	if _, err := transacoes.NewService(threeM).Transactions(context.Background(), "u-1", transacoes.TransactionQuery{Period: "3m"}); err != nil {
+		t.Fatalf("erro inesperado: %v", err)
+	}
+	if threeM.gotFilter.Since == nil || now.Sub(*threeM.gotFilter.Since).Hours()/24 < 80 {
+		t.Errorf("3m: since deveria recuar ~90 dias, veio %v", threeM.gotFilter.Since)
+	}
+
+	// "custom": usa from/to exatos como recorte inferior/superior.
+	custom := &fakeStore{}
+	if _, err := transacoes.NewService(custom).Transactions(context.Background(), "u-1",
+		transacoes.TransactionQuery{Period: "custom", From: "2026-01-10", To: "2026-02-20"}); err != nil {
+		t.Fatalf("erro inesperado: %v", err)
+	}
+	if custom.gotFilter.Since == nil || custom.gotFilter.Since.Format("2006-01-02") != "2026-01-10" {
+		t.Errorf("custom since = %v, quero 2026-01-10", custom.gotFilter.Since)
+	}
+	if custom.gotFilter.Until == nil || custom.gotFilter.Until.Format("2006-01-02") != "2026-02-20" {
+		t.Errorf("custom until = %v, quero 2026-02-20", custom.gotFilter.Until)
+	}
+}
+
+func TestCategoriesMapeia(t *testing.T) {
+	fake := &fakeStore{cats: []store.CategoryRow{
+		{ID: "c1", Name: "Alimentação", Icon: "restaurant", Kind: "expense"},
+	}}
+	got, err := transacoes.NewService(fake).Categories(context.Background(), "u-7")
+	if err != nil {
+		t.Fatalf("erro inesperado: %v", err)
+	}
+	if fake.gotUserID != "u-7" {
+		t.Errorf("escopo: userID = %q, quero u-7", fake.gotUserID)
+	}
+	want := transacoes.Category{ID: "c1", Name: "Alimentação", Icon: "restaurant", Kind: "expense"}
+	if len(got) != 1 || got[0] != want {
+		t.Errorf("got = %+v, quero [%+v]", got, want)
 	}
 }
 
@@ -159,11 +238,12 @@ func TestFutureDebtsDerivaProgressoELabel(t *testing.T) {
 
 func TestListasVaziasNaoQuebram(t *testing.T) {
 	svc := transacoes.NewService(&fakeStore{})
-	txns, _ := svc.Transactions(context.Background(), "u-1")
+	page, _ := svc.Transactions(context.Background(), "u-1", transacoes.TransactionQuery{})
 	rules, _ := svc.Recurrences(context.Background(), "u-1")
 	debts, _ := svc.FutureDebts(context.Background(), "u-1")
-	if txns == nil || len(txns) != 0 || rules == nil || len(rules) != 0 || debts == nil || len(debts) != 0 {
-		t.Errorf("listas vazias devem ser slice não-nil (txns=%v rules=%v debts=%v)", txns, rules, debts)
+	cats, _ := svc.Categories(context.Background(), "u-1")
+	if page.Items == nil || len(page.Items) != 0 || rules == nil || len(rules) != 0 || debts == nil || len(debts) != 0 || cats == nil || len(cats) != 0 {
+		t.Errorf("listas vazias devem ser slice não-nil (items=%v rules=%v debts=%v cats=%v)", page.Items, rules, debts, cats)
 	}
 }
 
@@ -172,8 +252,11 @@ func TestPropagaErroDoStore(t *testing.T) {
 	if _, err := svc.CashflowSummary(context.Background(), "u-1", time.Now()); err == nil {
 		t.Error("CashflowSummary: esperava erro propagado")
 	}
-	if _, err := svc.Transactions(context.Background(), "u-1"); err == nil {
+	if _, err := svc.Transactions(context.Background(), "u-1", transacoes.TransactionQuery{}); err == nil {
 		t.Error("Transactions: esperava erro propagado")
+	}
+	if _, err := svc.Categories(context.Background(), "u-1"); err == nil {
+		t.Error("Categories: esperava erro propagado")
 	}
 	if _, err := svc.Recurrences(context.Background(), "u-1"); err == nil {
 		t.Error("Recurrences: esperava erro propagado")

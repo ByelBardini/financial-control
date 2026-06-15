@@ -51,6 +51,7 @@ func TestRotasDeDadosExigemToken(t *testing.T) {
 		"/transacoes/list",
 		"/transacoes/recurrences",
 		"/transacoes/debts",
+		"/categories",
 		"/transactions/t1",
 	}
 	for _, p := range dataPaths {

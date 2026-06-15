@@ -9,14 +9,17 @@ import (
 	"testing"
 	"time"
 
+	"github.com/jackc/pgx/v5"
+
 	"financial-control/server/internal/store"
 	"financial-control/server/internal/transacoes"
 )
 
 // IDs fixos do seed do usuário A (ver db/seed.sql), usados pra criar transações no teste.
 const (
-	userANubankAcc = "a0000000-0000-0000-0000-000000000001"
-	userAFoodCat   = "c0000000-0000-0000-0000-000000000002"
+	userANubankAcc    = "a0000000-0000-0000-0000-000000000001"
+	userAFoodCat      = "c0000000-0000-0000-0000-000000000002"
+	userATransportCat = "c0000000-0000-0000-0000-000000000003"
 )
 
 // Bate nos endpoints reais da tela de Transações sobre o seed (DESTRUTIVO: TRUNCATE).
@@ -28,6 +31,7 @@ func TestTransacoesEndpointsComSeed(t *testing.T) {
 	}
 	ctx := context.Background()
 	applySeed(t, ctx, dsn)
+	insertOldTransaction(t, ctx, dsn) // despesa de 40 dias atrás (só pro filtro de período)
 
 	st, err := store.Open(ctx, dsn)
 	if err != nil {
@@ -52,21 +56,87 @@ func TestTransacoesEndpointsComSeed(t *testing.T) {
 		}
 	})
 
-	t.Run("list", func(t *testing.T) {
-		var txns []transacoes.Transaction
-		getJSON(t, srv.URL+"/transacoes/list", token, &txns)
-		if len(txns) != 6 {
-			t.Fatalf("len = %d, quero 6 transações semeadas", len(txns))
+	t.Run("list (default = 30 Dias, exclui a antiga)", func(t *testing.T) {
+		var page transacoes.TransactionPage
+		getJSON(t, srv.URL+"/transacoes/list", token, &page)
+		if page.Total != 6 || page.Page != 1 || page.PageCount != 1 {
+			t.Fatalf("envelope = {total %d, page %d, pageCount %d}, quero {6,1,1} (default 30 dias)", page.Total, page.Page, page.PageCount)
 		}
-		mercado := findTransaction(txns, "Mercado")
+		if findTransaction(page.Items, "Compra Antiga") != nil {
+			t.Error("Compra Antiga (40 dias) não devia aparecer no default 30 Dias")
+		}
+		mercado := findTransaction(page.Items, "Mercado")
 		if mercado == nil {
 			t.Fatal("não achei a transação 'Mercado'")
 		}
 		if mercado.Direction != "outflow" || mercado.AmountCents != 62000 || mercado.AccountLabel != "Nubank" {
 			t.Errorf("Mercado = {%q,%d,%q}, quero {outflow,62000,Nubank}", mercado.Direction, mercado.AmountCents, mercado.AccountLabel)
 		}
-		if mercado.DateLabel == "" || mercado.TimeLabel == "" {
-			t.Errorf("labels de data vazios: %+v", mercado)
+	})
+
+	t.Run("3 Meses inclui a antiga", func(t *testing.T) {
+		var page transacoes.TransactionPage
+		getJSON(t, srv.URL+"/transacoes/list?period=3m", token, &page)
+		if page.Total != 7 || findTransaction(page.Items, "Compra Antiga") == nil {
+			t.Errorf("3 Meses total = %d, quero 7 (inclui a Compra Antiga de 40 dias)", page.Total)
+		}
+	})
+
+	t.Run("range custom recorta", func(t *testing.T) {
+		// Janela [hoje-50, hoje-30]: pega só a Compra Antiga (-40d); as do mês corrente
+		// ficam a < 30 dias (acima do teto). Determinístico, independe do dia de hoje.
+		from := time.Now().AddDate(0, 0, -50).Format("2006-01-02")
+		to := time.Now().AddDate(0, 0, -30).Format("2006-01-02")
+		var page transacoes.TransactionPage
+		getJSON(t, srv.URL+"/transacoes/list?period=custom&from="+from+"&to="+to, token, &page)
+		if page.Total != 1 || findTransaction(page.Items, "Compra Antiga") == nil {
+			t.Errorf("custom [%s,%s] total = %d, quero 1 (só a Compra Antiga)", from, to, page.Total)
+		}
+	})
+
+	t.Run("filtro de categoria (uma)", func(t *testing.T) {
+		var page transacoes.TransactionPage
+		getJSON(t, srv.URL+"/transacoes/list?category="+userAFoodCat, token, &page)
+		if page.Total != 1 || findTransaction(page.Items, "Mercado") == nil {
+			t.Errorf("categoria Alimentação total = %d, quero 1 (Mercado)", page.Total)
+		}
+	})
+
+	t.Run("multi-categoria = OR", func(t *testing.T) {
+		// 3 Meses (pra incluir a antiga) + Alimentação OU Transporte: Mercado + Uber + Compra Antiga.
+		var page transacoes.TransactionPage
+		getJSON(t, srv.URL+"/transacoes/list?period=3m&category="+userAFoodCat+"&category="+userATransportCat, token, &page)
+		if page.Total != 3 {
+			t.Errorf("multi-categoria OR total = %d, quero 3 (Mercado/Uber/Compra Antiga)", page.Total)
+		}
+	})
+
+	t.Run("busca q (ILIKE)", func(t *testing.T) {
+		var page transacoes.TransactionPage
+		getJSON(t, srv.URL+"/transacoes/list?q=fone", token, &page)
+		if page.Total != 2 {
+			t.Errorf("busca 'fone' total = %d, quero 2 (Fone 1/3 e 2/3)", page.Total)
+		}
+	})
+
+	t.Run("paginação fora do alcance", func(t *testing.T) {
+		// Poucos itens (< pageSize) → a página 2 vem vazia. (A matemática de pageCount/offset
+		// é coberta no unit; aqui só confirmo que a página além dos dados não estoura.)
+		var page transacoes.TransactionPage
+		getJSON(t, srv.URL+"/transacoes/list?page=2", token, &page)
+		if len(page.Items) != 0 || page.Page != 2 {
+			t.Errorf("page 2 = {items %d, page %d}, quero {0,2}", len(page.Items), page.Page)
+		}
+	})
+
+	t.Run("categorias", func(t *testing.T) {
+		var cats []transacoes.Category
+		getJSON(t, srv.URL+"/categories", token, &cats)
+		if len(cats) != 4 {
+			t.Fatalf("len categorias = %d, quero 4 (Alimentação/Lazer/Salário/Transporte)", len(cats))
+		}
+		if cats[0].Name != "Alimentação" { // ORDER BY name
+			t.Errorf("primeira categoria = %q, quero Alimentação (ordenado por nome)", cats[0].Name)
 		}
 	})
 
@@ -138,9 +208,9 @@ func TestTransacoesWriteFlowEIsolamento(t *testing.T) {
 	if got := outflow(tokenA); got != baseline+5000 {
 		t.Errorf("outflow após criar = %d, quero %d", got, baseline+5000)
 	}
-	var txns []transacoes.Transaction
-	getJSON(t, srv.URL+"/transacoes/list", tokenA, &txns)
-	if findTransaction(txns, "Teste Integração") == nil {
+	var page transacoes.TransactionPage
+	getJSON(t, srv.URL+"/transacoes/list", tokenA, &page)
+	if findTransaction(page.Items, "Teste Integração") == nil {
 		t.Error("transação criada não apareceu no /transacoes/list")
 	}
 
@@ -170,6 +240,24 @@ func TestTransacoesWriteFlowEIsolamento(t *testing.T) {
 	}
 	if got := outflow(tokenA); got != baseline {
 		t.Errorf("outflow de A mudou após a tentativa de B (%d) — VAZAMENTO", got)
+	}
+}
+
+// insertOldTransaction insere uma despesa de 40 dias atrás (fora do mês corrente e do
+// filtro "30 Dias") na conta/categoria do seed, pra exercitar o filtro de período SEM
+// tocar no seed.sql compartilhado (outros testes dependem dos saldos de lá).
+func insertOldTransaction(t *testing.T, ctx context.Context, dsn string) {
+	t.Helper()
+	conn, err := pgx.Connect(ctx, dsn)
+	if err != nil {
+		t.Fatalf("pgx.Connect: %v", err)
+	}
+	defer conn.Close(ctx)
+	if _, err := conn.Exec(ctx, `INSERT INTO transactions
+		(account_id, user_id, category_id, description, direction, amount, occurred_on)
+		VALUES ($1, '00000000-0000-0000-0000-000000000001', $2, 'Compra Antiga', 'expense', 70.00, (now() - interval '40 days')::date)`,
+		userANubankAcc, "c0000000-0000-0000-0000-000000000003"); err != nil {
+		t.Fatalf("inserir transação antiga: %v", err)
 	}
 }
 
