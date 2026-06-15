@@ -5,12 +5,30 @@ import * as api from '../../src/api/transacoes';
 import { transacoesSnapshot } from '../../src/mocks/transacoesSnapshot';
 import {
   useCashflowSummary,
+  useCategories,
   useFutureDebts,
   useRecurrences,
-  useTransactions,
+  useTransactionsInfinite,
+  useTransactionsPage,
 } from '../../src/hooks/useTransacoesQueries';
+import type { TransactionFilters, TransactionPage } from '../../src/types/transacoes';
 
 jest.mock('../../src/api/transacoes');
+
+const filters: TransactionFilters = {
+  period: '30d',
+  categoryIds: [],
+  query: '',
+  from: '',
+  to: '',
+};
+const samplePage = (): TransactionPage => ({
+  items: transacoesSnapshot.transactions,
+  page: 1,
+  pageSize: 10,
+  total: transacoesSnapshot.transactions.length,
+  pageCount: 1,
+});
 
 // QueryClient novo por teste: retry off + gcTime 0 (senão o timer de GC trava o jest).
 const makeWrapper = () => {
@@ -41,15 +59,35 @@ describe('useCashflowSummary (React Query)', () => {
 
 describe('demais recursos de Transações', () => {
   beforeEach(() => {
-    jest.mocked(api.getTransactions).mockResolvedValue(transacoesSnapshot.transactions);
+    jest.mocked(api.getTransactionsPage).mockResolvedValue(samplePage());
+    jest.mocked(api.getCategories).mockResolvedValue([]);
     jest.mocked(api.getRecurrences).mockResolvedValue(transacoesSnapshot.recurrences);
     jest.mocked(api.getFutureDebts).mockResolvedValue(transacoesSnapshot.debts);
   });
 
-  it('useTransactions entrega o log de transações', async () => {
-    const { result } = await renderHook(() => useTransactions(), { wrapper: makeWrapper() });
+  it('useTransactionsPage entrega a página do log', async () => {
+    const { result } = await renderHook(() => useTransactionsPage(filters, 1), {
+      wrapper: makeWrapper(),
+    });
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
-    expect(result.current.data?.[0]?.title).toBe('iFood - "Só hoje"');
+    expect(result.current.data?.items[0]?.title).toBe('iFood - "Só hoje"');
+  });
+
+  it('useTransactionsInfinite acumula páginas', async () => {
+    const { result } = await renderHook(() => useTransactionsInfinite(filters), {
+      wrapper: makeWrapper(),
+    });
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(result.current.data?.pages[0]?.items[0]?.title).toBe('iFood - "Só hoje"');
+  });
+
+  it('useCategories entrega as categorias', async () => {
+    jest
+      .mocked(api.getCategories)
+      .mockResolvedValue([{ id: 'c1', name: 'Alimentação', icon: 'restaurant', kind: 'expense' }]);
+    const { result } = await renderHook(() => useCategories(), { wrapper: makeWrapper() });
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(result.current.data?.[0]?.name).toBe('Alimentação');
   });
 
   it('useRecurrences entrega as recorrências', async () => {

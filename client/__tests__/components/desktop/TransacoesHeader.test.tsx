@@ -1,13 +1,30 @@
-import { render, screen } from '@testing-library/react-native';
+import { useState } from 'react';
+import { render, screen, userEvent } from '@testing-library/react-native';
 import { TransacoesHeader } from '../../../src/components/desktop/TransacoesHeader';
 
+function Harness() {
+  const [q, setQ] = useState('');
+  return (
+    <TransacoesHeader
+      hidden={false}
+      onToggleHidden={jest.fn()}
+      searchText={q}
+      onSearchChange={setQ}
+    />
+  );
+}
+
 describe('TransacoesHeader (desktop)', () => {
-  it('mostra título, subtítulo, toggle de valores e a ação visual de nova transação', async () => {
-    await render(<TransacoesHeader hidden={false} onToggleHidden={jest.fn()} />);
+  it('mostra título, busca, toggle de valores e a ação de nova transação', async () => {
+    await render(<Harness />);
 
     expect(screen.getByRole('header', { name: 'Transações' })).toBeOnTheScreen();
     expect(screen.getByText('Rastreando cada centavo em fuga.')).toBeOnTheScreen();
     expect(screen.getByRole('switch', { name: 'Ocultar valores' })).toBeOnTheScreen();
     expect(screen.getByText('NOVA TRANSAÇÃO')).toBeOnTheScreen();
+
+    const input = screen.getByLabelText('Buscar transações');
+    await userEvent.setup().type(input, 'uber');
+    expect(input.props.value).toBe('uber');
   });
 });

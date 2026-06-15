@@ -1,5 +1,7 @@
-import { screen } from '@testing-library/react-native';
+import { screen, userEvent, waitFor } from '@testing-library/react-native';
 import { DesktopTransacoes } from '../../../src/components/desktop/DesktopTransacoes';
+import { useTransactionFilters } from '../../../src/hooks/useTransactionFilters';
+import * as api from '../../../src/api/transacoes';
 import { mockTransacoesApi, renderWithClient } from '../../_support/renderWithClient';
 
 jest.mock('../../../src/api/transacoes');
@@ -9,27 +11,43 @@ beforeEach(() => {
   mockTransacoesApi();
 });
 
-const noop = () => {};
+// Harness com o controlador real (a tela é quem o possui) — exercita filtro→refetch.
+function Harness() {
+  const controls = useTransactionFilters();
+  return (
+    <DesktopTransacoes
+      hidden={false}
+      onToggleHidden={() => {}}
+      controls={controls}
+      route="transacoes"
+    />
+  );
+}
 
 describe('DesktopTransacoes', () => {
-  it('renderiza header, fluxo de caixa, lista e os painéis laterais', async () => {
-    await renderWithClient(
-      <DesktopTransacoes hidden={false} onToggleHidden={noop} route="transacoes" />,
-    );
+  it('renderiza header, fluxo, lista e painéis; destaca Transações no SideNav', async () => {
+    await renderWithClient(<Harness />);
 
     expect(await screen.findByText('FLUXO DE CAIXA OPERACIONAL')).toBeOnTheScreen();
     expect(screen.getByRole('header', { name: 'Transações' })).toBeOnTheScreen();
     expect(screen.getByText('iFood - "Só hoje"')).toBeOnTheScreen();
     expect(screen.getByRole('header', { name: 'Recorrências' })).toBeOnTheScreen();
-    expect(screen.getByRole('header', { name: 'Dívidas Futuras' })).toBeOnTheScreen();
+    expect(screen.getByRole('button', { name: 'Transações' })).toBeSelected();
   });
 
-  it('destaca Transações no SideNav', async () => {
-    await renderWithClient(
-      <DesktopTransacoes hidden={false} onToggleHidden={noop} route="transacoes" />,
-    );
-    await screen.findByText('FLUXO DE CAIXA OPERACIONAL');
+  it('escolher "3 Meses" no dropdown de período refaz a busca com period=3m', async () => {
+    await renderWithClient(<Harness />);
+    await screen.findByText('iFood - "Só hoje"');
+    const user = userEvent.setup();
 
-    expect(screen.getByRole('button', { name: 'Transações' })).toBeSelected();
+    await user.press(screen.getByRole('button', { name: 'Período: 30 Dias' }));
+    await user.press(screen.getByRole('menuitem', { name: '3 Meses' }));
+
+    await waitFor(() =>
+      expect(jest.mocked(api.getTransactionsPage)).toHaveBeenCalledWith(
+        expect.objectContaining({ period: '3m' }),
+        1,
+      ),
+    );
   });
 });

@@ -39,7 +39,14 @@ export function mockContasApi(snapshot: ContasSnapshot = contasSnapshot) {
 // Requer `jest.mock('../../src/api/transacoes')` no topo do arquivo de teste.
 export function mockTransacoesApi(snapshot: TransacoesSnapshot = transacoesSnapshot) {
   jest.mocked(transacoesApi.getCashflowSummary).mockResolvedValue(snapshot.summary);
-  jest.mocked(transacoesApi.getTransactions).mockResolvedValue(snapshot.transactions);
+  jest.mocked(transacoesApi.getTransactionsPage).mockResolvedValue({
+    items: snapshot.transactions,
+    page: 1,
+    pageSize: 10,
+    total: snapshot.transactions.length,
+    pageCount: 1,
+  });
+  jest.mocked(transacoesApi.getCategories).mockResolvedValue([]);
   jest.mocked(transacoesApi.getRecurrences).mockResolvedValue(snapshot.recurrences);
   jest.mocked(transacoesApi.getFutureDebts).mockResolvedValue(snapshot.debts);
 }
