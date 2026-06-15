@@ -1,42 +1,83 @@
 import { Text, View } from 'react-native';
 import { DesktopTransactionRow } from './DesktopTransactionRow';
-import { Icon } from '../Icon';
-import { TransactionFilterTabs } from '../TransactionFilterTabs';
-import type { Transaction } from '../../types/transacoes';
+import { CategoryFilter } from '../CategoryFilter';
+import { FilterChips } from '../FilterChips';
+import { Pagination } from '../Pagination';
+import { PeriodFilter } from '../PeriodFilter';
+import type { TransactionControls } from '../../hooks/useTransactionFilters';
+import type { Category, Transaction } from '../../types/transacoes';
 
-type TransactionListPanelProps = { transactions: Transaction[]; hidden: boolean };
+type TransactionListPanelProps = {
+  transactions: Transaction[];
+  total: number;
+  hidden: boolean;
+  controls: TransactionControls;
+  categories: Category[];
+  page: number;
+  pageCount: number;
+  onPrev: () => void;
+  onNext: () => void;
+};
 
-// Painel principal do desktop: barra de abas (visuais) + contagem, a lista de linhas
-// e um rodapé de paginação (também visual nesta passada — sem backend que pagine).
-export function TransactionListPanel({ transactions, hidden }: TransactionListPanelProps) {
+// Painel principal do desktop: barra de filtros (abas de tempo + categoria) + chips de
+// estado, a lista filtrada/paginada e o rodapé de paginação numerada.
+export function TransactionListPanel({
+  transactions,
+  total,
+  hidden,
+  controls,
+  categories,
+  page,
+  pageCount,
+  onPrev,
+  onNext,
+}: TransactionListPanelProps) {
   return (
     <View>
-      <View className="flex-row items-center justify-between border-b border-grid-line p-stack-lg">
-        <TransactionFilterTabs tabs={['Recentes', '30 Dias', 'Categorias']} />
-        <Text className="font-geist-medium text-label-sm text-on-surface-variant">
-          Exibindo {transactions.length} tragédias
-        </Text>
+      <View className="flex-row items-center justify-between gap-stack-md border-b border-grid-line p-stack-lg">
+        <PeriodFilter
+          value={controls.filters.period}
+          from={controls.filters.from}
+          to={controls.filters.to}
+          onChange={controls.setPeriod}
+          onFromChange={controls.setFrom}
+          onToChange={controls.setTo}
+        />
+        <CategoryFilter
+          categories={categories}
+          value={controls.filters.categoryIds}
+          onToggle={controls.toggleCategory}
+          onClear={controls.clearCategory}
+        />
       </View>
 
-      <View>
-        {transactions.map((transaction) => (
-          <DesktopTransactionRow key={transaction.id} transaction={transaction} hidden={hidden} />
-        ))}
+      <View className="border-b border-grid-line px-stack-lg py-stack-md">
+        <FilterChips
+          filters={controls.filters}
+          categories={categories}
+          total={total}
+          onClearPeriod={controls.clearPeriod}
+          onRemoveCategory={controls.toggleCategory}
+          onClearQuery={controls.clearQuery}
+          onClearAll={controls.clearAll}
+        />
       </View>
 
-      <View className="flex-row items-center justify-between p-stack-lg">
-        <View className="flex-row items-center gap-stack-sm">
-          <Icon name="chevron_left" size={16} color="#cbc3d7" />
-          <Text className="font-geist-medium text-label-sm text-on-surface-variant">Anterior</Text>
+      {transactions.length === 0 ? (
+        <View className="p-stack-lg">
+          <Text className="font-geist-medium text-label-md text-on-surface-variant">
+            Nenhuma transação encontrada.
+          </Text>
         </View>
-        <Text className="font-geist-medium text-label-sm uppercase text-on-surface-variant">
-          Página 1 de 1
-        </Text>
-        <View className="flex-row items-center gap-stack-sm">
-          <Text className="font-geist-medium text-label-sm text-on-surface-variant">Próxima</Text>
-          <Icon name="chevron_right" size={16} color="#cbc3d7" />
+      ) : (
+        <View>
+          {transactions.map((transaction) => (
+            <DesktopTransactionRow key={transaction.id} transaction={transaction} hidden={hidden} />
+          ))}
         </View>
-      </View>
+      )}
+
+      <Pagination page={page} pageCount={pageCount} onPrev={onPrev} onNext={onNext} />
     </View>
   );
 }

@@ -61,7 +61,38 @@ export interface FutureDebt {
   note?: string;
 }
 
-// Snapshot completo: fixture de runtime hoje, shape da futura API de Transações.
+// Período do filtro de tempo da lista. '30d' (default) / '3m' / '6m' / '1y' recuam a
+// partir de hoje; 'custom' usa from/to (YYYY-MM-DD).
+export type TransactionPeriod = '30d' | '3m' | '6m' | '1y' | 'custom';
+
+// Filtros da lista (combinam AND no server; categoryIds em OR entre si). categoryIds vazio
+// = todas; query "" = sem busca; from/to só valem quando period === 'custom'.
+export interface TransactionFilters {
+  period: TransactionPeriod;
+  categoryIds: string[];
+  query: string;
+  from: string;
+  to: string;
+}
+
+// Página do log de transações + metadados de paginação (envelope de GET /transacoes/list).
+export interface TransactionPage {
+  items: Transaction[];
+  page: number;
+  pageSize: number;
+  total: number;
+  pageCount: number;
+}
+
+// Categoria do usuário — alimenta o filtro de categoria.
+export interface Category {
+  id: string;
+  name: string;
+  icon: IconName;
+  kind: 'income' | 'expense';
+}
+
+// Snapshot completo: fixture de teste (summary/recurrences/debts) + a lista no shape antigo.
 export interface TransacoesSnapshot {
   summary: CashflowSummary;
   transactions: Transaction[];

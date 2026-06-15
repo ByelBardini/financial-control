@@ -1,46 +1,59 @@
-import { ScrollView, View } from 'react-native';
+import { Pressable, ScrollView, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BottomNav } from './BottomNav';
 import { CashflowSummary } from './CashflowSummary';
+import { CategoryFilter } from './CategoryFilter';
+import { FilterChips } from './FilterChips';
 import { FutureDebtRow } from './FutureDebtRow';
 import { PanicMeter } from './PanicMeter';
+import { PeriodFilter } from './PeriodFilter';
 import { QuerySection } from './QuerySection';
 import { RecurrenceRow } from './RecurrenceRow';
+import { SectionError } from './SectionError';
 import { SectionHeading } from './SectionHeading';
+import { SectionSkeleton } from './SectionSkeleton';
 import { TopBar } from './TopBar';
-import { TransactionFilterTabs } from './TransactionFilterTabs';
 import { TransactionRow } from './TransactionRow';
+import { TransactionSearch } from './TransactionSearch';
 import {
   useCashflowSummary,
+  useCategories,
   useFutureDebts,
   useRecurrences,
-  useTransactions,
+  useTransactionsInfinite,
 } from '../hooks/useTransacoesQueries';
+import type { TransactionControls } from '../hooks/useTransactionFilters';
 import type { AppRoute } from '../navigation/routes';
 
 type MobileTransacoesProps = {
   hidden: boolean;
   onToggleHidden: () => void;
+  controls: TransactionControls;
   route?: AppRoute;
   onNavigate?: (route: AppRoute) => void;
   onLogout?: () => void;
 };
 
-// Pilha vertical do mobile (Transações). Cada seção é uma query independente
-// (loading/erro por seção via QuerySection). Read-only nesta passada: as abas de
-// filtro são visuais. BottomNav fixo respeitando o safe-area.
+// Pilha vertical do mobile (Transações). A seção do log tem busca + filtros (tempo/
+// categoria) + chips e pagina por "Carregar mais" (useInfiniteQuery acumula as páginas).
+// Recorrências/Dívidas seguem seções abaixo. BottomNav fixo respeitando o safe-area.
 export function MobileTransacoes({
   hidden,
   onToggleHidden,
+  controls,
   route = 'transacoes',
   onNavigate,
   onLogout,
 }: MobileTransacoesProps) {
   const insets = useSafeAreaInsets();
   const summary = useCashflowSummary();
-  const transactions = useTransactions();
+  const list = useTransactionsInfinite(controls.filters);
   const recurrences = useRecurrences();
   const debts = useFutureDebts();
+  const categories = useCategories();
+
+  const items = list.data?.pages.flatMap((p) => p.items) ?? [];
+  const total = list.data?.pages[0]?.total ?? 0;
 
   return (
     <View className="flex-1 bg-background" style={{ paddingTop: insets.top }}>
@@ -61,20 +74,65 @@ export function MobileTransacoes({
           )}
         </QuerySection>
 
-        <View className="px-container-margin">
-          <TransactionFilterTabs tabs={['Recentes', 'Recorrências', 'Dívidas']} />
-        </View>
+        <View className="gap-stack-md px-container-margin">
+          <SectionHeading>Transações</SectionHeading>
+          <TransactionSearch value={controls.searchText} onChange={controls.setSearchText} />
+          <View className="flex-row flex-wrap items-center gap-stack-sm">
+            <PeriodFilter
+              value={controls.filters.period}
+              from={controls.filters.from}
+              to={controls.filters.to}
+              onChange={controls.setPeriod}
+              onFromChange={controls.setFrom}
+              onToChange={controls.setTo}
+            />
+            <CategoryFilter
+              categories={categories.data ?? []}
+              value={controls.filters.categoryIds}
+              onToggle={controls.toggleCategory}
+              onClear={controls.clearCategory}
+            />
+          </View>
+          <FilterChips
+            filters={controls.filters}
+            categories={categories.data ?? []}
+            total={total}
+            onClearPeriod={controls.clearPeriod}
+            onRemoveCategory={controls.toggleCategory}
+            onClearQuery={controls.clearQuery}
+            onClearAll={controls.clearAll}
+          />
 
-        <QuerySection query={transactions} label="as transações">
-          {(data) => (
-            <View className="gap-stack-md px-container-margin">
-              <SectionHeading>Transações</SectionHeading>
-              {data.map((transaction) => (
+          {list.isPending ? (
+            <SectionSkeleton />
+          ) : list.isError ? (
+            <SectionError label="as transações" onRetry={() => void list.refetch()} />
+          ) : items.length === 0 ? (
+            <Text className="font-geist-medium text-label-md text-on-surface-variant">
+              Nenhuma transação encontrada.
+            </Text>
+          ) : (
+            <>
+              {items.map((transaction) => (
                 <TransactionRow key={transaction.id} transaction={transaction} hidden={hidden} />
               ))}
-            </View>
+              {list.hasNextPage ? (
+                <Pressable
+                  onPress={() => void list.fetchNextPage()}
+                  disabled={list.isFetchingNextPage}
+                  accessibilityRole="button"
+                  accessibilityLabel="Carregar mais"
+                  accessibilityState={{ disabled: list.isFetchingNextPage }}
+                  className="min-h-[44px] items-center justify-center rounded-xl border border-outline-variant"
+                >
+                  <Text className="font-geist-semibold text-label-md text-primary">
+                    {list.isFetchingNextPage ? 'Carregando…' : 'Carregar mais'}
+                  </Text>
+                </Pressable>
+              ) : null}
+            </>
           )}
-        </QuerySection>
+        </View>
 
         <QuerySection query={recurrences} label="as recorrências">
           {(data) => (

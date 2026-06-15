@@ -1,13 +1,24 @@
 import { Pressable, Text, View } from 'react-native';
 import { HideValuesToggle } from '../HideValuesToggle';
 import { Icon } from '../Icon';
+import { TransactionSearch } from '../TransactionSearch';
 
-type TransacoesHeaderProps = { hidden: boolean; onToggleHidden: () => void };
+type TransacoesHeaderProps = {
+  hidden: boolean;
+  onToggleHidden: () => void;
+  searchText: string;
+  onSearchChange: (text: string) => void;
+};
 
-// Cabeçalho da página de Transações no desktop: título + subtítulo à esquerda; switch
-// de ocultar valores, busca e "Nova transação" à direita. Busca e "Nova transação" são
-// VISUAIS nesta passada (sem filtro nem modal ainda — viram funcionais com o backend).
-export function TransacoesHeader({ hidden, onToggleHidden }: TransacoesHeaderProps) {
+// Cabeçalho da página de Transações no desktop: título + subtítulo à esquerda; busca
+// (funcional, debounçada na tela), switch de ocultar valores e "Nova transação" (ainda
+// visual — sem modal) à direita.
+export function TransacoesHeader({
+  hidden,
+  onToggleHidden,
+  searchText,
+  onSearchChange,
+}: TransacoesHeaderProps) {
   return (
     <View className="flex-row items-end justify-between border-b border-grid-line px-container-margin py-stack-lg">
       <View className="gap-base">
@@ -23,11 +34,8 @@ export function TransacoesHeader({ hidden, onToggleHidden }: TransacoesHeaderPro
       </View>
 
       <View className="flex-row items-center gap-stack-md">
-        <View className="flex-row items-center gap-stack-sm rounded-full border border-outline-variant bg-surface-container-lowest px-stack-md py-base">
-          <Icon name="search" size={20} color="#cbc3d7" />
-          <Text className="font-geist-medium text-label-md text-on-surface-variant">
-            Filtrar eventos...
-          </Text>
+        <View className="w-48">
+          <TransactionSearch value={searchText} onChange={onSearchChange} compact />
         </View>
 
         <HideValuesToggle hidden={hidden} onToggleHidden={onToggleHidden} />

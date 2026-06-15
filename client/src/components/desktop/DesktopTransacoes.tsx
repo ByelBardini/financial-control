@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { DividasPanel } from './DividasPanel';
@@ -9,34 +10,47 @@ import { TransactionListPanel } from './TransactionListPanel';
 import { QuerySection } from '../QuerySection';
 import {
   useCashflowSummary,
+  useCategories,
   useFutureDebts,
   useRecurrences,
-  useTransactions,
+  useTransactionsPage,
 } from '../../hooks/useTransacoesQueries';
+import type { TransactionControls } from '../../hooks/useTransactionFilters';
 import type { AppRoute } from '../../navigation/routes';
 
 type DesktopTransacoesProps = {
   hidden: boolean;
   onToggleHidden: () => void;
+  controls: TransactionControls;
   route?: AppRoute;
   onNavigate?: (route: AppRoute) => void;
   onLogout?: () => void;
 };
 
-// Layout enterprise da tela de Transações: rail fixo + header + faixa de fluxo de caixa
-// + grid 2/3 (lista de transações) / 1/3 (Recorrências + Dívidas Futuras), dividido por
-// border-grid-line. Cada célula é uma query independente. Brilho verde→roxo no fundo.
+// Layout enterprise da tela de Transações: rail fixo + header (com busca) + faixa de
+// fluxo de caixa + grid 2/3 (lista filtrada/paginada) / 1/3 (Recorrências + Dívidas).
+// A página volta a 1 quando os filtros mudam; o saldo/recorrências/dívidas não paginam.
 export function DesktopTransacoes({
   hidden,
   onToggleHidden,
+  controls,
   route = 'transacoes',
   onNavigate,
   onLogout,
 }: DesktopTransacoesProps) {
+  const [page, setPage] = useState(1);
+  // Reseta a página quando os filtros mudam (ajuste de estado no render — sem effect).
+  const [appliedFilters, setAppliedFilters] = useState(controls.filters);
+  if (appliedFilters !== controls.filters) {
+    setAppliedFilters(controls.filters);
+    setPage(1);
+  }
+
   const summary = useCashflowSummary();
-  const transactions = useTransactions();
+  const list = useTransactionsPage(controls.filters, page);
   const recurrences = useRecurrences();
   const debts = useFutureDebts();
+  const categories = useCategories();
 
   return (
     <View className="flex-1 flex-row bg-surface-container-lowest">
@@ -50,7 +64,12 @@ export function DesktopTransacoes({
       />
       <SideNav currentRoute={route} onNavigate={onNavigate} onLogout={onLogout} />
       <ScrollView className="flex-1" contentContainerStyle={{ flexGrow: 1 }}>
-        <TransacoesHeader hidden={hidden} onToggleHidden={onToggleHidden} />
+        <TransacoesHeader
+          hidden={hidden}
+          onToggleHidden={onToggleHidden}
+          searchText={controls.searchText}
+          onSearchChange={controls.setSearchText}
+        />
 
         <QuerySection query={summary} label="o fluxo de caixa">
           {(data) => <FluxoCaixaBar summary={data} hidden={hidden} />}
@@ -58,8 +77,20 @@ export function DesktopTransacoes({
 
         <View className="flex-1 flex-row border-t border-grid-line">
           <View className="border-r border-grid-line" style={{ flex: 2 }}>
-            <QuerySection query={transactions} label="as transações">
-              {(data) => <TransactionListPanel transactions={data} hidden={hidden} />}
+            <QuerySection query={list} label="as transações">
+              {(data) => (
+                <TransactionListPanel
+                  transactions={data.items}
+                  total={data.total}
+                  hidden={hidden}
+                  controls={controls}
+                  categories={categories.data ?? []}
+                  page={data.page}
+                  pageCount={data.pageCount}
+                  onPrev={() => setPage((p) => Math.max(1, p - 1))}
+                  onNext={() => setPage((p) => p + 1)}
+                />
+              )}
             </QuerySection>
           </View>
 

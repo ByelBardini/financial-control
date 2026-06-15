@@ -42,6 +42,7 @@ const glyphs = {
   directions_car: 'directions-car',
   sports_esports: 'sports-esports',
   category: 'category',
+  filter_list: 'filter-list',
 } as const;
 
 export type IconName = keyof typeof glyphs;
