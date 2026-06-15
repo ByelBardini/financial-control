@@ -14,7 +14,7 @@
 
 ## Pastas
 - `server/db/migrations/` — migrations versionadas (`00001_init.sql`, …). O `sqlc` lê o schema daqui.
-- `server/db/queries/` — SQL das queries do `sqlc` (`accounts.sql` [leitura + CRUD], `dashboard.sql`, `contas.sql` [views da tela de Contas], `transacoes.sql` [views da tela de Transações + CRUD de transação `standard`: `ListRecentTransactions`/`ListActiveRecurringRules`/`ListInstallmentDebts` + `CreateTransaction`/`GetTransactionByID`/`UpdateTransaction`/`DeleteTransaction`; o `CreateTransaction` é `INSERT...SELECT...WHERE EXISTS` da conta do usuário, garantindo o isolamento no próprio insert], `users.sql`).
+- `server/db/queries/` — SQL das queries do `sqlc` (`accounts.sql` [leitura + CRUD], `dashboard.sql`, `contas.sql` [views da tela de Contas], `transacoes.sql` [views da tela de Transações + CRUD de transação `standard`: `ListTransactionsFiltered` (filtros opcionais de período/categoria/busca ILIKE + `LIMIT`/`OFFSET` + `COUNT(*) OVER()` pro total numa query só), `ListCategories`, `ListActiveRecurringRules`, `ListInstallmentDebts` + `CreateTransaction`/`GetTransactionByID`/`UpdateTransaction`/`DeleteTransaction`; o `CreateTransaction` é `INSERT...SELECT...WHERE EXISTS` da conta do usuário, garantindo o isolamento no próprio insert], `users.sql`).
 - `server/db/seed.sql` — dados de exemplo (rodado à mão, **não** é migration goose; faz `TRUNCATE` + insert ancorado no mês corrente). Inclui transações (avulsas + 1 parcela), categorias e **`recurring_rules`** (Salário/Netflix/Gympass) — alimenta `/dashboard/*` e `/transacoes/*`.
 
 ## Convenções

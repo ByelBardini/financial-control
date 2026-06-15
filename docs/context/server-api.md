@@ -86,7 +86,8 @@ sempre em **centavos** (inteiro). **Toda rota abaixo exige `Authorization: Beare
 | GET | `/contas/xray` | "Raio-X de Pobreza": dívida/limite (cartões) + Panic Meter | implementado |
 | GET | `/contas/tip` | "Dica de Gestão" (texto fixo derivado) | implementado |
 | GET | `/transacoes/summary` | fluxo de caixa do mês (inflow/outflow/net + barra + "Previsão de Colapso"); aceita `?month=YYYY-MM` | implementado |
-| GET | `/transacoes/list` | log de transações recentes (conta/categoria + labels/tag/sentido derivados); `LIMIT` 50 | implementado |
+| GET | `/transacoes/list` | log **filtrado + paginado**: `?period=30d`(default)`\|3m\|6m\|1y\|custom` (custom usa `?from=&to=` YYYY-MM-DD), `?category=<id>` **repetível** (OR entre as), `?q=<busca ILIKE>`, `?page=N` (1-based; filtros lenientes) → **envelope** `TransactionPage` | implementado |
+| GET | `/categories` | categorias ativas do usuário (alimenta o filtro de categoria) | implementado |
 | GET | `/transacoes/recurrences` | recorrências ativas (`recurring_rules`) — receitas + assinaturas | implementado |
 | GET | `/transacoes/debts` | compras parceladas agregadas por `purchase_group_id` (progresso + ironia) | implementado |
 | POST | `/transactions` | cria transação `standard` (body em centavos; `direction` inflow/outflow → income/expense) → **201** + recurso; **400** inválido **ou** conta/categoria não-própria | implementado |
@@ -133,7 +134,8 @@ Valores `*Cents`/monetários são **int64 em centavos**.
 | `EsteMes` | `/dashboard/este-mes` | `spentPercent`, `biggestVillain` (categoria de maior gasto no mês) |
 | `Diagnosis` | `/dashboard/diagnosis` | `title`, `body` |
 | `CashflowSummary` | `/transacoes/summary` | `inflowCents`, `outflowCents`, `netBurnCents`, `burnPercent` (0..100), `collapse` (`PanicMeter`: `percent`/`levelLabel`/`levelTone`/`lowLabel`/`highLabel`/`note`) |
-| `Transaction[]` | `/transacoes/list` | `id`, `dateLabel` ("12 OUT"), `timeLabel` ("12/10"), `title`, `accountLabel`, `category`, `tag`, `tagTone`, `amountCents`, `direction` (inflow/outflow), `icon` |
+| `TransactionPage` | `/transacoes/list` | `items` (`Transaction[]`: `id`, `dateLabel` "12 OUT", `timeLabel` "12/10", `title`, `accountLabel`, `category`, `tag`, `tagTone`, `amountCents`, `direction`, `icon`), `page`, `pageSize` (10), `total`, `pageCount` |
+| `Category[]` | `/categories` | `id`, `name`, `icon`, `kind` (income/expense) |
 | `Recurrence[]` | `/transacoes/recurrences` | `id`, `name`, `category`, `amountCents`, `direction`, `icon` |
 | `FutureDebt[]` | `/transacoes/debts` | `id`, `label`, `installmentLabel` ("Parcela X/Y"), `amountCents`, `percent`, `tone`, `icon`, `note` |
 | `CreateTransactionInput` (req) | `POST /transactions` | `accountId`, `categoryId?`, `description`, `direction` (inflow/outflow), `amountCents` (> 0), `occurredOn` (`YYYY-MM-DD`) |
