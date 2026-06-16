@@ -15,12 +15,14 @@ INSERT INTO accounts (id, user_id, name, account_type, opening_balance, icon, to
   ('a0000000-0000-0000-0000-000000000002', '00000000-0000-0000-0000-000000000001', 'Carteira','cash',      300.00, 'account_balance_wallet', 'neutral', '#958ea0'),
   ('a0000000-0000-0000-0000-000000000003', '00000000-0000-0000-0000-000000000001', 'Binance', 'exchange', 1450.00, 'currency_bitcoin',       'neutral', '#f3ba2f');
 
--- Categorias (uma de receita, três de despesa) — do usuário padrão
-INSERT INTO categories (id, user_id, name, kind, color, icon, tone) VALUES
-  ('c0000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000001', 'Salário',     'income',  '#33b58a', 'payments',        'secondary'),
-  ('c0000000-0000-0000-0000-000000000002', '00000000-0000-0000-0000-000000000001', 'Alimentação', 'expense', '#d0bcff', 'restaurant',      'primary'),
-  ('c0000000-0000-0000-0000-000000000003', '00000000-0000-0000-0000-000000000001', 'Transporte',  'expense', '#d0bcff', 'directions_car',  'primary'),
-  ('c0000000-0000-0000-0000-000000000004', '00000000-0000-0000-0000-000000000001', 'Lazer',       'expense', '#d0bcff', 'sports_esports',  'primary');
+-- Categorias (uma de receita, três de despesa) — do usuário padrão. essentialness define a
+-- tag da despesa: Alimentação/Transporte = essential (Sobrevivência); Lazer = discretionary
+-- (Supérfluo). Salário é receita (essentialness não é lida; fica no default).
+INSERT INTO categories (id, user_id, name, kind, color, icon, tone, essentialness) VALUES
+  ('c0000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000001', 'Salário',     'income',  '#33b58a', 'payments',        'secondary', 'discretionary'),
+  ('c0000000-0000-0000-0000-000000000002', '00000000-0000-0000-0000-000000000001', 'Alimentação', 'expense', '#d0bcff', 'restaurant',      'primary',   'essential'),
+  ('c0000000-0000-0000-0000-000000000003', '00000000-0000-0000-0000-000000000001', 'Transporte',  'expense', '#d0bcff', 'directions_car',  'primary',   'essential'),
+  ('c0000000-0000-0000-0000-000000000004', '00000000-0000-0000-0000-000000000001', 'Lazer',       'expense', '#d0bcff', 'sports_esports',  'primary',   'discretionary');
 
 -- Receita do mês corrente
 INSERT INTO transactions (account_id, user_id, category_id, description, direction, amount, occurred_on) VALUES

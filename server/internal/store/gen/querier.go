@@ -16,6 +16,18 @@ type Querier interface {
 	ArchiveAccount(ctx context.Context, arg ArchiveAccountParams) (string, error)
 	// Cria conta do usuário. Dinheiro entra em centavos (bigint) e vira NUMERIC no insert.
 	CreateAccount(ctx context.Context, arg CreateAccountParams) (string, error)
+	// Cria uma compra parcelada: N linhas kind='installment' compartilhando um purchase_group_id
+	// (gerado uma vez no CTE), com "X/N" no fim da descrição, o valor POR PARCELA e occurred_on
+	// mês a mês a partir de occurred_on. purchase_total_amount = parcela × N. Só insere se a conta
+	// (e a categoria, se houver) são do usuário — 0 linhas afetadas → conta/categoria inválida.
+	// Statement único = atômico. Centavos → NUMERIC na borda.
+	CreateInstallmentPurchase(ctx context.Context, arg CreateInstallmentPurchaseParams) (int64, error)
+	// Cria uma regra de recorrência E lança a transação do período atual (kind='standard',
+	// recurring_rule_id apontando pra regra) numa só query atômica (CTE). O lançamento usa a
+	// start_date como competência. Só cria se a conta (e a categoria, se houver) são do usuário —
+	// guard no INSERT da regra; se 0 regras criadas, o CTE fica vazio e nada é lançado → 0 linhas
+	// afetadas (conta/categoria inválida). end_date XOR max_occurrences é garantido pelo CHECK.
+	CreateRecurringRuleWithFirst(ctx context.Context, arg CreateRecurringRuleWithFirstParams) (int64, error)
 	// Cria uma transação 'standard' do usuário. Só insere se a conta (e a categoria, se
 	// informada) pertencem ao usuário — impede anexar transação à conta de outro dono.
 	// 0 linhas (ErrNoRows no store) → conta/categoria inválida. Centavos → NUMERIC na borda.
@@ -60,8 +72,10 @@ type Querier interface {
 	// p/ a seção "Cartões" (por cartão) e o Raio-X (somado).
 	ListCreditAccounts(ctx context.Context, userID pgtype.UUID) ([]ListCreditAccountsRow, error)
 	// Compras parceladas (kind='installment') do usuário agrupadas por purchase_group_id:
-	// progresso (parcelas lançadas / total), valor da parcela e ícone da categoria. Em
-	// centavos. COALESCE em tudo p/ o sqlc gerar tipos não-nulos. Mais recentes primeiro.
+	// progresso (parcelas vencidas / total), valor da parcela e ícone da categoria. As N parcelas
+	// são materializadas de uma vez (datas mês a mês), então "vencidas" = parcelas com competência
+	// no mês corrente ou antes (determinístico, independe do dia) — não COUNT(*) de todas as linhas.
+	// Em centavos. COALESCE em tudo p/ o sqlc gerar tipos não-nulos. Mais recentes primeiro.
 	ListInstallmentDebts(ctx context.Context, userID pgtype.UUID) ([]ListInstallmentDebtsRow, error)
 	// Queries da tela de Transações. Valores em centavos (bigint) com cast no SQL.
 	// Tudo escopado por user_id, com os joins filtrados pelo mesmo dono (isolamento nos

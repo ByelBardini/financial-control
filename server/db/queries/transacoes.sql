@@ -16,6 +16,9 @@ SELECT
     COALESCE(c.icon, 'payments') AS category_icon,
     t.direction                  AS direction,
     (t.amount * 100)::bigint     AS amount_cents,
+    t.kind                       AS kind,
+    (t.recurring_rule_id IS NOT NULL)::boolean AS is_recurring,
+    COALESCE(c.essentialness, 'discretionary')::text AS essentialness,
     COUNT(*) OVER()::bigint      AS total_count
 FROM transactions t
 JOIN accounts a ON a.id = t.account_id AND a.user_id = t.user_id
@@ -65,13 +68,17 @@ ORDER BY r.direction DESC, r.amount DESC;
 
 -- name: ListInstallmentDebts :many
 -- Compras parceladas (kind='installment') do usuário agrupadas por purchase_group_id:
--- progresso (parcelas lançadas / total), valor da parcela e ícone da categoria. Em
--- centavos. COALESCE em tudo p/ o sqlc gerar tipos não-nulos. Mais recentes primeiro.
+-- progresso (parcelas vencidas / total), valor da parcela e ícone da categoria. As N parcelas
+-- são materializadas de uma vez (datas mês a mês), então "vencidas" = parcelas com competência
+-- no mês corrente ou antes (determinístico, independe do dia) — não COUNT(*) de todas as linhas.
+-- Em centavos. COALESCE em tudo p/ o sqlc gerar tipos não-nulos. Mais recentes primeiro.
 SELECT
     COALESCE(t.purchase_group_id::text, '')::text AS group_id,
     MIN(t.description)::text                       AS description,
     COALESCE(MAX(t.installment_total), 0)::int     AS installment_total,
-    COUNT(*)::int                                  AS installments_paid,
+    COUNT(*) FILTER (
+        WHERE t.occurred_on < date_trunc('month', CURRENT_DATE) + interval '1 month'
+    )::int                                         AS installments_paid,
     (COALESCE(MAX(t.amount), 0) * 100)::bigint      AS installment_cents,
     COALESCE(MAX(c.icon), 'payments')::text        AS category_icon
 FROM transactions t
@@ -103,6 +110,82 @@ WHERE EXISTS (
     OR EXISTS (SELECT 1 FROM categories WHERE categories.id = sqlc.narg(category_id) AND categories.user_id = sqlc.arg(user_id))
   )
 RETURNING id::text AS id;
+
+-- name: CreateInstallmentPurchase :execrows
+-- Cria uma compra parcelada: N linhas kind='installment' compartilhando um purchase_group_id
+-- (gerado uma vez no CTE), com "X/N" no fim da descrição, o valor POR PARCELA e occurred_on
+-- mês a mês a partir de occurred_on. purchase_total_amount = parcela × N. Só insere se a conta
+-- (e a categoria, se houver) são do usuário — 0 linhas afetadas → conta/categoria inválida.
+-- Statement único = atômico. Centavos → NUMERIC na borda.
+WITH grp AS (SELECT gen_random_uuid() AS gid)
+INSERT INTO transactions (
+    user_id, account_id, category_id, description, kind, direction,
+    amount, occurred_on, purchase_group_id, installment_number, installment_total, purchase_total_amount
+)
+SELECT
+    sqlc.arg(user_id),
+    sqlc.arg(account_id),
+    sqlc.narg(category_id),
+    sqlc.arg(description) || ' (' || g::text || '/' || (sqlc.arg(total)::int)::text || ')',
+    'installment',
+    'expense',
+    (sqlc.arg(amount_cents)::bigint)::numeric / 100,
+    (sqlc.arg(occurred_on)::date + ((g - 1)::text || ' months')::interval)::date,
+    grp.gid,
+    g,
+    sqlc.arg(total)::int,
+    (sqlc.arg(amount_cents)::bigint * sqlc.arg(total)::int)::numeric / 100
+FROM generate_series(1, sqlc.arg(total)::int) AS g
+CROSS JOIN grp
+WHERE EXISTS (
+    SELECT 1 FROM accounts
+    WHERE accounts.id = sqlc.arg(account_id) AND accounts.user_id = sqlc.arg(user_id) AND accounts.is_archived = false
+)
+  AND (
+    sqlc.narg(category_id)::uuid IS NULL
+    OR EXISTS (SELECT 1 FROM categories WHERE categories.id = sqlc.narg(category_id) AND categories.user_id = sqlc.arg(user_id))
+  );
+
+-- name: CreateRecurringRuleWithFirst :execrows
+-- Cria uma regra de recorrência E lança a transação do período atual (kind='standard',
+-- recurring_rule_id apontando pra regra) numa só query atômica (CTE). O lançamento usa a
+-- start_date como competência. Só cria se a conta (e a categoria, se houver) são do usuário —
+-- guard no INSERT da regra; se 0 regras criadas, o CTE fica vazio e nada é lançado → 0 linhas
+-- afetadas (conta/categoria inválida). end_date XOR max_occurrences é garantido pelo CHECK.
+WITH new_rule AS (
+    INSERT INTO recurring_rules (
+        user_id, account_id, category_id, description, direction, amount,
+        frequency, interval_count, start_date, end_date, max_occurrences
+    )
+    SELECT
+        sqlc.arg(user_id),
+        sqlc.arg(account_id),
+        sqlc.narg(category_id),
+        sqlc.arg(description),
+        sqlc.arg(direction),
+        (sqlc.arg(amount_cents)::bigint)::numeric / 100,
+        sqlc.arg(frequency),
+        sqlc.arg(interval_count)::int,
+        sqlc.arg(start_date)::date,
+        sqlc.narg(end_date)::date,
+        sqlc.narg(max_occurrences)::int
+    WHERE EXISTS (
+        SELECT 1 FROM accounts
+        WHERE accounts.id = sqlc.arg(account_id) AND accounts.user_id = sqlc.arg(user_id) AND accounts.is_archived = false
+    )
+      AND (
+        sqlc.narg(category_id)::uuid IS NULL
+        OR EXISTS (SELECT 1 FROM categories WHERE categories.id = sqlc.narg(category_id) AND categories.user_id = sqlc.arg(user_id))
+      )
+    RETURNING id, account_id, category_id, description, direction, amount, start_date
+)
+INSERT INTO transactions (
+    user_id, account_id, category_id, description, kind, direction, amount, occurred_on, recurring_rule_id
+)
+SELECT
+    sqlc.arg(user_id), new_rule.account_id, new_rule.category_id, new_rule.description,
+    'standard', new_rule.direction, new_rule.amount, new_rule.start_date, new_rule.id
+FROM new_rule;
 
 -- name: GetTransactionByID :one
 -- Transação única do usuário (escopada por id + user_id) com conta/categoria juntadas,

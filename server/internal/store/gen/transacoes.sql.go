@@ -11,6 +11,144 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const createInstallmentPurchase = `-- name: CreateInstallmentPurchase :execrows
+WITH grp AS (SELECT gen_random_uuid() AS gid)
+INSERT INTO transactions (
+    user_id, account_id, category_id, description, kind, direction,
+    amount, occurred_on, purchase_group_id, installment_number, installment_total, purchase_total_amount
+)
+SELECT
+    $1,
+    $2,
+    $3,
+    $4 || ' (' || g::text || '/' || ($5::int)::text || ')',
+    'installment',
+    'expense',
+    ($6::bigint)::numeric / 100,
+    ($7::date + ((g - 1)::text || ' months')::interval)::date,
+    grp.gid,
+    g,
+    $5::int,
+    ($6::bigint * $5::int)::numeric / 100
+FROM generate_series(1, $5::int) AS g
+CROSS JOIN grp
+WHERE EXISTS (
+    SELECT 1 FROM accounts
+    WHERE accounts.id = $2 AND accounts.user_id = $1 AND accounts.is_archived = false
+)
+  AND (
+    $3::uuid IS NULL
+    OR EXISTS (SELECT 1 FROM categories WHERE categories.id = $3 AND categories.user_id = $1)
+  )
+`
+
+type CreateInstallmentPurchaseParams struct {
+	UserID      pgtype.UUID
+	AccountID   pgtype.UUID
+	CategoryID  pgtype.UUID
+	Description pgtype.Text
+	Total       int32
+	AmountCents int64
+	OccurredOn  pgtype.Date
+}
+
+// Cria uma compra parcelada: N linhas kind='installment' compartilhando um purchase_group_id
+// (gerado uma vez no CTE), com "X/N" no fim da descrição, o valor POR PARCELA e occurred_on
+// mês a mês a partir de occurred_on. purchase_total_amount = parcela × N. Só insere se a conta
+// (e a categoria, se houver) são do usuário — 0 linhas afetadas → conta/categoria inválida.
+// Statement único = atômico. Centavos → NUMERIC na borda.
+func (q *Queries) CreateInstallmentPurchase(ctx context.Context, arg CreateInstallmentPurchaseParams) (int64, error) {
+	result, err := q.db.Exec(ctx, createInstallmentPurchase,
+		arg.UserID,
+		arg.AccountID,
+		arg.CategoryID,
+		arg.Description,
+		arg.Total,
+		arg.AmountCents,
+		arg.OccurredOn,
+	)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const createRecurringRuleWithFirst = `-- name: CreateRecurringRuleWithFirst :execrows
+WITH new_rule AS (
+    INSERT INTO recurring_rules (
+        user_id, account_id, category_id, description, direction, amount,
+        frequency, interval_count, start_date, end_date, max_occurrences
+    )
+    SELECT
+        $1,
+        $2,
+        $3,
+        $4,
+        $5,
+        ($6::bigint)::numeric / 100,
+        $7,
+        $8::int,
+        $9::date,
+        $10::date,
+        $11::int
+    WHERE EXISTS (
+        SELECT 1 FROM accounts
+        WHERE accounts.id = $2 AND accounts.user_id = $1 AND accounts.is_archived = false
+    )
+      AND (
+        $3::uuid IS NULL
+        OR EXISTS (SELECT 1 FROM categories WHERE categories.id = $3 AND categories.user_id = $1)
+      )
+    RETURNING id, account_id, category_id, description, direction, amount, start_date
+)
+INSERT INTO transactions (
+    user_id, account_id, category_id, description, kind, direction, amount, occurred_on, recurring_rule_id
+)
+SELECT
+    $1, new_rule.account_id, new_rule.category_id, new_rule.description,
+    'standard', new_rule.direction, new_rule.amount, new_rule.start_date, new_rule.id
+FROM new_rule
+`
+
+type CreateRecurringRuleWithFirstParams struct {
+	UserID         pgtype.UUID
+	AccountID      pgtype.UUID
+	CategoryID     pgtype.UUID
+	Description    string
+	Direction      string
+	AmountCents    int64
+	Frequency      string
+	IntervalCount  int32
+	StartDate      pgtype.Date
+	EndDate        pgtype.Date
+	MaxOccurrences pgtype.Int4
+}
+
+// Cria uma regra de recorrência E lança a transação do período atual (kind='standard',
+// recurring_rule_id apontando pra regra) numa só query atômica (CTE). O lançamento usa a
+// start_date como competência. Só cria se a conta (e a categoria, se houver) são do usuário —
+// guard no INSERT da regra; se 0 regras criadas, o CTE fica vazio e nada é lançado → 0 linhas
+// afetadas (conta/categoria inválida). end_date XOR max_occurrences é garantido pelo CHECK.
+func (q *Queries) CreateRecurringRuleWithFirst(ctx context.Context, arg CreateRecurringRuleWithFirstParams) (int64, error) {
+	result, err := q.db.Exec(ctx, createRecurringRuleWithFirst,
+		arg.UserID,
+		arg.AccountID,
+		arg.CategoryID,
+		arg.Description,
+		arg.Direction,
+		arg.AmountCents,
+		arg.Frequency,
+		arg.IntervalCount,
+		arg.StartDate,
+		arg.EndDate,
+		arg.MaxOccurrences,
+	)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const createTransaction = `-- name: CreateTransaction :one
 INSERT INTO transactions (user_id, account_id, category_id, description, direction, amount, occurred_on)
 SELECT
@@ -241,7 +379,9 @@ SELECT
     COALESCE(t.purchase_group_id::text, '')::text AS group_id,
     MIN(t.description)::text                       AS description,
     COALESCE(MAX(t.installment_total), 0)::int     AS installment_total,
-    COUNT(*)::int                                  AS installments_paid,
+    COUNT(*) FILTER (
+        WHERE t.occurred_on < date_trunc('month', CURRENT_DATE) + interval '1 month'
+    )::int                                         AS installments_paid,
     (COALESCE(MAX(t.amount), 0) * 100)::bigint      AS installment_cents,
     COALESCE(MAX(c.icon), 'payments')::text        AS category_icon
 FROM transactions t
@@ -262,8 +402,10 @@ type ListInstallmentDebtsRow struct {
 }
 
 // Compras parceladas (kind='installment') do usuário agrupadas por purchase_group_id:
-// progresso (parcelas lançadas / total), valor da parcela e ícone da categoria. Em
-// centavos. COALESCE em tudo p/ o sqlc gerar tipos não-nulos. Mais recentes primeiro.
+// progresso (parcelas vencidas / total), valor da parcela e ícone da categoria. As N parcelas
+// são materializadas de uma vez (datas mês a mês), então "vencidas" = parcelas com competência
+// no mês corrente ou antes (determinístico, independe do dia) — não COUNT(*) de todas as linhas.
+// Em centavos. COALESCE em tudo p/ o sqlc gerar tipos não-nulos. Mais recentes primeiro.
 func (q *Queries) ListInstallmentDebts(ctx context.Context, userID pgtype.UUID) ([]ListInstallmentDebtsRow, error) {
 	rows, err := q.db.Query(ctx, listInstallmentDebts, userID)
 	if err != nil {
@@ -302,6 +444,9 @@ SELECT
     COALESCE(c.icon, 'payments') AS category_icon,
     t.direction                  AS direction,
     (t.amount * 100)::bigint     AS amount_cents,
+    t.kind                       AS kind,
+    (t.recurring_rule_id IS NOT NULL)::boolean AS is_recurring,
+    COALESCE(c.essentialness, 'discretionary')::text AS essentialness,
     COUNT(*) OVER()::bigint      AS total_count
 FROM transactions t
 JOIN accounts a ON a.id = t.account_id AND a.user_id = t.user_id
@@ -333,15 +478,18 @@ type ListTransactionsFilteredParams struct {
 }
 
 type ListTransactionsFilteredRow struct {
-	ID           string
-	OccurredOn   pgtype.Date
-	Description  string
-	AccountName  string
-	CategoryName string
-	CategoryIcon string
-	Direction    string
-	AmountCents  int64
-	TotalCount   int64
+	ID            string
+	OccurredOn    pgtype.Date
+	Description   string
+	AccountName   string
+	CategoryName  string
+	CategoryIcon  string
+	Direction     string
+	AmountCents   int64
+	Kind          string
+	IsRecurring   bool
+	Essentialness string
+	TotalCount    int64
 }
 
 // Queries da tela de Transações. Valores em centavos (bigint) com cast no SQL.
@@ -377,6 +525,9 @@ func (q *Queries) ListTransactionsFiltered(ctx context.Context, arg ListTransact
 			&i.CategoryIcon,
 			&i.Direction,
 			&i.AmountCents,
+			&i.Kind,
+			&i.IsRecurring,
+			&i.Essentialness,
 			&i.TotalCount,
 		); err != nil {
 			return nil, err
