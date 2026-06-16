@@ -10,9 +10,13 @@ import (
 	"financial-control/server/internal/store"
 )
 
-// pageSize é o tamanho fixo de página do log de transações (desktop pagina, mobile
-// carrega mais — sempre em blocos desse tamanho).
-const pageSize = 10
+// defaultPageSize é o tamanho de página quando o client não pede um (mobile "carrega mais"
+// e o 1º load do desktop). maxPageSize é o teto: o desktop calcula o pageSize pela altura da
+// tela, então limitamos pra não deixar a query crescer sem limite.
+const (
+	defaultPageSize = 10
+	maxPageSize     = 100
+)
 
 // TransacoesStore é a dependência de dados das views de Transações (escopada por usuário).
 // Reaproveita GetMonthSummary do store (já usado pelo dashboard) para o fluxo de caixa.
@@ -23,6 +27,8 @@ type TransacoesStore interface {
 	ListInstallmentDebts(ctx context.Context, userID string) ([]store.InstallmentDebtRow, error)
 	ListCategories(ctx context.Context, userID string) ([]store.CategoryRow, error)
 	CreateTransaction(ctx context.Context, userID string, in store.TransactionInput) (string, error)
+	CreateInstallmentPurchase(ctx context.Context, userID string, in store.InstallmentInput) (int64, error)
+	CreateRecurringRuleWithFirst(ctx context.Context, userID string, in store.RecurringRuleInput) (int64, error)
 	GetTransactionByID(ctx context.Context, userID, id string) (store.TransactionDetailRow, error)
 	UpdateTransaction(ctx context.Context, userID, id string, in store.TransactionInput) error
 	DeleteTransaction(ctx context.Context, userID, id string) error
@@ -30,7 +36,7 @@ type TransacoesStore interface {
 
 // TransactionQuery são os filtros + a página pedidos pela tela. Period: "30d" (default) /
 // "3m" / "6m" / "1y" recuam a partir de hoje; "custom" usa From/To (YYYY-MM-DD). CategoryIDs
-// vazio = todas (OR entre as informadas). Page é 1-based.
+// vazio = todas (OR entre as informadas). Page é 1-based. PageSize <= 0 cai no default.
 type TransactionQuery struct {
 	Period      string
 	CategoryIDs []string
@@ -38,6 +44,7 @@ type TransactionQuery struct {
 	From        string
 	To          string
 	Page        int
+	PageSize    int
 }
 
 // Service agrega as views da tela de Transações: junta o dado real do store com a
@@ -75,21 +82,22 @@ func (s *Service) Transactions(ctx context.Context, userID string, q Transaction
 	if page < 1 {
 		page = 1
 	}
+	size := resolvePageSize(q.PageSize)
 	since, until := periodBounds(q)
 	rows, total, err := s.store.ListTransactionsFiltered(ctx, userID, store.TransactionFilter{
 		Since:       since,
 		Until:       until,
 		CategoryIDs: q.CategoryIDs,
 		Query:       strings.TrimSpace(q.Query),
-		Limit:       pageSize,
-		Offset:      (page - 1) * pageSize,
+		Limit:       size,
+		Offset:      (page - 1) * size,
 	})
 	if err != nil {
 		return TransactionPage{}, fmt.Errorf("transacoes: listar transações: %w", err)
 	}
 	items := make([]Transaction, 0, len(rows))
 	for _, r := range rows {
-		tag, tone := transactionTag(r.Direction)
+		tag, tone := transactionTag(r.Direction, r.Kind, r.Essentialness, r.IsRecurring)
 		items = append(items, Transaction{
 			ID:           r.ID,
 			DateLabel:    dateLabel(r.OccurredOn),
@@ -107,10 +115,22 @@ func (s *Service) Transactions(ctx context.Context, userID string, q Transaction
 	return TransactionPage{
 		Items:     items,
 		Page:      page,
-		PageSize:  pageSize,
+		PageSize:  size,
 		Total:     total,
-		PageCount: pageCount(total, pageSize),
+		PageCount: pageCount(total, size),
 	}, nil
+}
+
+// resolvePageSize aplica o default (n <= 0) e o teto (maxPageSize) ao tamanho pedido pelo
+// client — o desktop manda o nº de linhas que cabem na tela; aqui é saneado.
+func resolvePageSize(n int) int {
+	if n <= 0 {
+		return defaultPageSize
+	}
+	if n > maxPageSize {
+		return maxPageSize
+	}
+	return n
 }
 
 // Categories devolve as categorias ativas do usuário (pro filtro de categoria).

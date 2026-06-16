@@ -37,12 +37,28 @@ func timeLabel(d time.Time) string {
 	return fmt.Sprintf("%02d/%02d", d.Day(), int(d.Month()))
 }
 
-// transactionTag deriva a etiqueta + tom de uma transação pelo sentido. PLACEHOLDER.
-func transactionTag(dbDirection string) (tag, tone string) {
-	if dbDirection == "income" {
-		return "Inflow Esperado", "secondary"
+// transactionTag deriva a etiqueta + tom (single-badge) a partir de sinais reais, por
+// precedência: parcela > recorrente > essencialidade da categoria. Despesa avulsa essencial
+// = Sobrevivência; supérflua = Supérfluo; recorrente = Fixo; parcela = Parcelado. Receita
+// recorrente = Inflow Esperado; avulsa = Renda Extra. dbDirection é "income"/"expense",
+// kind é "standard"/"installment"/"transfer", essentialness é "essential"/"discretionary".
+func transactionTag(dbDirection, kind, essentialness string, isRecurring bool) (tag, tone string) {
+	if kind == "installment" {
+		return "Parcelado", "primary"
 	}
-	return "Sobrevivência", "error"
+	if dbDirection == "income" {
+		if isRecurring {
+			return "Inflow Esperado", "secondary"
+		}
+		return "Renda Extra", "secondary"
+	}
+	if isRecurring {
+		return "Fixo", "primary"
+	}
+	if essentialness == "essential" {
+		return "Sobrevivência", "error"
+	}
+	return "Supérfluo", "primary"
 }
 
 // collapseForecast monta a "Previsão de Colapso" (PanicMeter) a partir de receitas e

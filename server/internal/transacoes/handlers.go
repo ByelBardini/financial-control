@@ -82,6 +82,7 @@ func ListHandler(svc *Service) http.Handler {
 			From:        qs.Get("from"),
 			To:          qs.Get("to"),
 			Page:        atoiOr(qs.Get("page"), 1),
+			PageSize:    atoiOr(qs.Get("pageSize"), 0), // 0 = default; saneado no service
 		}
 		out, err := svc.Transactions(r.Context(), userID, query)
 		if err != nil {
