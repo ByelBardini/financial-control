@@ -261,11 +261,123 @@ func insertOldTransaction(t *testing.T, ctx context.Context, dsn string) {
 	}
 }
 
+// TestInstallmentPurchaseFlow cria uma compra parcelada (valor POR parcela) e confere que as N
+// parcelas viram linhas reais (datas mês a mês), com a tag "Parcelado" na lista e o progresso
+// certo na Dívidas (só a 1ª venceu neste mês → "Parcela 1/3").
+func TestInstallmentPurchaseFlow(t *testing.T) {
+	dsn := os.Getenv("DATABASE_URL")
+	if dsn == "" {
+		t.Skip("DATABASE_URL não definido; pulando integração (precisa do Postgres)")
+	}
+	ctx := context.Background()
+	applySeed(t, ctx, dsn)
+
+	st, err := store.Open(ctx, dsn)
+	if err != nil {
+		t.Fatalf("store.Open: %v", err)
+	}
+	defer st.Close()
+
+	srv := newServer(t, st)
+	tokenA := login(t, srv.URL, "teste@teste.com", "12345")
+	today := time.Now().Format("2006-01-02")
+
+	// 3 parcelas de R$ 300,00 (valor POR parcela) na conta/categoria de A.
+	body := `{"accountId":"` + userANubankAcc + `","categoryId":"` + userAFoodCat + `","description":"Notebook","amountCents":30000,"totalInstallments":3,"occurredOn":"` + today + `"}`
+	if code := sendJSON(t, http.MethodPost, srv.URL+"/transactions/installment-purchases", tokenA, body, nil); code != http.StatusCreated {
+		t.Fatalf("POST installment = %d, quero 201", code)
+	}
+
+	// Dívidas: o Notebook aparece com a parcela = 30000 e só a 1ª vencida neste mês (1/3).
+	var debts []transacoes.FutureDebt
+	getJSON(t, srv.URL+"/transacoes/debts", tokenA, &debts)
+	nb := findDebt(debts, "Notebook")
+	if nb == nil {
+		t.Fatalf("dívida 'Notebook' não apareceu; debts=%+v", debts)
+	}
+	if nb.AmountCents != 30000 || nb.InstallmentLabel != "Parcela 1/3" {
+		t.Errorf("Notebook = {%d,%q}, quero {30000, Parcela 1/3}", nb.AmountCents, nb.InstallmentLabel)
+	}
+
+	// Lista (3 Meses, pra pegar as parcelas futuras): a 1ª parcela vem com a tag "Parcelado".
+	var page transacoes.TransactionPage
+	getJSON(t, srv.URL+"/transacoes/list?period=3m", tokenA, &page)
+	p := findTransaction(page.Items, "Notebook (1/3)")
+	if p == nil {
+		t.Fatalf("parcela 'Notebook (1/3)' não apareceu no list; items=%+v", page.Items)
+	}
+	if p.Tag != "Parcelado" || p.Direction != "outflow" || p.AmountCents != 30000 {
+		t.Errorf("parcela = {%q,%q,%d}, quero {Parcelado,outflow,30000}", p.Tag, p.Direction, p.AmountCents)
+	}
+}
+
+// TestRecurringRuleFlow cria uma recorrência ("regra + lançamento de agora"): registra a regra
+// (aparece em Recorrências) E lança a transação do período atual (tag "Fixo", reflete no saldo).
+func TestRecurringRuleFlow(t *testing.T) {
+	dsn := os.Getenv("DATABASE_URL")
+	if dsn == "" {
+		t.Skip("DATABASE_URL não definido; pulando integração (precisa do Postgres)")
+	}
+	ctx := context.Background()
+	applySeed(t, ctx, dsn)
+
+	st, err := store.Open(ctx, dsn)
+	if err != nil {
+		t.Fatalf("store.Open: %v", err)
+	}
+	defer st.Close()
+
+	srv := newServer(t, st)
+	tokenA := login(t, srv.URL, "teste@teste.com", "12345")
+	today := time.Now().Format("2006-01-02")
+
+	// Recorrência: aluguel mensal de R$ 1.500,00 começando hoje (despesa, sem fim).
+	body := `{"accountId":"` + userANubankAcc + `","categoryId":"` + userATransportCat + `","description":"Aluguel","direction":"outflow","amountCents":150000,"frequency":"monthly","intervalCount":1,"startDate":"` + today + `"}`
+	if code := sendJSON(t, http.MethodPost, srv.URL+"/recurring-rules", tokenA, body, nil); code != http.StatusCreated {
+		t.Fatalf("POST recurring = %d, quero 201", code)
+	}
+
+	// A regra aparece em Recorrências (agora 4: 3 do seed + Aluguel).
+	var recs []transacoes.Recurrence
+	getJSON(t, srv.URL+"/transacoes/recurrences", tokenA, &recs)
+	if len(recs) != 4 {
+		t.Fatalf("len recorrências = %d, quero 4 (3 do seed + Aluguel)", len(recs))
+	}
+
+	// O lançamento de agora entrou no extrato com a tag "Fixo" (despesa recorrente).
+	var page transacoes.TransactionPage
+	getJSON(t, srv.URL+"/transacoes/list", tokenA, &page)
+	al := findTransaction(page.Items, "Aluguel")
+	if al == nil {
+		t.Fatalf("lançamento 'Aluguel' não apareceu no list; items=%+v", page.Items)
+	}
+	if al.Tag != "Fixo" || al.Direction != "outflow" || al.AmountCents != 150000 {
+		t.Errorf("Aluguel = {%q,%q,%d}, quero {Fixo,outflow,150000}", al.Tag, al.Direction, al.AmountCents)
+	}
+
+	// O saldo (derivado) reflete o lançamento de agora.
+	var cf transacoes.CashflowSummary
+	getJSON(t, srv.URL+"/transacoes/summary", tokenA, &cf)
+	if cf.OutflowCents != 111550+150000 {
+		t.Errorf("outflow = %d, quero %d (seed + aluguel)", cf.OutflowCents, 111550+150000)
+	}
+}
+
 // findTransaction acha a transação pelo título (nil se ausente).
 func findTransaction(txns []transacoes.Transaction, title string) *transacoes.Transaction {
 	for i := range txns {
 		if txns[i].Title == title {
 			return &txns[i]
+		}
+	}
+	return nil
+}
+
+// findDebt acha a dívida parcelada pelo rótulo (nil se ausente).
+func findDebt(debts []transacoes.FutureDebt, label string) *transacoes.FutureDebt {
+	for i := range debts {
+		if debts[i].Label == label {
+			return &debts[i]
 		}
 	}
 	return nil

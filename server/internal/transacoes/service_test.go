@@ -32,6 +32,16 @@ type fakeStore struct {
 	deleteErr error
 	gotInput  store.TransactionInput
 	gotID     string
+
+	// parcelamento
+	installmentRows int64
+	installmentErr  error
+	gotInstallment  store.InstallmentInput
+
+	// recorrência
+	recurringRows int64
+	recurringErr  error
+	gotRecurring  store.RecurringRuleInput
 }
 
 func (f *fakeStore) GetMonthSummary(_ context.Context, userID string, _ time.Time) (store.MonthSummaryRow, error) {
@@ -64,6 +74,18 @@ func (f *fakeStore) CreateTransaction(_ context.Context, userID string, in store
 	f.gotUserID = userID
 	f.gotInput = in
 	return f.createID, f.createErr
+}
+
+func (f *fakeStore) CreateInstallmentPurchase(_ context.Context, userID string, in store.InstallmentInput) (int64, error) {
+	f.gotUserID = userID
+	f.gotInstallment = in
+	return f.installmentRows, f.installmentErr
+}
+
+func (f *fakeStore) CreateRecurringRuleWithFirst(_ context.Context, userID string, in store.RecurringRuleInput) (int64, error) {
+	f.gotUserID = userID
+	f.gotRecurring = in
+	return f.recurringRows, f.recurringErr
 }
 
 func (f *fakeStore) GetTransactionByID(_ context.Context, userID, id string) (store.TransactionDetailRow, error) {
@@ -108,8 +130,8 @@ func TestCashflowSummaryMapeiaEDerivaColapso(t *testing.T) {
 func TestTransactionsMapeiaLabelsTagESentido(t *testing.T) {
 	occurred := time.Date(2026, 6, 12, 0, 0, 0, 0, time.UTC)
 	fake := &fakeStore{total: 2, txns: []store.TransactionRow{
-		{ID: "t1", OccurredOn: occurred, Description: "iFood", AccountName: "Nubank", CategoryName: "Alimentação", CategoryIcon: "fastfood", Direction: "expense", AmountCents: 8990},
-		{ID: "t2", OccurredOn: occurred, Description: "Salário", AccountName: "Nubank", CategoryName: "Salário", CategoryIcon: "payments", Direction: "income", AmountCents: 320000},
+		{ID: "t1", OccurredOn: occurred, Description: "iFood", AccountName: "Nubank", CategoryName: "Alimentação", CategoryIcon: "fastfood", Direction: "expense", AmountCents: 8990, Kind: "standard", Essentialness: "essential"},
+		{ID: "t2", OccurredOn: occurred, Description: "Salário", AccountName: "Nubank", CategoryName: "Salário", CategoryIcon: "payments", Direction: "income", AmountCents: 320000, Kind: "standard", IsRecurring: true},
 	}}
 	got, err := transacoes.NewService(fake).Transactions(context.Background(), "u-9", transacoes.TransactionQuery{})
 	if err != nil {
@@ -181,6 +203,46 @@ func TestTransactionsPeriodoEPaginacao(t *testing.T) {
 	}
 	if custom.gotFilter.Until == nil || custom.gotFilter.Until.Format("2006-01-02") != "2026-02-20" {
 		t.Errorf("custom until = %v, quero 2026-02-20", custom.gotFilter.Until)
+	}
+}
+
+func TestTransactionsPageSizeDinamico(t *testing.T) {
+	// pageSize custom vira o Limit/Offset e recalcula o pageCount do envelope.
+	custom := &fakeStore{total: 12}
+	got, err := transacoes.NewService(custom).Transactions(context.Background(), "u-1",
+		transacoes.TransactionQuery{PageSize: 5, Page: 2})
+	if err != nil {
+		t.Fatalf("erro inesperado: %v", err)
+	}
+	if custom.gotFilter.Limit != 5 {
+		t.Errorf("Limit = %d, quero 5 (pageSize custom)", custom.gotFilter.Limit)
+	}
+	if custom.gotFilter.Offset != 5 { // página 2 → offset = pageSize
+		t.Errorf("Offset = %d, quero 5", custom.gotFilter.Offset)
+	}
+	if got.PageSize != 5 || got.PageCount != 3 { // 12/5 = 3
+		t.Errorf("envelope = {pageSize %d, pageCount %d}, quero {5,3}", got.PageSize, got.PageCount)
+	}
+
+	// pageSize <= 0 cai no default 10.
+	zero := &fakeStore{total: 10}
+	gotZero, err := transacoes.NewService(zero).Transactions(context.Background(), "u-1",
+		transacoes.TransactionQuery{PageSize: 0})
+	if err != nil {
+		t.Fatalf("erro inesperado: %v", err)
+	}
+	if zero.gotFilter.Limit != 10 || gotZero.PageSize != 10 {
+		t.Errorf("pageSize 0 → {Limit %d, envelope %d}, quero {10,10}", zero.gotFilter.Limit, gotZero.PageSize)
+	}
+
+	// acima do teto é limitado (não deixa a query ilimitada).
+	big := &fakeStore{}
+	if _, err := transacoes.NewService(big).Transactions(context.Background(), "u-1",
+		transacoes.TransactionQuery{PageSize: 500}); err != nil {
+		t.Fatalf("erro inesperado: %v", err)
+	}
+	if big.gotFilter.Limit != 100 {
+		t.Errorf("pageSize 500 → Limit %d, quero 100 (teto)", big.gotFilter.Limit)
 	}
 }
 

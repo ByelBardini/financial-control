@@ -69,7 +69,7 @@ func TestSummaryHandlerErroDoStore(t *testing.T) {
 func TestListHandlerEnvelopeJSON(t *testing.T) {
 	occurred := time.Date(2026, 6, 12, 0, 0, 0, 0, time.UTC)
 	svc := transacoes.NewService(&fakeStore{total: 1, txns: []store.TransactionRow{
-		{ID: "t1", OccurredOn: occurred, Description: "iFood", AccountName: "Nubank", CategoryName: "Alimentação", CategoryIcon: "fastfood", Direction: "expense", AmountCents: 8990},
+		{ID: "t1", OccurredOn: occurred, Description: "iFood", AccountName: "Nubank", CategoryName: "Alimentação", CategoryIcon: "fastfood", Direction: "expense", AmountCents: 8990, Kind: "standard", Essentialness: "essential"},
 	}})
 	rec := do(t, transacoes.ListHandler(svc), "/transacoes/list")
 	const want = `{"items":[{"id":"t1","dateLabel":"12 JUN","timeLabel":"12/06","title":"iFood","accountLabel":"Nubank","category":"Alimentação","tag":"Sobrevivência","tagTone":"error","amountCents":8990,"direction":"outflow","icon":"fastfood"}],"page":1,"pageSize":10,"total":1,"pageCount":1}` + "\n"
@@ -109,6 +109,17 @@ func TestListHandlerParseiaFiltros(t *testing.T) {
 	}
 	if fake.gotFilter.Offset != 2*fake.gotFilter.Limit { // page 3 → offset 2*pageSize
 		t.Errorf("page=3: offset = %d, quero %d", fake.gotFilter.Offset, 2*fake.gotFilter.Limit)
+	}
+}
+
+func TestListHandlerPageSizeParam(t *testing.T) {
+	fake := &fakeStore{}
+	rec := do(t, transacoes.ListHandler(transacoes.NewService(fake)), "/transacoes/list?pageSize=7")
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, quero 200", rec.Code)
+	}
+	if fake.gotFilter.Limit != 7 {
+		t.Errorf("pageSize=7 → Limit %d, quero 7", fake.gotFilter.Limit)
 	}
 }
 

@@ -44,11 +44,27 @@ func TestTimeLabel(t *testing.T) {
 }
 
 func TestTransactionTag(t *testing.T) {
-	if tag, tone := transactionTag("income"); tag != "Inflow Esperado" || tone != "secondary" {
-		t.Errorf("transactionTag(income) = (%q,%q), quero (Inflow Esperado,secondary)", tag, tone)
+	cases := []struct {
+		name                       string
+		direction, kind, essential string
+		recurring                  bool
+		wantTag, wantTone          string
+	}{
+		{"despesa essencial avulsa", "expense", "standard", "essential", false, "Sobrevivência", "error"},
+		{"despesa supérflua avulsa", "expense", "standard", "discretionary", false, "Supérfluo", "primary"},
+		{"despesa recorrente vira Fixo", "expense", "standard", "essential", true, "Fixo", "primary"},
+		{"parcela vira Parcelado (precede tudo)", "expense", "installment", "essential", true, "Parcelado", "primary"},
+		{"receita recorrente vira Inflow Esperado", "income", "standard", "discretionary", true, "Inflow Esperado", "secondary"},
+		{"receita avulsa vira Renda Extra", "income", "standard", "discretionary", false, "Renda Extra", "secondary"},
 	}
-	if tag, tone := transactionTag("expense"); tag != "Sobrevivência" || tone != "error" {
-		t.Errorf("transactionTag(expense) = (%q,%q), quero (Sobrevivência,error)", tag, tone)
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			tag, tone := transactionTag(tc.direction, tc.kind, tc.essential, tc.recurring)
+			if tag != tc.wantTag || tone != tc.wantTone {
+				t.Errorf("transactionTag(%q,%q,%q,%v) = (%q,%q), quero (%q,%q)",
+					tc.direction, tc.kind, tc.essential, tc.recurring, tag, tone, tc.wantTag, tc.wantTone)
+			}
+		})
 	}
 }
 
