@@ -47,6 +47,7 @@ describe('DesktopTransacoes', () => {
       expect(jest.mocked(api.getTransactionsPage)).toHaveBeenCalledWith(
         expect.objectContaining({ period: '3m' }),
         1,
+        undefined, // pageSize: só medido em layout real (não dispara no jsdom)
       ),
     );
   });

@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react-native';
+import { render, screen, userEvent } from '@testing-library/react-native';
 import { TransactionRow } from '../../src/components/TransactionRow';
 import { transacoesSnapshot } from '../../src/mocks/transacoesSnapshot';
 
@@ -19,5 +19,13 @@ describe('TransactionRow (card mobile)', () => {
 
     expect(screen.queryByText('- R$ 89,90')).toBeNull();
     expect(screen.getByLabelText('valor oculto')).toBeOnTheScreen();
+  });
+
+  it('com onPress vira um alvo "Editar" e dispara ao tocar', async () => {
+    const onPress = jest.fn();
+    await render(<TransactionRow transaction={ifood} hidden={false} onPress={onPress} />);
+
+    await userEvent.setup().press(screen.getByRole('button', { name: `Editar ${ifood.title}` }));
+    expect(onPress).toHaveBeenCalledTimes(1);
   });
 });

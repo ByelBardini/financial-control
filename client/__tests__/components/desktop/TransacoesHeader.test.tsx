@@ -27,4 +27,20 @@ describe('TransacoesHeader (desktop)', () => {
     await userEvent.setup().type(input, 'uber');
     expect(input.props.value).toBe('uber');
   });
+
+  it('dispara onCreate ao tocar em "Nova transação"', async () => {
+    const onCreate = jest.fn();
+    await render(
+      <TransacoesHeader
+        hidden={false}
+        onToggleHidden={jest.fn()}
+        searchText=""
+        onSearchChange={jest.fn()}
+        onCreate={onCreate}
+      />,
+    );
+
+    await userEvent.setup().press(screen.getByRole('button', { name: 'Nova transação' }));
+    expect(onCreate).toHaveBeenCalledTimes(1);
+  });
 });
