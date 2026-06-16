@@ -86,7 +86,7 @@ sempre em **centavos** (inteiro). **Toda rota abaixo exige `Authorization: Beare
 | GET | `/contas/xray` | "Raio-X de Pobreza": dívida/limite (cartões) + Panic Meter | implementado |
 | GET | `/contas/tip` | "Dica de Gestão" (texto fixo derivado) | implementado |
 | GET | `/transacoes/summary` | fluxo de caixa do mês (inflow/outflow/net + barra + "Previsão de Colapso"); aceita `?month=YYYY-MM` | implementado |
-| GET | `/transacoes/list` | log **filtrado + paginado**: `?period=30d`(default)`\|3m\|6m\|1y\|custom` (custom usa `?from=&to=` YYYY-MM-DD), `?category=<id>` **repetível** (OR entre as), `?q=<busca ILIKE>`, `?page=N` (1-based; filtros lenientes) → **envelope** `TransactionPage` | implementado |
+| GET | `/transacoes/list` | log **filtrado + paginado**: `?period=30d`(default)`\|3m\|6m\|1y\|custom` (custom usa `?from=&to=` YYYY-MM-DD), `?category=<id>` **repetível** (OR entre as), `?q=<busca ILIKE>`, `?page=N` (1-based), `?pageSize=N` (default **10**, clamp `[1,100]`; ≤0/ausente → default — o desktop manda o nº de linhas que cabem na tela; filtros lenientes) → **envelope** `TransactionPage` | implementado |
 | GET | `/categories` | categorias ativas do usuário (alimenta o filtro de categoria) | implementado |
 | GET | `/transacoes/recurrences` | recorrências ativas (`recurring_rules`) — receitas + assinaturas | implementado |
 | GET | `/transacoes/debts` | compras parceladas agregadas por `purchase_group_id` (progresso + ironia) | implementado |
@@ -94,15 +94,21 @@ sempre em **centavos** (inteiro). **Toda rota abaixo exige `Authorization: Beare
 | GET | `/transactions/{id}` | transação única (escopada por id+user) → **200** `TransactionDetail`; **404** | implementado |
 | PATCH | `/transactions/{id}` | edita (sem trocar de conta) → **200** + recurso; **404** | implementado |
 | DELETE | `/transactions/{id}` | exclui (**hard delete** — transação não tem soft-delete) → **204**; **404** | implementado |
+| POST | `/transactions/installment-purchases` | **compra parcelada**: cria N linhas `kind='installment'` (mesmo `purchase_group_id`, datadas mês a mês), valor **por parcela** → **201** `{created:N}`; **400** inválido ou conta não-própria | implementado |
+| POST | `/recurring-rules` | **transação fixa**: registra a regra em `recurring_rules` **E** lança a transação do período atual (atômico, `recurring_rule_id` setado) → **201** `{created:true}`; **400** inválido ou conta não-própria | implementado |
 | GET | `/investments` | lista de investimentos | stub deferido (`[]`) |
 | GET | `/dashboard/investments-summary` | resumo da carteira | stub deferido (zerado) |
 | GET | `/dashboard/ticker` | cotação destacada (cripto) | stub deferido (zerado) |
 
 > Os textos de personalidade (`statusLabel`/`quip`/`diagnosis` no dashboard; `note`/
-> `noteTone`/`status`/`quip`/labels do panic/`tip` em **contas**; `tag`/`tagTone`/`collapse`
-> (Previsão de Colapso) + notas de dívida e os `dateLabel`/`timeLabel` em **transacoes**) são
-> computados nos respectivos `service.go`/`personality.go` por regrinhas de limiar/formatação
-> marcadas PLACEHOLDER. O CRUD de `/accounts` e `/transactions` mora em `*/crud.go` (escrita em
+> `noteTone`/`status`/`quip`/labels do panic/`tip` em **contas**; `collapse` (Previsão de Colapso)
+> + notas de dívida e os `dateLabel`/`timeLabel` em **transacoes**) são computados nos respectivos
+> `service.go`/`personality.go` por regrinhas de limiar/formatação marcadas PLACEHOLDER. A `tag`/
+> `tagTone` de cada transação **deixou de ser placeholder**: é derivada de sinais reais por
+> precedência em `transactionTag(direction, kind, essentialness, isRecurring)` — `Parcelado`
+> (kind=installment) > `Fixo`/`Inflow Esperado` (recurring) > `Sobrevivência`/`Supérfluo`
+> (essentialness da categoria) / `Renda Extra` (receita avulsa). O CRUD de `/accounts` e
+> `/transactions` mora em `*/crud.go` (escrita em
 > **centavos** → NUMERIC no SQL; validação inválida → **400** com o valor ofensivo). Em
 > `transacoes`, `direction` do client (inflow/outflow) é mapeado pro banco (income/expense), e a
 > criação só grava se a conta/categoria do corpo é do usuário (isolamento no próprio INSERT).
@@ -141,6 +147,8 @@ Valores `*Cents`/monetários são **int64 em centavos**.
 | `CreateTransactionInput` (req) | `POST /transactions` | `accountId`, `categoryId?`, `description`, `direction` (inflow/outflow), `amountCents` (> 0), `occurredOn` (`YYYY-MM-DD`) |
 | `UpdateTransactionInput` (req) | `PATCH /transactions/{id}` | igual ao Create **menos `accountId`** (não troca de conta) |
 | `TransactionDetail` | `GET/POST/PATCH /transactions` | `id`, `accountId`, `categoryId`, `description`, `direction` (inflow/outflow), `amountCents`, `occurredOn`, `accountLabel`, `category`, `icon` |
+| `CreateInstallmentInput` (req) | `POST /transactions/installment-purchases` | `accountId`, `categoryId?`, `description`, `amountCents` (**por parcela**, > 0), `totalInstallments` (2..48), `occurredOn` (1ª parcela) — sempre despesa |
+| `CreateRecurringRuleInput` (req) | `POST /recurring-rules` | `accountId`, `categoryId?`, `description`, `direction` (inflow/outflow), `amountCents` (> 0), `frequency` (daily/weekly/monthly/yearly), `intervalCount` (≥1), `startDate`, `endDate?` **XOR** `maxOccurrences?` (ambos nulos = permanente) |
 | `Investment[]` | `/investments` | `id`, `name`, `valueCents`, `dailyChangePct`, `icon` — **stub `[]`** |
 | `InvestmentsSummary` | `/dashboard/investments-summary` | `totalCents`, `changeCents`, `changePct` — **stub zerado** |
 | `Ticker` | `/dashboard/ticker` | `name`, `symbol`, `changePct24h`, `priceCents`, `positionCents` — **stub** com `name:"Bitcoin"`/`symbol:"B"`, resto zerado |
