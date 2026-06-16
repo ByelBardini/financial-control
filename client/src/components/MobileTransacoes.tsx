@@ -15,6 +15,7 @@ import { SectionSkeleton } from './SectionSkeleton';
 import { TopBar } from './TopBar';
 import { TransactionRow } from './TransactionRow';
 import { TransactionSearch } from './TransactionSearch';
+import { TransactionSpeedDial } from './transacoes/TransactionSpeedDial';
 import {
   useCashflowSummary,
   useCategories,
@@ -24,6 +25,7 @@ import {
 } from '../hooks/useTransacoesQueries';
 import type { TransactionControls } from '../hooks/useTransactionFilters';
 import type { AppRoute } from '../navigation/routes';
+import type { TransactionDirection } from '../types/transacoes';
 
 type MobileTransacoesProps = {
   hidden: boolean;
@@ -32,6 +34,8 @@ type MobileTransacoesProps = {
   route?: AppRoute;
   onNavigate?: (route: AppRoute) => void;
   onLogout?: () => void;
+  onCreateTransaction?: (direction: TransactionDirection) => void;
+  onEditTransaction?: (id: string) => void;
 };
 
 // Pilha vertical do mobile (Transações). A seção do log tem busca + filtros (tempo/
@@ -44,6 +48,8 @@ export function MobileTransacoes({
   route = 'transacoes',
   onNavigate,
   onLogout,
+  onCreateTransaction,
+  onEditTransaction,
 }: MobileTransacoesProps) {
   const insets = useSafeAreaInsets();
   const summary = useCashflowSummary();
@@ -114,7 +120,12 @@ export function MobileTransacoes({
           ) : (
             <>
               {items.map((transaction) => (
-                <TransactionRow key={transaction.id} transaction={transaction} hidden={hidden} />
+                <TransactionRow
+                  key={transaction.id}
+                  transaction={transaction}
+                  hidden={hidden}
+                  onPress={onEditTransaction ? () => onEditTransaction(transaction.id) : undefined}
+                />
               ))}
               {list.hasNextPage ? (
                 <Pressable
@@ -160,6 +171,9 @@ export function MobileTransacoes({
       <View className="absolute bottom-0 left-0 right-0" style={{ paddingBottom: insets.bottom }}>
         <BottomNav currentRoute={route} onNavigate={onNavigate} />
       </View>
+
+      {/* Speed dial por último = fica acima do BottomNav (e do backdrop ao abrir). */}
+      <TransactionSpeedDial onPick={(direction) => onCreateTransaction?.(direction)} />
     </View>
   );
 }

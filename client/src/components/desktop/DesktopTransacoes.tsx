@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { DividasPanel } from './DividasPanel';
@@ -17,6 +17,7 @@ import {
 } from '../../hooks/useTransacoesQueries';
 import type { TransactionControls } from '../../hooks/useTransactionFilters';
 import type { AppRoute } from '../../navigation/routes';
+import type { MenuAnchor } from '../transacoes/NewTransactionMenu';
 
 type DesktopTransacoesProps = {
   hidden: boolean;
@@ -25,6 +26,8 @@ type DesktopTransacoesProps = {
   route?: AppRoute;
   onNavigate?: (route: AppRoute) => void;
   onLogout?: () => void;
+  onCreateTransaction?: (anchor?: MenuAnchor) => void;
+  onEditTransaction?: (id: string) => void;
 };
 
 // Layout enterprise da tela de Transações: rail fixo + header (com busca) + faixa de
@@ -37,6 +40,8 @@ export function DesktopTransacoes({
   route = 'transacoes',
   onNavigate,
   onLogout,
+  onCreateTransaction,
+  onEditTransaction,
 }: DesktopTransacoesProps) {
   const [page, setPage] = useState(1);
   // Reseta a página quando os filtros mudam (ajuste de estado no render — sem effect).
@@ -46,8 +51,13 @@ export function DesktopTransacoes({
     setPage(1);
   }
 
+  // pageSize calculado pela altura da tela: undefined no 1º load (server usa o default) e
+  // travado no primeiro valor medido (decisão: não recalcular ao redimensionar).
+  const [pageSize, setPageSize] = useState<number | undefined>(undefined);
+  const lockRows = useCallback((rows: number) => setPageSize((prev) => prev ?? rows), []);
+
   const summary = useCashflowSummary();
-  const list = useTransactionsPage(controls.filters, page);
+  const list = useTransactionsPage(controls.filters, page, pageSize);
   const recurrences = useRecurrences();
   const debts = useFutureDebts();
   const categories = useCategories();
@@ -63,20 +73,21 @@ export function DesktopTransacoes({
         pointerEvents="none"
       />
       <SideNav currentRoute={route} onNavigate={onNavigate} onLogout={onLogout} />
-      <ScrollView className="flex-1" contentContainerStyle={{ flexGrow: 1 }}>
+      <View className="flex-1">
         <TransacoesHeader
           hidden={hidden}
           onToggleHidden={onToggleHidden}
           searchText={controls.searchText}
           onSearchChange={controls.setSearchText}
+          onCreate={onCreateTransaction}
         />
 
         <QuerySection query={summary} label="o fluxo de caixa">
           {(data) => <FluxoCaixaBar summary={data} hidden={hidden} />}
         </QuerySection>
 
-        <View className="flex-1 flex-row border-t border-grid-line">
-          <View className="border-r border-grid-line" style={{ flex: 2 }}>
+        <View className="min-h-0 flex-1 flex-row border-t border-grid-line">
+          <View className="min-h-0 border-r border-grid-line" style={{ flex: 2 }}>
             <QuerySection query={list} label="as transações">
               {(data) => (
                 <TransactionListPanel
@@ -89,12 +100,14 @@ export function DesktopTransacoes({
                   pageCount={data.pageCount}
                   onPrev={() => setPage((p) => Math.max(1, p - 1))}
                   onNext={() => setPage((p) => p + 1)}
+                  onEdit={onEditTransaction}
+                  onRowsFit={lockRows}
                 />
               )}
             </QuerySection>
           </View>
 
-          <View className="flex-1">
+          <ScrollView className="min-h-0 flex-1">
             <QuerySection query={recurrences} label="as recorrências">
               {(data) => <RecorrenciasPanel recurrences={data} hidden={hidden} />}
             </QuerySection>
@@ -103,9 +116,9 @@ export function DesktopTransacoes({
                 {(data) => <DividasPanel debts={data} hidden={hidden} />}
               </QuerySection>
             </View>
-          </View>
+          </ScrollView>
         </View>
-      </ScrollView>
+      </View>
     </View>
   );
 }

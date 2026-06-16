@@ -7,6 +7,7 @@ const glyphs = {
   credit_card: 'credit-card',
   currency_bitcoin: 'currency-bitcoin',
   trending_up: 'trending-up',
+  trending_down: 'trending-down',
   visibility: 'visibility',
   visibility_off: 'visibility-off',
   dashboard: 'dashboard',

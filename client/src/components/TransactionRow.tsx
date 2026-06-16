@@ -1,4 +1,5 @@
 import { Text, View } from 'react-native';
+import { EditableCard } from './EditableCard';
 import { Icon } from './Icon';
 import { TransactionAmount } from './TransactionAmount';
 import { TransactionTag } from './TransactionTag';
@@ -11,13 +12,17 @@ const directionTone = (t: Transaction) => (t.direction === 'inflow' ? 'secondary
 const tileClass = (t: Transaction) =>
   t.direction === 'inflow' ? 'bg-secondary/10' : 'bg-error/10';
 
-type TransactionRowProps = { transaction: Transaction; hidden: boolean };
+const cardClass =
+  'flex-row items-center justify-between rounded-xl border border-outline-variant bg-surface-container p-stack-md';
+
+type TransactionRowProps = { transaction: Transaction; hidden: boolean; onPress?: () => void };
 
 // Card de transação do layout mobile: tile do ícone (tingido pelo sentido) + título +
-// etiqueta à esquerda; valor assinado + horário à direita. Presentacional.
-export function TransactionRow({ transaction, hidden }: TransactionRowProps) {
+// etiqueta à esquerda; valor assinado + horário à direita. Com onPress, vira um alvo
+// "Editar transação" acessível.
+export function TransactionRow({ transaction, hidden, onPress }: TransactionRowProps) {
   return (
-    <View className="flex-row items-center justify-between rounded-xl border border-outline-variant bg-surface-container p-stack-md">
+    <EditableCard className={cardClass} editLabel={`Editar ${transaction.title}`} onPress={onPress}>
       <View className="flex-1 flex-row items-center gap-stack-md">
         <View
           className={`h-10 w-10 items-center justify-center rounded-full ${tileClass(transaction)}`}
@@ -42,6 +47,6 @@ export function TransactionRow({ transaction, hidden }: TransactionRowProps) {
           {transaction.timeLabel}
         </Text>
       </View>
-    </View>
+    </EditableCard>
   );
 }

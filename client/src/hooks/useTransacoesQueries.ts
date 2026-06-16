@@ -15,12 +15,13 @@ import type { TransactionFilters } from '../types/transacoes';
 export const useCashflowSummary = () =>
   useQuery({ queryKey: ['transacoes', 'summary'], queryFn: () => getCashflowSummary() });
 
-// Desktop: uma página por vez. placeholderData mantém a página anterior visível na troca
+// Desktop: uma página por vez. pageSize é calculado pela altura da tela (undefined até a
+// medição → server usa o default). placeholderData mantém a página anterior visível na troca
 // (keepPreviousData do v5) — paginação sem "piscar".
-export const useTransactionsPage = (filters: TransactionFilters, page: number) =>
+export const useTransactionsPage = (filters: TransactionFilters, page: number, pageSize?: number) =>
   useQuery({
-    queryKey: ['transacoes', 'list', filters, page],
-    queryFn: () => getTransactionsPage(filters, page),
+    queryKey: ['transacoes', 'list', filters, page, pageSize],
+    queryFn: () => getTransactionsPage(filters, page, pageSize),
     placeholderData: (prev) => prev,
   });
 

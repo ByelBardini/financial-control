@@ -92,6 +92,64 @@ export interface Category {
   kind: 'income' | 'expense';
 }
 
+// Recurso transação devolvido por criar/editar/GET (campos crus + presentação). 1:1 com o
+// TransactionDetail do server; usado pra pré-preencher a edição.
+export interface TransactionDetail {
+  id: string;
+  accountId: string;
+  categoryId: string; // '' = sem categoria
+  description: string;
+  direction: TransactionDirection;
+  amountCents: number;
+  occurredOn: string; // YYYY-MM-DD
+  accountLabel: string;
+  category: string;
+  icon: IconName;
+}
+
+// Corpo de criação de transação. categoryId null = sem categoria.
+export interface CreateTransactionInput {
+  accountId: string;
+  categoryId: string | null;
+  description: string;
+  direction: TransactionDirection;
+  amountCents: number;
+  occurredOn: string; // YYYY-MM-DD
+}
+
+// Corpo de edição — igual ao Create menos accountId (a edição não troca de conta).
+export type UpdateTransactionInput = Omit<CreateTransactionInput, 'accountId'>;
+
+// Corpo de criação de uma compra PARCELADA. amountCents é o valor de UMA parcela; o server
+// cria N linhas (kind='installment') datadas mês a mês a partir de occurredOn. Sempre despesa.
+export interface CreateInstallmentInput {
+  accountId: string;
+  categoryId: string | null;
+  description: string;
+  amountCents: number; // por parcela
+  totalInstallments: number;
+  occurredOn: string; // YYYY-MM-DD (1ª parcela)
+}
+
+// Frequência de uma regra de recorrência (transação Fixa).
+export type RecurrenceFrequency = 'daily' | 'weekly' | 'monthly' | 'yearly';
+
+// Corpo de criação de uma regra de recorrência ("Fixo"). O server registra a regra E lança a
+// transação do período atual (startDate). Fim opcional e EXCLUSIVO: endDate OU maxOccurrences
+// (nunca os dois; ambos null = permanente).
+export interface CreateRecurringRuleInput {
+  accountId: string;
+  categoryId: string | null;
+  description: string;
+  direction: TransactionDirection;
+  amountCents: number;
+  frequency: RecurrenceFrequency;
+  intervalCount: number;
+  startDate: string; // YYYY-MM-DD
+  endDate: string | null;
+  maxOccurrences: number | null;
+}
+
 // Snapshot completo: fixture de teste (summary/recurrences/debts) + a lista no shape antigo.
 export interface TransacoesSnapshot {
   summary: CashflowSummary;

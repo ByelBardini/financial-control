@@ -8,9 +8,10 @@ type AuthenticatedAppProps = {
   onLogout?: () => void;
 };
 
-// Área autenticada: alterna entre Dashboard, Transações e Contas via estado local (sem
-// lib de routing), espelhando o toggle login/criar-conta do RootNavigator. route +
-// setRoute descem pra navegação (Side/Bottom nav) destacar o destino atual e trocar de tela.
+// Área autenticada: alterna entre Dashboard, Transações e Contas via estado local (sem lib de
+// routing), espelhando o toggle login/criar-conta do RootNavigator. route + setRoute descem pra
+// navegação (Side/Bottom nav). O lançamento de transação é um MODAL dono da própria tela
+// (TransacoesScreen), não uma rota.
 export function AuthenticatedApp({ onLogout }: AuthenticatedAppProps) {
   const [route, setRoute] = useState<AppRoute>('dashboard');
 
