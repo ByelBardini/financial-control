@@ -15,9 +15,7 @@ describe('DesktopHeader', () => {
 
   it('dispara onCreate ao tocar em "Nova transação"', async () => {
     const onCreate = jest.fn();
-    await render(
-      <DesktopHeader hidden={false} onToggleHidden={jest.fn()} onCreate={onCreate} />,
-    );
+    await render(<DesktopHeader hidden={false} onToggleHidden={jest.fn()} onCreate={onCreate} />);
 
     await userEvent.setup().press(screen.getByRole('button', { name: 'Nova transação' }));
     expect(onCreate).toHaveBeenCalledTimes(1);

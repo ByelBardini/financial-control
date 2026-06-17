@@ -38,7 +38,12 @@ export function DashboardScreen({
         onLogout={onLogout}
         onCreate={openMenu}
       />
-      <NewTransactionMenu visible={menuOpen} anchor={menuAnchor} onPick={pick} onClose={closeMenu} />
+      <NewTransactionMenu
+        visible={menuOpen}
+        anchor={menuAnchor}
+        onPick={pick}
+        onClose={closeMenu}
+      />
     </>
   ) : (
     <MobileDashboard

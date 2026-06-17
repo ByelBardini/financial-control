@@ -41,7 +41,12 @@ export function TransacoesScreen({
         onCreateTransaction={openMenu}
         onEditTransaction={openEdit}
       />
-      <NewTransactionMenu visible={menuOpen} anchor={menuAnchor} onPick={pick} onClose={closeMenu} />
+      <NewTransactionMenu
+        visible={menuOpen}
+        anchor={menuAnchor}
+        onPick={pick}
+        onClose={closeMenu}
+      />
     </>
   ) : (
     <MobileTransacoes
