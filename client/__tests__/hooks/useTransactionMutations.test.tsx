@@ -7,6 +7,7 @@ import {
   useCreateRecurringRule,
   useCreateTransaction,
   useDeleteTransaction,
+  useRegisterRecurrence,
   useTransaction,
   useUpdateTransaction,
 } from '../../src/hooks/useTransactionMutations';
@@ -102,6 +103,21 @@ describe('useCreateRecurringRule', () => {
     });
 
     expect(api.createRecurringRule).toHaveBeenCalledWith(rule);
+    expectInvalidatedAll(invalidateSpy);
+  });
+});
+
+describe('useRegisterRecurrence', () => {
+  it('registra a ocorrência (por id) e invalida transacoes/accounts/contas/dashboard', async () => {
+    jest.mocked(api.registerRecurrence).mockResolvedValue({ id: 't9' } as never);
+    const { invalidateSpy, wrapper } = setup();
+    const { result } = await renderHook(() => useRegisterRecurrence(), { wrapper });
+
+    await act(async () => {
+      await result.current.mutateAsync('salario');
+    });
+
+    expect(api.registerRecurrence).toHaveBeenCalledWith('salario');
     expectInvalidatedAll(invalidateSpy);
   });
 });

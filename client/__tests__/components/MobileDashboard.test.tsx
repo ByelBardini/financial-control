@@ -31,6 +31,23 @@ describe('MobileDashboard', () => {
     expect(onToggleHidden).toHaveBeenCalledTimes(1);
   });
 
+  it('o FAB de nova transação abre o speed dial e chama onCreateTransaction com o sentido', async () => {
+    const onCreateTransaction = jest.fn();
+    await renderWithClient(
+      <MobileDashboard
+        hidden={false}
+        onToggleHidden={jest.fn()}
+        onCreateTransaction={onCreateTransaction}
+      />,
+    );
+    const user = userEvent.setup();
+
+    await user.press(screen.getByRole('button', { name: 'Nova transação' }));
+    await user.press(screen.getByRole('button', { name: 'Despesa' }));
+
+    expect(onCreateTransaction).toHaveBeenCalledWith('outflow');
+  });
+
   it('mascara os valores quando hidden', async () => {
     await renderWithClient(<MobileDashboard hidden onToggleHidden={jest.fn()} />);
     await screen.findByText('Saldo do Mês'); // espera o BalanceHero carregar
