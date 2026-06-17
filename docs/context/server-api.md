@@ -88,14 +88,15 @@ sempre em **centavos** (inteiro). **Toda rota abaixo exige `Authorization: Beare
 | GET | `/transacoes/summary` | fluxo de caixa do mês (inflow/outflow/net + barra + "Previsão de Colapso"); aceita `?month=YYYY-MM` | implementado |
 | GET | `/transacoes/list` | log **filtrado + paginado**: `?period=30d`(default)`\|3m\|6m\|1y\|custom` (custom usa `?from=&to=` YYYY-MM-DD), `?category=<id>` **repetível** (OR entre as), `?q=<busca ILIKE>`, `?page=N` (1-based), `?pageSize=N` (default **10**, clamp `[1,100]`; ≤0/ausente → default — o desktop manda o nº de linhas que cabem na tela; filtros lenientes) → **envelope** `TransactionPage` | implementado |
 | GET | `/categories` | categorias ativas do usuário (alimenta o filtro de categoria) | implementado |
-| GET | `/transacoes/recurrences` | recorrências ativas (`recurring_rules`) — receitas + assinaturas | implementado |
+| GET | `/transacoes/recurrences` | recorrências ativas (`recurring_rules`) — receitas + assinaturas; cada uma traz **`isDue`** (a ocorrência do período corrente ainda não foi registrada → o client mostra "Registrar") | implementado |
 | GET | `/transacoes/debts` | compras parceladas agregadas por `purchase_group_id` (progresso + ironia) | implementado |
 | POST | `/transactions` | cria transação `standard` (body em centavos; `direction` inflow/outflow → income/expense) → **201** + recurso; **400** inválido **ou** conta/categoria não-própria | implementado |
 | GET | `/transactions/{id}` | transação única (escopada por id+user) → **200** `TransactionDetail`; **404** | implementado |
 | PATCH | `/transactions/{id}` | edita (sem trocar de conta) → **200** + recurso; **404** | implementado |
 | DELETE | `/transactions/{id}` | exclui (**hard delete** — transação não tem soft-delete) → **204**; **404** | implementado |
 | POST | `/transactions/installment-purchases` | **compra parcelada**: cria N linhas `kind='installment'` (mesmo `purchase_group_id`, datadas mês a mês), valor **por parcela** → **201** `{created:N}`; **400** inválido ou conta não-própria | implementado |
-| POST | `/recurring-rules` | **transação fixa**: registra a regra em `recurring_rules` **E** lança a transação do período atual (atômico, `recurring_rule_id` setado) → **201** `{created:true}`; **400** inválido ou conta não-própria | implementado |
+| POST | `/recurring-rules` | **transação fixa (modelo)**: registra só a regra em `recurring_rules` — **não lança transação** (cada ocorrência é registrada pelo botão) → **201** `{created:true}`; **400** inválido ou conta não-própria | implementado |
+| POST | `/recurring-rules/{id}/register` | **registra a ocorrência do período corrente**: lança a transação `standard` (copia conta/categoria/valor/sentido da regra, `recurring_rule_id` setado, `occurred_on=hoje`) → **201** + `TransactionDetail`; **409** já registrada neste período / fora da janela; **404** regra não-própria | implementado |
 | GET | `/investments` | lista de investimentos | stub deferido (`[]`) |
 | GET | `/dashboard/investments-summary` | resumo da carteira | stub deferido (zerado) |
 | GET | `/dashboard/ticker` | cotação destacada (cripto) | stub deferido (zerado) |
@@ -142,7 +143,7 @@ Valores `*Cents`/monetários são **int64 em centavos**.
 | `CashflowSummary` | `/transacoes/summary` | `inflowCents`, `outflowCents`, `netBurnCents`, `burnPercent` (0..100), `collapse` (`PanicMeter`: `percent`/`levelLabel`/`levelTone`/`lowLabel`/`highLabel`/`note`) |
 | `TransactionPage` | `/transacoes/list` | `items` (`Transaction[]`: `id`, `dateLabel` "12 OUT", `timeLabel` "12/10", `title`, `accountLabel`, `category`, `tag`, `tagTone`, `amountCents`, `direction`, `icon`), `page`, `pageSize` (10), `total`, `pageCount` |
 | `Category[]` | `/categories` | `id`, `name`, `icon`, `kind` (income/expense) |
-| `Recurrence[]` | `/transacoes/recurrences` | `id`, `name`, `category`, `amountCents`, `direction`, `icon` |
+| `Recurrence[]` | `/transacoes/recurrences` | `id`, `name`, `category`, `amountCents`, `direction`, `icon`, `isDue` (período corrente pendente de registro; calendário: dia / semana-domingo / mês / ano — `interval_count` ignorado na V1; decidido em Go com relógio injetável) |
 | `FutureDebt[]` | `/transacoes/debts` | `id`, `label`, `installmentLabel` ("Parcela X/Y"), `amountCents`, `percent`, `tone`, `icon`, `note` |
 | `CreateTransactionInput` (req) | `POST /transactions` | `accountId`, `categoryId?`, `description`, `direction` (inflow/outflow), `amountCents` (> 0), `occurredOn` (`YYYY-MM-DD`) |
 | `UpdateTransactionInput` (req) | `PATCH /transactions/{id}` | igual ao Create **menos `accountId`** (não troca de conta) |
