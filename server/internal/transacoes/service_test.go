@@ -42,6 +42,14 @@ type fakeStore struct {
 	recurringRows int64
 	recurringErr  error
 	gotRecurring  store.RecurringRuleInput
+
+	// registro de ocorrência de recorrência
+	ruleForRegister store.RecurringRuleRow
+	ruleGetErr      error
+	registerID      string
+	registerErr     error
+	gotRegisterID   string
+	gotOccurredOn   time.Time
 }
 
 func (f *fakeStore) GetMonthSummary(_ context.Context, userID string, _ time.Time) (store.MonthSummaryRow, error) {
@@ -82,10 +90,23 @@ func (f *fakeStore) CreateInstallmentPurchase(_ context.Context, userID string, 
 	return f.installmentRows, f.installmentErr
 }
 
-func (f *fakeStore) CreateRecurringRuleWithFirst(_ context.Context, userID string, in store.RecurringRuleInput) (int64, error) {
+func (f *fakeStore) CreateRecurringRule(_ context.Context, userID string, in store.RecurringRuleInput) (int64, error) {
 	f.gotUserID = userID
 	f.gotRecurring = in
 	return f.recurringRows, f.recurringErr
+}
+
+func (f *fakeStore) GetRecurringRuleForRegister(_ context.Context, userID, ruleID string) (store.RecurringRuleRow, error) {
+	f.gotUserID = userID
+	f.gotRegisterID = ruleID
+	return f.ruleForRegister, f.ruleGetErr
+}
+
+func (f *fakeStore) RegisterRecurringOccurrence(_ context.Context, userID, ruleID string, occurredOn time.Time) (string, error) {
+	f.gotUserID = userID
+	f.gotRegisterID = ruleID
+	f.gotOccurredOn = occurredOn
+	return f.registerID, f.registerErr
 }
 
 func (f *fakeStore) GetTransactionByID(_ context.Context, userID, id string) (store.TransactionDetailRow, error) {
@@ -263,21 +284,32 @@ func TestCategoriesMapeia(t *testing.T) {
 	}
 }
 
-func TestRecurrencesMapeiaSentido(t *testing.T) {
+func TestRecurrencesMapeiaSentidoEDevido(t *testing.T) {
+	today := time.Date(2026, 6, 17, 9, 0, 0, 0, time.UTC)
 	fake := &fakeStore{rules: []store.RecurringRuleRow{
-		{ID: "r1", Description: "Salário Base", CategoryName: "Salário", CategoryIcon: "payments", Direction: "income", AmountCents: 500000},
-		{ID: "r2", Description: "Netflix", CategoryName: "Lazer", CategoryIcon: "subscriptions", Direction: "expense", AmountCents: 5590},
+		// mensal nunca registrada (last nil) → devida no período corrente.
+		{ID: "r1", Description: "Salário Base", CategoryName: "Salário", CategoryIcon: "payments", Direction: "income", AmountCents: 500000,
+			Frequency: "monthly", StartDate: time.Date(2026, 6, 1, 0, 0, 0, 0, time.UTC)},
+		// diária registrada hoje → NÃO devida (já cobriu o período).
+		{ID: "r2", Description: "Netflix", CategoryName: "Lazer", CategoryIcon: "subscriptions", Direction: "expense", AmountCents: 5590,
+			Frequency: "daily", StartDate: time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC), LastOccurredOn: &today, OccurrenceCount: 5},
 	}}
-	got, err := transacoes.NewService(fake).Recurrences(context.Background(), "u-1")
+	got, err := transacoes.NewServiceWithClock(fake, func() time.Time { return today }).Recurrences(context.Background(), "u-1")
 	if err != nil {
 		t.Fatalf("erro inesperado: %v", err)
 	}
-	want0 := transacoes.Recurrence{ID: "r1", Name: "Salário Base", Category: "Salário", AmountCents: 500000, Direction: "inflow", Icon: "payments"}
+	if fake.gotUserID != "u-1" {
+		t.Errorf("escopo: userID = %q, quero u-1", fake.gotUserID)
+	}
+	want0 := transacoes.Recurrence{ID: "r1", Name: "Salário Base", Category: "Salário", AmountCents: 500000, Direction: "inflow", Icon: "payments", IsDue: true}
 	if got[0] != want0 {
 		t.Errorf("got[0] = %+v, quero %+v", got[0], want0)
 	}
 	if got[1].Direction != "outflow" {
 		t.Errorf("got[1].Direction = %q, quero outflow", got[1].Direction)
+	}
+	if got[1].IsDue {
+		t.Error("r2 registrada hoje não deveria estar devida")
 	}
 }
 

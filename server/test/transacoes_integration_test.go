@@ -311,8 +311,9 @@ func TestInstallmentPurchaseFlow(t *testing.T) {
 	}
 }
 
-// TestRecurringRuleFlow cria uma recorrência ("regra + lançamento de agora"): registra a regra
-// (aparece em Recorrências) E lança a transação do período atual (tag "Fixo", reflete no saldo).
+// TestRecurringRuleFlow cobre o modelo "recorrência = template + registro por período": criar a
+// regra NÃO lança transação (só vira modelo); o botão registra a ocorrência do período (1×) → aí
+// sim entra no extrato (tag "Fixo") e move o saldo; registrar de novo no mesmo período → 409.
 func TestRecurringRuleFlow(t *testing.T) {
 	dsn := os.Getenv("DATABASE_URL")
 	if dsn == "" {
@@ -337,30 +338,66 @@ func TestRecurringRuleFlow(t *testing.T) {
 		t.Fatalf("POST recurring = %d, quero 201", code)
 	}
 
-	// A regra aparece em Recorrências (agora 4: 3 do seed + Aluguel).
+	// A regra (modelo) aparece em Recorrências (4: 3 do seed + Aluguel) e está DEVIDA (nunca
+	// registrada). As 3 do seed também ficam devidas (sem transação ligada ainda).
 	var recs []transacoes.Recurrence
 	getJSON(t, srv.URL+"/transacoes/recurrences", tokenA, &recs)
 	if len(recs) != 4 {
 		t.Fatalf("len recorrências = %d, quero 4 (3 do seed + Aluguel)", len(recs))
 	}
+	aluguel := findRecurrence(recs, "Aluguel")
+	if aluguel == nil || !aluguel.IsDue {
+		t.Fatalf("Aluguel = %+v, quero presente e isDue=true", aluguel)
+	}
 
-	// O lançamento de agora entrou no extrato com a tag "Fixo" (despesa recorrente).
+	// Criar NÃO lança: o Aluguel ainda não está no extrato e o saldo não mudou.
 	var page transacoes.TransactionPage
+	getJSON(t, srv.URL+"/transacoes/list", tokenA, &page)
+	if findTransaction(page.Items, "Aluguel") != nil {
+		t.Fatalf("Aluguel não deveria estar no extrato antes de registrar; items=%+v", page.Items)
+	}
+	var cf transacoes.CashflowSummary
+	getJSON(t, srv.URL+"/transacoes/summary", tokenA, &cf)
+	if cf.OutflowCents != 111550 {
+		t.Errorf("outflow antes do registro = %d, quero 111550 (só o seed)", cf.OutflowCents)
+	}
+
+	// Registrar a ocorrência do período → 201. Agora entra no extrato (tag "Fixo") e move o saldo.
+	registerURL := srv.URL + "/recurring-rules/" + aluguel.ID + "/register"
+	if code := sendJSON(t, http.MethodPost, registerURL, tokenA, "", nil); code != http.StatusCreated {
+		t.Fatalf("POST register = %d, quero 201", code)
+	}
 	getJSON(t, srv.URL+"/transacoes/list", tokenA, &page)
 	al := findTransaction(page.Items, "Aluguel")
 	if al == nil {
-		t.Fatalf("lançamento 'Aluguel' não apareceu no list; items=%+v", page.Items)
+		t.Fatalf("lançamento 'Aluguel' não apareceu após registrar; items=%+v", page.Items)
 	}
 	if al.Tag != "Fixo" || al.Direction != "outflow" || al.AmountCents != 150000 {
 		t.Errorf("Aluguel = {%q,%q,%d}, quero {Fixo,outflow,150000}", al.Tag, al.Direction, al.AmountCents)
 	}
-
-	// O saldo (derivado) reflete o lançamento de agora.
-	var cf transacoes.CashflowSummary
 	getJSON(t, srv.URL+"/transacoes/summary", tokenA, &cf)
 	if cf.OutflowCents != 111550+150000 {
-		t.Errorf("outflow = %d, quero %d (seed + aluguel)", cf.OutflowCents, 111550+150000)
+		t.Errorf("outflow após registro = %d, quero %d (seed + aluguel)", cf.OutflowCents, 111550+150000)
 	}
+
+	// Já registrado neste período: o botão some (isDue=false) e re-registrar → 409.
+	getJSON(t, srv.URL+"/transacoes/recurrences", tokenA, &recs)
+	if r := findRecurrence(recs, "Aluguel"); r == nil || r.IsDue {
+		t.Errorf("Aluguel após registro = %+v, quero isDue=false", r)
+	}
+	if code := sendJSON(t, http.MethodPost, registerURL, tokenA, "", nil); code != http.StatusConflict {
+		t.Errorf("re-registrar no mesmo período = %d, quero 409", code)
+	}
+}
+
+// findRecurrence acha a recorrência pelo nome (nil se ausente).
+func findRecurrence(recs []transacoes.Recurrence, name string) *transacoes.Recurrence {
+	for i := range recs {
+		if recs[i].Name == name {
+			return &recs[i]
+		}
+	}
+	return nil
 }
 
 // findTransaction acha a transação pelo título (nil se ausente).
