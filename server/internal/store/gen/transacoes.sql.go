@@ -73,44 +73,34 @@ func (q *Queries) CreateInstallmentPurchase(ctx context.Context, arg CreateInsta
 	return result.RowsAffected(), nil
 }
 
-const createRecurringRuleWithFirst = `-- name: CreateRecurringRuleWithFirst :execrows
-WITH new_rule AS (
-    INSERT INTO recurring_rules (
-        user_id, account_id, category_id, description, direction, amount,
-        frequency, interval_count, start_date, end_date, max_occurrences
-    )
-    SELECT
-        $1,
-        $2,
-        $3,
-        $4,
-        $5,
-        ($6::bigint)::numeric / 100,
-        $7,
-        $8::int,
-        $9::date,
-        $10::date,
-        $11::int
-    WHERE EXISTS (
-        SELECT 1 FROM accounts
-        WHERE accounts.id = $2 AND accounts.user_id = $1 AND accounts.is_archived = false
-    )
-      AND (
-        $3::uuid IS NULL
-        OR EXISTS (SELECT 1 FROM categories WHERE categories.id = $3 AND categories.user_id = $1)
-      )
-    RETURNING id, account_id, category_id, description, direction, amount, start_date
-)
-INSERT INTO transactions (
-    user_id, account_id, category_id, description, kind, direction, amount, occurred_on, recurring_rule_id
+const createRecurringRule = `-- name: CreateRecurringRule :execrows
+INSERT INTO recurring_rules (
+    user_id, account_id, category_id, description, direction, amount,
+    frequency, interval_count, start_date, end_date, max_occurrences
 )
 SELECT
-    $1, new_rule.account_id, new_rule.category_id, new_rule.description,
-    'standard', new_rule.direction, new_rule.amount, new_rule.start_date, new_rule.id
-FROM new_rule
+    $1,
+    $2,
+    $3,
+    $4,
+    $5,
+    ($6::bigint)::numeric / 100,
+    $7,
+    $8::int,
+    $9::date,
+    $10::date,
+    $11::int
+WHERE EXISTS (
+    SELECT 1 FROM accounts
+    WHERE accounts.id = $2 AND accounts.user_id = $1 AND accounts.is_archived = false
+)
+  AND (
+    $3::uuid IS NULL
+    OR EXISTS (SELECT 1 FROM categories WHERE categories.id = $3 AND categories.user_id = $1)
+  )
 `
 
-type CreateRecurringRuleWithFirstParams struct {
+type CreateRecurringRuleParams struct {
 	UserID         pgtype.UUID
 	AccountID      pgtype.UUID
 	CategoryID     pgtype.UUID
@@ -124,13 +114,12 @@ type CreateRecurringRuleWithFirstParams struct {
 	MaxOccurrences pgtype.Int4
 }
 
-// Cria uma regra de recorrência E lança a transação do período atual (kind='standard',
-// recurring_rule_id apontando pra regra) numa só query atômica (CTE). O lançamento usa a
-// start_date como competência. Só cria se a conta (e a categoria, se houver) são do usuário —
-// guard no INSERT da regra; se 0 regras criadas, o CTE fica vazio e nada é lançado → 0 linhas
-// afetadas (conta/categoria inválida). end_date XOR max_occurrences é garantido pelo CHECK.
-func (q *Queries) CreateRecurringRuleWithFirst(ctx context.Context, arg CreateRecurringRuleWithFirstParams) (int64, error) {
-	result, err := q.db.Exec(ctx, createRecurringRuleWithFirst,
+// Cria uma regra de recorrência (modelo puro — NÃO lança transação; cada ocorrência, inclusive
+// a do período atual, é registrada pelo botão via RegisterRecurringOccurrence). Só cria se a
+// conta (e a categoria, se houver) são do usuário — 0 linhas afetadas = conta/categoria inválida.
+// end_date XOR max_occurrences é garantido pelo CHECK. Centavos → NUMERIC na borda.
+func (q *Queries) CreateRecurringRule(ctx context.Context, arg CreateRecurringRuleParams) (int64, error) {
+	result, err := q.db.Exec(ctx, createRecurringRule,
 		arg.UserID,
 		arg.AccountID,
 		arg.CategoryID,
@@ -219,6 +208,72 @@ func (q *Queries) DeleteTransaction(ctx context.Context, arg DeleteTransactionPa
 	return id, err
 }
 
+const getRecurringRuleForRegister = `-- name: GetRecurringRuleForRegister :one
+SELECT
+    r.id::text                   AS id,
+    r.description                AS description,
+    COALESCE(c.name, '')         AS category_name,
+    COALESCE(c.icon, 'payments') AS category_icon,
+    r.direction                  AS direction,
+    (r.amount * 100)::bigint     AS amount_cents,
+    r.frequency                  AS frequency,
+    r.start_date                 AS start_date,
+    r.end_date                   AS end_date,
+    r.max_occurrences            AS max_occurrences,
+    (SELECT MAX(t.occurred_on) FROM transactions t
+        WHERE t.recurring_rule_id = r.id AND t.user_id = r.user_id)::date AS last_occurred_on,
+    (SELECT COUNT(*) FROM transactions t
+        WHERE t.recurring_rule_id = r.id AND t.user_id = r.user_id)::bigint AS occurrence_count
+FROM recurring_rules r
+LEFT JOIN categories c ON c.id = r.category_id AND c.user_id = r.user_id
+WHERE r.id = $1
+  AND r.user_id = $2
+  AND r.is_active = true
+`
+
+type GetRecurringRuleForRegisterParams struct {
+	ID     pgtype.UUID
+	UserID pgtype.UUID
+}
+
+type GetRecurringRuleForRegisterRow struct {
+	ID              string
+	Description     string
+	CategoryName    string
+	CategoryIcon    string
+	Direction       string
+	AmountCents     int64
+	Frequency       string
+	StartDate       pgtype.Date
+	EndDate         pgtype.Date
+	MaxOccurrences  pgtype.Int4
+	LastOccurredOn  pgtype.Date
+	OccurrenceCount int64
+}
+
+// Uma regra ativa (escopada por id + user) com os mesmos sinais de "devido" da lista — usada
+// pra checar isDue no servidor antes de registrar a ocorrência. ErrNoRows quando não é do usuário
+// ou está inativa.
+func (q *Queries) GetRecurringRuleForRegister(ctx context.Context, arg GetRecurringRuleForRegisterParams) (GetRecurringRuleForRegisterRow, error) {
+	row := q.db.QueryRow(ctx, getRecurringRuleForRegister, arg.ID, arg.UserID)
+	var i GetRecurringRuleForRegisterRow
+	err := row.Scan(
+		&i.ID,
+		&i.Description,
+		&i.CategoryName,
+		&i.CategoryIcon,
+		&i.Direction,
+		&i.AmountCents,
+		&i.Frequency,
+		&i.StartDate,
+		&i.EndDate,
+		&i.MaxOccurrences,
+		&i.LastOccurredOn,
+		&i.OccurrenceCount,
+	)
+	return i, err
+}
+
 const getTransactionByID = `-- name: GetTransactionByID :one
 SELECT
     t.id::text                        AS id,
@@ -283,7 +338,15 @@ SELECT
     COALESCE(c.name, '')         AS category_name,
     COALESCE(c.icon, 'payments') AS category_icon,
     r.direction                  AS direction,
-    (r.amount * 100)::bigint     AS amount_cents
+    (r.amount * 100)::bigint     AS amount_cents,
+    r.frequency                  AS frequency,
+    r.start_date                 AS start_date,
+    r.end_date                   AS end_date,
+    r.max_occurrences            AS max_occurrences,
+    (SELECT MAX(t.occurred_on) FROM transactions t
+        WHERE t.recurring_rule_id = r.id AND t.user_id = r.user_id)::date AS last_occurred_on,
+    (SELECT COUNT(*) FROM transactions t
+        WHERE t.recurring_rule_id = r.id AND t.user_id = r.user_id)::bigint AS occurrence_count
 FROM recurring_rules r
 LEFT JOIN categories c ON c.id = r.category_id AND c.user_id = r.user_id
 WHERE r.user_id = $1
@@ -292,15 +355,23 @@ ORDER BY r.direction DESC, r.amount DESC
 `
 
 type ListActiveRecurringRulesRow struct {
-	ID           string
-	Description  string
-	CategoryName string
-	CategoryIcon string
-	Direction    string
-	AmountCents  int64
+	ID              string
+	Description     string
+	CategoryName    string
+	CategoryIcon    string
+	Direction       string
+	AmountCents     int64
+	Frequency       string
+	StartDate       pgtype.Date
+	EndDate         pgtype.Date
+	MaxOccurrences  pgtype.Int4
+	LastOccurredOn  pgtype.Date
+	OccurrenceCount int64
 }
 
-// Regras de recorrência ativas do usuário, com a categoria juntada (nome + ícone).
+// Regras de recorrência ativas do usuário, com a categoria juntada (nome + ícone) e os sinais
+// pro "devido" (decidido em Go): frequência, datas/limite e os agregados das transações ligadas
+// à regra — last_occurred_on (MAX competência) e occurrence_count (nº de ocorrências já lançadas).
 // Receitas (income) antes das despesas; maior valor primeiro.
 func (q *Queries) ListActiveRecurringRules(ctx context.Context, userID pgtype.UUID) ([]ListActiveRecurringRulesRow, error) {
 	rows, err := q.db.Query(ctx, listActiveRecurringRules, userID)
@@ -318,6 +389,12 @@ func (q *Queries) ListActiveRecurringRules(ctx context.Context, userID pgtype.UU
 			&i.CategoryIcon,
 			&i.Direction,
 			&i.AmountCents,
+			&i.Frequency,
+			&i.StartDate,
+			&i.EndDate,
+			&i.MaxOccurrences,
+			&i.LastOccurredOn,
+			&i.OccurrenceCount,
 		); err != nil {
 			return nil, err
 		}
@@ -538,6 +615,37 @@ func (q *Queries) ListTransactionsFiltered(ctx context.Context, arg ListTransact
 		return nil, err
 	}
 	return items, nil
+}
+
+const registerRecurringOccurrence = `-- name: RegisterRecurringOccurrence :one
+INSERT INTO transactions (
+    user_id, account_id, category_id, description, kind, direction, amount, occurred_on, recurring_rule_id
+)
+SELECT
+    r.user_id, r.account_id, r.category_id, r.description,
+    'standard', r.direction, r.amount, $1::date, r.id
+FROM recurring_rules r
+WHERE r.id = $2
+  AND r.user_id = $3
+  AND r.is_active = true
+RETURNING id::text AS id
+`
+
+type RegisterRecurringOccurrenceParams struct {
+	OccurredOn pgtype.Date
+	RuleID     pgtype.UUID
+	UserID     pgtype.UUID
+}
+
+// Lança a transação 'standard' do período atual a partir de uma regra existente (copia
+// conta/categoria/descrição/sentido/valor da regra; occurred_on = hoje, vindo do service). Só
+// insere se a regra é do usuário e está ativa — 0 linhas (ErrNoRows no store) → regra inexistente
+// ou não é do usuário. A checagem de "devido" (1×/período) é feita no service antes desta query.
+func (q *Queries) RegisterRecurringOccurrence(ctx context.Context, arg RegisterRecurringOccurrenceParams) (string, error) {
+	row := q.db.QueryRow(ctx, registerRecurringOccurrence, arg.OccurredOn, arg.RuleID, arg.UserID)
+	var id string
+	err := row.Scan(&id)
+	return id, err
 }
 
 const updateTransaction = `-- name: UpdateTransaction :one

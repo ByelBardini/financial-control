@@ -101,14 +101,22 @@ type TransactionRow struct {
 	Essentialness string // 'essential'/'discretionary' da categoria — alimenta a tag (Sobrevivência/Supérfluo)
 }
 
-// RecurringRuleRow é uma regra de recorrência ativa, com a categoria juntada (centavos).
+// RecurringRuleRow é uma regra de recorrência ativa, com a categoria juntada (centavos) e os
+// sinais pro cálculo de "devido" no service: frequência/datas/limite + agregados das transações
+// ligadas (LastOccurredOn = MAX competência, nil se nunca lançada; OccurrenceCount = nº lançadas).
 type RecurringRuleRow struct {
-	ID           string
-	Description  string
-	CategoryName string
-	CategoryIcon string
-	Direction    string
-	AmountCents  int64
+	ID              string
+	Description     string
+	CategoryName    string
+	CategoryIcon    string
+	Direction       string
+	AmountCents     int64
+	Frequency       string
+	StartDate       time.Time
+	EndDate         *time.Time
+	MaxOccurrences  *int
+	LastOccurredOn  *time.Time
+	OccurrenceCount int
 }
 
 // InstallmentDebtRow é uma compra parcelada agregada por purchase_group_id: progresso
@@ -479,12 +487,18 @@ func (s *Store) ListRecurringRules(ctx context.Context, userID string) ([]Recurr
 	out := make([]RecurringRuleRow, 0, len(rows))
 	for _, r := range rows {
 		out = append(out, RecurringRuleRow{
-			ID:           r.ID,
-			Description:  r.Description,
-			CategoryName: r.CategoryName,
-			CategoryIcon: r.CategoryIcon,
-			Direction:    r.Direction,
-			AmountCents:  r.AmountCents,
+			ID:              r.ID,
+			Description:     r.Description,
+			CategoryName:    r.CategoryName,
+			CategoryIcon:    r.CategoryIcon,
+			Direction:       r.Direction,
+			AmountCents:     r.AmountCents,
+			Frequency:       r.Frequency,
+			StartDate:       r.StartDate.Time,
+			EndDate:         datePtr(r.EndDate),
+			MaxOccurrences:  int4Ptr(r.MaxOccurrences),
+			LastOccurredOn:  datePtr(r.LastOccurredOn),
+			OccurrenceCount: int(r.OccurrenceCount),
 		})
 	}
 	return out, nil
@@ -579,10 +593,10 @@ func (s *Store) CreateInstallmentPurchase(ctx context.Context, userID string, in
 	return n, nil
 }
 
-// CreateRecurringRuleWithFirst cria a regra de recorrência E lança a transação do período
-// atual (linkada à regra) numa só query atômica; devolve o nº de linhas inseridas no ledger
+// CreateRecurringRule cria a regra de recorrência (modelo puro — NÃO lança transação; cada
+// ocorrência é registrada depois via RegisterRecurringOccurrence). Devolve o nº de regras criadas
 // (1 = ok; 0 = conta/categoria não é do usuário → handler responde 400).
-func (s *Store) CreateRecurringRuleWithFirst(ctx context.Context, userID string, in RecurringRuleInput) (int64, error) {
+func (s *Store) CreateRecurringRule(ctx context.Context, userID string, in RecurringRuleInput) (int64, error) {
 	uid, err := uuidArg(userID)
 	if err != nil {
 		return 0, err
@@ -595,7 +609,7 @@ func (s *Store) CreateRecurringRuleWithFirst(ctx context.Context, userID string,
 	if err != nil {
 		return 0, ErrTransactionNotFound
 	}
-	n, err := s.q.CreateRecurringRuleWithFirst(ctx, gen.CreateRecurringRuleWithFirstParams{
+	n, err := s.q.CreateRecurringRule(ctx, gen.CreateRecurringRuleParams{
 		UserID:         uid,
 		AccountID:      aid,
 		CategoryID:     cid,
@@ -612,6 +626,67 @@ func (s *Store) CreateRecurringRuleWithFirst(ctx context.Context, userID string,
 		return 0, fmt.Errorf("store: criar recorrência: %w", err)
 	}
 	return n, nil
+}
+
+// GetRecurringRuleForRegister devolve uma regra ativa do usuário (escopada por id+user) com os
+// sinais de "devido" (frequência/datas/limite + agregados). ErrTransactionNotFound quando não
+// existe, não é do usuário ou está inativa.
+func (s *Store) GetRecurringRuleForRegister(ctx context.Context, userID, ruleID string) (RecurringRuleRow, error) {
+	uid, err := uuidArg(userID)
+	if err != nil {
+		return RecurringRuleRow{}, err
+	}
+	rid, err := uuidArg(ruleID)
+	if err != nil {
+		return RecurringRuleRow{}, ErrTransactionNotFound
+	}
+	r, err := s.q.GetRecurringRuleForRegister(ctx, gen.GetRecurringRuleForRegisterParams{ID: rid, UserID: uid})
+	if errors.Is(err, pgx.ErrNoRows) {
+		return RecurringRuleRow{}, ErrTransactionNotFound
+	}
+	if err != nil {
+		return RecurringRuleRow{}, fmt.Errorf("store: buscar recorrência por id: %w", err)
+	}
+	return RecurringRuleRow{
+		ID:              r.ID,
+		Description:     r.Description,
+		CategoryName:    r.CategoryName,
+		CategoryIcon:    r.CategoryIcon,
+		Direction:       r.Direction,
+		AmountCents:     r.AmountCents,
+		Frequency:       r.Frequency,
+		StartDate:       r.StartDate.Time,
+		EndDate:         datePtr(r.EndDate),
+		MaxOccurrences:  int4Ptr(r.MaxOccurrences),
+		LastOccurredOn:  datePtr(r.LastOccurredOn),
+		OccurrenceCount: int(r.OccurrenceCount),
+	}, nil
+}
+
+// RegisterRecurringOccurrence lança a transação 'standard' do período atual a partir de uma regra
+// (copia os campos dela; occurredOn = hoje, vindo do service) e devolve o id da nova transação.
+// ErrTransactionNotFound quando a regra não é do usuário ou está inativa.
+func (s *Store) RegisterRecurringOccurrence(ctx context.Context, userID, ruleID string, occurredOn time.Time) (string, error) {
+	uid, err := uuidArg(userID)
+	if err != nil {
+		return "", err
+	}
+	rid, err := uuidArg(ruleID)
+	if err != nil {
+		return "", ErrTransactionNotFound
+	}
+	id, err := s.q.RegisterRecurringOccurrence(ctx, gen.RegisterRecurringOccurrenceParams{
+		RuleID:     rid,
+		UserID:     uid,
+		OccurredOn: dateArg(occurredOn),
+	})
+	if errors.Is(err, pgx.ErrNoRows) {
+		return "", ErrTransactionNotFound
+	}
+	if err != nil {
+		return "", fmt.Errorf("store: registrar ocorrência da recorrência: %w", err)
+	}
+	return id, nil
 }
 
 // GetTransactionByID devolve a transação do usuário (escopada por id+user) com conta e
@@ -887,6 +962,26 @@ func int4ArgN(n *int) pgtype.Int4 {
 		return pgtype.Int4{}
 	}
 	return pgtype.Int4{Int32: int32(*n), Valid: true}
+}
+
+// datePtr lê um pgtype.Date nullable das queries num *time.Time (NULL → nil) — usado pelos
+// campos opcionais da regra de recorrência (end_date, last_occurred_on agregado).
+func datePtr(d pgtype.Date) *time.Time {
+	if !d.Valid {
+		return nil
+	}
+	t := d.Time
+	return &t
+}
+
+// int4Ptr lê um pgtype.Int4 nullable das queries num *int (NULL → nil) — usado pelo
+// max_occurrences da regra de recorrência.
+func int4Ptr(n pgtype.Int4) *int {
+	if !n.Valid {
+		return nil
+	}
+	v := int(n.Int32)
+	return &v
 }
 
 // textArg converte um *string opcional no pgtype.Text das queries (nil = NULL no banco).

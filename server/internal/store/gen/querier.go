@@ -22,12 +22,11 @@ type Querier interface {
 	// (e a categoria, se houver) são do usuário — 0 linhas afetadas → conta/categoria inválida.
 	// Statement único = atômico. Centavos → NUMERIC na borda.
 	CreateInstallmentPurchase(ctx context.Context, arg CreateInstallmentPurchaseParams) (int64, error)
-	// Cria uma regra de recorrência E lança a transação do período atual (kind='standard',
-	// recurring_rule_id apontando pra regra) numa só query atômica (CTE). O lançamento usa a
-	// start_date como competência. Só cria se a conta (e a categoria, se houver) são do usuário —
-	// guard no INSERT da regra; se 0 regras criadas, o CTE fica vazio e nada é lançado → 0 linhas
-	// afetadas (conta/categoria inválida). end_date XOR max_occurrences é garantido pelo CHECK.
-	CreateRecurringRuleWithFirst(ctx context.Context, arg CreateRecurringRuleWithFirstParams) (int64, error)
+	// Cria uma regra de recorrência (modelo puro — NÃO lança transação; cada ocorrência, inclusive
+	// a do período atual, é registrada pelo botão via RegisterRecurringOccurrence). Só cria se a
+	// conta (e a categoria, se houver) são do usuário — 0 linhas afetadas = conta/categoria inválida.
+	// end_date XOR max_occurrences é garantido pelo CHECK. Centavos → NUMERIC na borda.
+	CreateRecurringRule(ctx context.Context, arg CreateRecurringRuleParams) (int64, error)
 	// Cria uma transação 'standard' do usuário. Só insere se a conta (e a categoria, se
 	// informada) pertencem ao usuário — impede anexar transação à conta de outro dono.
 	// 0 linhas (ErrNoRows no store) → conta/categoria inválida. Centavos → NUMERIC na borda.
@@ -46,6 +45,10 @@ type Querier interface {
 	// Receitas e gastos do mês de @reference_date, em centavos (bigint). Mês vazio → 0.
 	// Escopado por usuário.
 	GetMonthSummary(ctx context.Context, arg GetMonthSummaryParams) (GetMonthSummaryRow, error)
+	// Uma regra ativa (escopada por id + user) com os mesmos sinais de "devido" da lista — usada
+	// pra checar isDue no servidor antes de registrar a ocorrência. ErrNoRows quando não é do usuário
+	// ou está inativa.
+	GetRecurringRuleForRegister(ctx context.Context, arg GetRecurringRuleForRegisterParams) (GetRecurringRuleForRegisterRow, error)
 	// Transação única do usuário (escopada por id + user_id) com conta/categoria juntadas,
 	// em centavos. Usada pra montar a resposta após criar/editar e pra pré-preencher a edição.
 	GetTransactionByID(ctx context.Context, arg GetTransactionByIDParams) (GetTransactionByIDRow, error)
@@ -54,7 +57,9 @@ type Querier interface {
 	// Saldo all-time (não mês): opening_balance + soma do ledger, em centavos (bigint).
 	// Escopado por usuário: contas do usuário + apenas transações dele no join.
 	ListAccountsWithBalance(ctx context.Context, userID pgtype.UUID) ([]ListAccountsWithBalanceRow, error)
-	// Regras de recorrência ativas do usuário, com a categoria juntada (nome + ícone).
+	// Regras de recorrência ativas do usuário, com a categoria juntada (nome + ícone) e os sinais
+	// pro "devido" (decidido em Go): frequência, datas/limite e os agregados das transações ligadas
+	// à regra — last_occurred_on (MAX competência) e occurrence_count (nº de ocorrências já lançadas).
 	// Receitas (income) antes das despesas; maior valor primeiro.
 	ListActiveRecurringRules(ctx context.Context, userID pgtype.UUID) ([]ListActiveRecurringRulesRow, error)
 	// Queries da tela de Contas. Saldo é derivado (opening_balance + soma do ledger),
@@ -87,6 +92,11 @@ type Querier interface {
 	ListTransactionsFiltered(ctx context.Context, arg ListTransactionsFilteredParams) ([]ListTransactionsFilteredRow, error)
 	// Contas "Vales": saldo atual + valor concedido (opening_balance) como baseline de 100%.
 	ListVoucherAccounts(ctx context.Context, userID pgtype.UUID) ([]ListVoucherAccountsRow, error)
+	// Lança a transação 'standard' do período atual a partir de uma regra existente (copia
+	// conta/categoria/descrição/sentido/valor da regra; occurred_on = hoje, vindo do service). Só
+	// insere se a regra é do usuário e está ativa — 0 linhas (ErrNoRows no store) → regra inexistente
+	// ou não é do usuário. A checagem de "devido" (1×/período) é feita no service antes desta query.
+	RegisterRecurringOccurrence(ctx context.Context, arg RegisterRecurringOccurrenceParams) (string, error)
 	// Atualiza os campos mutáveis da conta (escopado por id + user_id). NÃO altera o
 	// opening_balance: saldo só muda via transações, nunca por edição manual. RETURNING
 	// vazio (ErrNoRows) quando a conta não é do usuário ou já está arquivada → 404.

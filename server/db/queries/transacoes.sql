@@ -51,7 +51,9 @@ WHERE c.user_id = sqlc.arg(user_id)
 ORDER BY c.name;
 
 -- name: ListActiveRecurringRules :many
--- Regras de recorrência ativas do usuário, com a categoria juntada (nome + ícone).
+-- Regras de recorrência ativas do usuário, com a categoria juntada (nome + ícone) e os sinais
+-- pro "devido" (decidido em Go): frequência, datas/limite e os agregados das transações ligadas
+-- à regra — last_occurred_on (MAX competência) e occurrence_count (nº de ocorrências já lançadas).
 -- Receitas (income) antes das despesas; maior valor primeiro.
 SELECT
     r.id::text                   AS id,
@@ -59,12 +61,45 @@ SELECT
     COALESCE(c.name, '')         AS category_name,
     COALESCE(c.icon, 'payments') AS category_icon,
     r.direction                  AS direction,
-    (r.amount * 100)::bigint     AS amount_cents
+    (r.amount * 100)::bigint     AS amount_cents,
+    r.frequency                  AS frequency,
+    r.start_date                 AS start_date,
+    r.end_date                   AS end_date,
+    r.max_occurrences            AS max_occurrences,
+    (SELECT MAX(t.occurred_on) FROM transactions t
+        WHERE t.recurring_rule_id = r.id AND t.user_id = r.user_id)::date AS last_occurred_on,
+    (SELECT COUNT(*) FROM transactions t
+        WHERE t.recurring_rule_id = r.id AND t.user_id = r.user_id)::bigint AS occurrence_count
 FROM recurring_rules r
 LEFT JOIN categories c ON c.id = r.category_id AND c.user_id = r.user_id
 WHERE r.user_id = sqlc.arg(user_id)
   AND r.is_active = true
 ORDER BY r.direction DESC, r.amount DESC;
+
+-- name: GetRecurringRuleForRegister :one
+-- Uma regra ativa (escopada por id + user) com os mesmos sinais de "devido" da lista — usada
+-- pra checar isDue no servidor antes de registrar a ocorrência. ErrNoRows quando não é do usuário
+-- ou está inativa.
+SELECT
+    r.id::text                   AS id,
+    r.description                AS description,
+    COALESCE(c.name, '')         AS category_name,
+    COALESCE(c.icon, 'payments') AS category_icon,
+    r.direction                  AS direction,
+    (r.amount * 100)::bigint     AS amount_cents,
+    r.frequency                  AS frequency,
+    r.start_date                 AS start_date,
+    r.end_date                   AS end_date,
+    r.max_occurrences            AS max_occurrences,
+    (SELECT MAX(t.occurred_on) FROM transactions t
+        WHERE t.recurring_rule_id = r.id AND t.user_id = r.user_id)::date AS last_occurred_on,
+    (SELECT COUNT(*) FROM transactions t
+        WHERE t.recurring_rule_id = r.id AND t.user_id = r.user_id)::bigint AS occurrence_count
+FROM recurring_rules r
+LEFT JOIN categories c ON c.id = r.category_id AND c.user_id = r.user_id
+WHERE r.id = sqlc.arg(id)
+  AND r.user_id = sqlc.arg(user_id)
+  AND r.is_active = true;
 
 -- name: ListInstallmentDebts :many
 -- Compras parceladas (kind='installment') do usuário agrupadas por purchase_group_id:
@@ -146,46 +181,52 @@ WHERE EXISTS (
     OR EXISTS (SELECT 1 FROM categories WHERE categories.id = sqlc.narg(category_id) AND categories.user_id = sqlc.arg(user_id))
   );
 
--- name: CreateRecurringRuleWithFirst :execrows
--- Cria uma regra de recorrência E lança a transação do período atual (kind='standard',
--- recurring_rule_id apontando pra regra) numa só query atômica (CTE). O lançamento usa a
--- start_date como competência. Só cria se a conta (e a categoria, se houver) são do usuário —
--- guard no INSERT da regra; se 0 regras criadas, o CTE fica vazio e nada é lançado → 0 linhas
--- afetadas (conta/categoria inválida). end_date XOR max_occurrences é garantido pelo CHECK.
-WITH new_rule AS (
-    INSERT INTO recurring_rules (
-        user_id, account_id, category_id, description, direction, amount,
-        frequency, interval_count, start_date, end_date, max_occurrences
-    )
-    SELECT
-        sqlc.arg(user_id),
-        sqlc.arg(account_id),
-        sqlc.narg(category_id),
-        sqlc.arg(description),
-        sqlc.arg(direction),
-        (sqlc.arg(amount_cents)::bigint)::numeric / 100,
-        sqlc.arg(frequency),
-        sqlc.arg(interval_count)::int,
-        sqlc.arg(start_date)::date,
-        sqlc.narg(end_date)::date,
-        sqlc.narg(max_occurrences)::int
-    WHERE EXISTS (
-        SELECT 1 FROM accounts
-        WHERE accounts.id = sqlc.arg(account_id) AND accounts.user_id = sqlc.arg(user_id) AND accounts.is_archived = false
-    )
-      AND (
-        sqlc.narg(category_id)::uuid IS NULL
-        OR EXISTS (SELECT 1 FROM categories WHERE categories.id = sqlc.narg(category_id) AND categories.user_id = sqlc.arg(user_id))
-      )
-    RETURNING id, account_id, category_id, description, direction, amount, start_date
+-- name: CreateRecurringRule :execrows
+-- Cria uma regra de recorrência (modelo puro — NÃO lança transação; cada ocorrência, inclusive
+-- a do período atual, é registrada pelo botão via RegisterRecurringOccurrence). Só cria se a
+-- conta (e a categoria, se houver) são do usuário — 0 linhas afetadas = conta/categoria inválida.
+-- end_date XOR max_occurrences é garantido pelo CHECK. Centavos → NUMERIC na borda.
+INSERT INTO recurring_rules (
+    user_id, account_id, category_id, description, direction, amount,
+    frequency, interval_count, start_date, end_date, max_occurrences
 )
+SELECT
+    sqlc.arg(user_id),
+    sqlc.arg(account_id),
+    sqlc.narg(category_id),
+    sqlc.arg(description),
+    sqlc.arg(direction),
+    (sqlc.arg(amount_cents)::bigint)::numeric / 100,
+    sqlc.arg(frequency),
+    sqlc.arg(interval_count)::int,
+    sqlc.arg(start_date)::date,
+    sqlc.narg(end_date)::date,
+    sqlc.narg(max_occurrences)::int
+WHERE EXISTS (
+    SELECT 1 FROM accounts
+    WHERE accounts.id = sqlc.arg(account_id) AND accounts.user_id = sqlc.arg(user_id) AND accounts.is_archived = false
+)
+  AND (
+    sqlc.narg(category_id)::uuid IS NULL
+    OR EXISTS (SELECT 1 FROM categories WHERE categories.id = sqlc.narg(category_id) AND categories.user_id = sqlc.arg(user_id))
+  );
+
+-- name: RegisterRecurringOccurrence :one
+-- Lança a transação 'standard' do período atual a partir de uma regra existente (copia
+-- conta/categoria/descrição/sentido/valor da regra; occurred_on = hoje, vindo do service). Só
+-- insere se a regra é do usuário e está ativa — 0 linhas (ErrNoRows no store) → regra inexistente
+-- ou não é do usuário. A checagem de "devido" (1×/período) é feita no service antes desta query.
 INSERT INTO transactions (
     user_id, account_id, category_id, description, kind, direction, amount, occurred_on, recurring_rule_id
 )
 SELECT
-    sqlc.arg(user_id), new_rule.account_id, new_rule.category_id, new_rule.description,
-    'standard', new_rule.direction, new_rule.amount, new_rule.start_date, new_rule.id
-FROM new_rule;
+    r.user_id, r.account_id, r.category_id, r.description,
+    'standard', r.direction, r.amount, sqlc.arg(occurred_on)::date, r.id
+FROM recurring_rules r
+WHERE r.id = sqlc.arg(rule_id)
+  AND r.user_id = sqlc.arg(user_id)
+  AND r.is_active = true
+RETURNING id::text AS id;
 
 -- name: GetTransactionByID :one
 -- Transação única do usuário (escopada por id + user_id) com conta/categoria juntadas,
