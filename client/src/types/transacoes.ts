@@ -38,7 +38,8 @@ export interface CashflowSummary {
 }
 
 // Receita ou despesa recorrente (Salário, Netflix...). direction separa Receitas de
-// Assinaturas no mobile; category é o rótulo ácido ("Evasão Digital").
+// Assinaturas no mobile; category é o rótulo ácido ("Evasão Digital"). isDue: a ocorrência do
+// período corrente ainda não foi registrada → a linha mostra o botão "Registrar".
 export interface Recurrence {
   id: string;
   name: string;
@@ -46,6 +47,7 @@ export interface Recurrence {
   amountCents: number;
   direction: TransactionDirection;
   icon: IconName;
+  isDue: boolean;
 }
 
 // Dívida futura/parcelada. installmentLabel = "Parcela 04/12" ou "Próx. 5 dias";

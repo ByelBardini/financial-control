@@ -62,6 +62,11 @@ export const deleteTransaction = (id: string) => apiDelete(`/transactions/${id}`
 export const createInstallmentPurchase = (input: CreateInstallmentInput) =>
   apiPost<{ created: number }>('/transactions/installment-purchases', input);
 
-// Recorrência ("Fixo"): registra a regra + lança a transação do período atual. Devolve {created}.
+// Recorrência ("Fixo"): registra só a regra (modelo, sem lançar transação). Devolve {created}.
 export const createRecurringRule = (input: CreateRecurringRuleInput) =>
   apiPost<{ created: boolean }>('/recurring-rules', input);
+
+// Registra a ocorrência do período corrente de uma recorrência (lança a transação `standard`,
+// occurred_on=hoje). Devolve a transação criada. 409 se já registrada no período / fora da janela.
+export const registerRecurrence = (id: string) =>
+  apiPost<TransactionDetail>(`/recurring-rules/${id}/register`, {});

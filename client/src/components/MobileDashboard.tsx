@@ -8,6 +8,7 @@ import { DiagnosisCard } from './DiagnosisCard';
 import { InvestmentsSection } from './InvestmentsSection';
 import { QuerySection } from './QuerySection';
 import { TopBar } from './TopBar';
+import { TransactionSpeedDial } from './transacoes/TransactionSpeedDial';
 import {
   useAccounts,
   useCategories,
@@ -16,6 +17,7 @@ import {
   useMonthBalance,
 } from '../hooks/useDashboardQueries';
 import type { AppRoute } from '../navigation/routes';
+import type { TransactionDirection } from '../types/transacoes';
 
 type MobileDashboardProps = {
   hidden: boolean;
@@ -23,6 +25,7 @@ type MobileDashboardProps = {
   route?: AppRoute;
   onNavigate?: (route: AppRoute) => void;
   onLogout?: () => void;
+  onCreateTransaction?: (direction: TransactionDirection) => void;
 };
 
 // Pilha vertical do mobile. Cada seção é uma query independente (loading/erro por
@@ -34,6 +37,7 @@ export function MobileDashboard({
   route = 'dashboard',
   onNavigate,
   onLogout,
+  onCreateTransaction,
 }: MobileDashboardProps) {
   const insets = useSafeAreaInsets();
   const balance = useMonthBalance();
@@ -72,6 +76,9 @@ export function MobileDashboard({
       <View className="absolute bottom-0 left-0 right-0" style={{ paddingBottom: insets.bottom }}>
         <BottomNav currentRoute={route} onNavigate={onNavigate} />
       </View>
+
+      {/* Speed dial por último = fica acima do BottomNav (e do backdrop ao abrir). */}
+      <TransactionSpeedDial onPick={(direction) => onCreateTransaction?.(direction)} />
     </View>
   );
 }

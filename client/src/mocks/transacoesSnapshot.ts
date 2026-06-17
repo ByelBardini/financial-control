@@ -80,6 +80,7 @@ export const transacoesSnapshot: TransacoesSnapshot = {
       amountCents: 500000,
       direction: 'inflow',
       icon: 'payments',
+      isDue: true,
     },
     {
       id: 'dividendos',
@@ -88,6 +89,7 @@ export const transacoesSnapshot: TransacoesSnapshot = {
       amountCents: 50000,
       direction: 'inflow',
       icon: 'trending_up',
+      isDue: false,
     },
     {
       id: 'netflix',
@@ -96,6 +98,7 @@ export const transacoesSnapshot: TransacoesSnapshot = {
       amountCents: 5590,
       direction: 'outflow',
       icon: 'subscriptions',
+      isDue: true,
     },
     {
       id: 'gympass',
@@ -104,6 +107,7 @@ export const transacoesSnapshot: TransacoesSnapshot = {
       amountCents: 12000,
       direction: 'outflow',
       icon: 'fitness_center',
+      isDue: false,
     },
   ],
   debts: [

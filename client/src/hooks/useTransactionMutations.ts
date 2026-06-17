@@ -5,6 +5,7 @@ import {
   createTransaction,
   deleteTransaction,
   getTransaction,
+  registerRecurrence,
   updateTransaction,
 } from '../api/transacoes';
 import type {
@@ -55,6 +56,16 @@ export function useCreateRecurringRule() {
   const invalidate = useInvalidateTransactions();
   return useMutation({
     mutationFn: (input: CreateRecurringRuleInput) => createRecurringRule(input),
+    onSuccess: invalidate,
+  });
+}
+
+// Registra a ocorrência do período corrente de uma recorrência → lança uma transação real, então
+// invalida as mesmas chaves (saldo derivado muda) e a lista de recorrências (o isDue some).
+export function useRegisterRecurrence() {
+  const invalidate = useInvalidateTransactions();
+  return useMutation({
+    mutationFn: (id: string) => registerRecurrence(id),
     onSuccess: invalidate,
   });
 }
