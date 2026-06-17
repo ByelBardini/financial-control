@@ -57,7 +57,8 @@ type CashflowSummary struct {
 	Collapse     PanicMeter `json:"collapse"`
 }
 
-// Recurrence é uma receita/despesa recorrente (de recurring_rules).
+// Recurrence é uma receita/despesa recorrente (de recurring_rules). IsDue: a ocorrência do
+// período corrente ainda não foi registrada → o client mostra o botão "Registrar".
 type Recurrence struct {
 	ID          string `json:"id"`
 	Name        string `json:"name"`
@@ -65,6 +66,7 @@ type Recurrence struct {
 	AmountCents int64  `json:"amountCents"`
 	Direction   string `json:"direction"`
 	Icon        string `json:"icon"`
+	IsDue       bool   `json:"isDue"`
 }
 
 // FutureDebt é uma compra parcelada agregada (progresso + valor da parcela + ironia).

@@ -68,8 +68,9 @@ func (in CreateRecurringRuleInput) validate() error {
 	return nil
 }
 
-// CreateRecurringRule registra a regra E lança a transação do período atual (atômico). 0 linhas
-// (conta/categoria não é do usuário) → ErrTransactionNotFound (o handler responde 400).
+// CreateRecurringRule registra a regra (modelo puro — NÃO lança transação; as ocorrências, inclusive
+// a do período atual, são registradas pelo botão via RegisterOccurrence). 0 linhas (conta/categoria
+// não é do usuário) → ErrTransactionNotFound (o handler responde 400).
 func (s *Service) CreateRecurringRule(ctx context.Context, userID string, in CreateRecurringRuleInput) error {
 	start, _ := time.Parse(occurredOnLayout, in.StartDate) // já validado
 	var end *time.Time
@@ -77,7 +78,7 @@ func (s *Service) CreateRecurringRule(ctx context.Context, userID string, in Cre
 		e, _ := time.Parse(occurredOnLayout, *in.EndDate)
 		end = &e
 	}
-	n, err := s.store.CreateRecurringRuleWithFirst(ctx, userID, store.RecurringRuleInput{
+	n, err := s.store.CreateRecurringRule(ctx, userID, store.RecurringRuleInput{
 		AccountID:      in.AccountID,
 		CategoryID:     normalizeCategory(in.CategoryID),
 		Description:    strings.TrimSpace(in.Description),
@@ -98,14 +99,15 @@ func (s *Service) CreateRecurringRule(ctx context.Context, userID string, in Cre
 	return nil
 }
 
-// RecurringRuleResult é a resposta de criar a recorrência: a regra ficou registrada (aparece
-// em Recorrências) e 1 lançamento do período atual entrou no ledger.
+// RecurringRuleResult é a resposta de criar a recorrência: a regra (modelo) ficou registrada e
+// aparece em Recorrências, pronta pra ter cada ocorrência registrada pelo botão. Nenhum lançamento
+// é criado aqui.
 type RecurringRuleResult struct {
 	Created bool `json:"created"`
 }
 
-// CreateRecurringRuleHandler responde POST /recurring-rules registrando a regra + o lançamento
-// de agora → 201 + {created:true}. Conta/categoria inválida (não é do usuário) → 400.
+// CreateRecurringRuleHandler responde POST /recurring-rules registrando a regra (modelo, sem
+// lançar transação) → 201 + {created:true}. Conta/categoria inválida (não é do usuário) → 400.
 func CreateRecurringRuleHandler(svc *Service) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		userID, ok := authedUserID(w, r)
@@ -121,5 +123,51 @@ func CreateRecurringRuleHandler(svc *Service) http.Handler {
 			return
 		}
 		httpx.WriteJSON(w, http.StatusCreated, RecurringRuleResult{Created: true})
+	})
+}
+
+// ErrOccurrenceNotDue: a ocorrência do período corrente não está disponível pra registro — já foi
+// registrada (1×/período), a regra ainda não começou, ou já encerrou. O handler responde 409.
+var ErrOccurrenceNotDue = errors.New("transacoes: ocorrência do período não está disponível para registro")
+
+// RegisterOccurrence lança a transação do período corrente de uma recorrência (occurred_on = hoje,
+// do relógio injetado) e devolve o recurso criado. Recarrega a regra + agregados e revalida o
+// "devido" (anti clique-duplo): ErrOccurrenceNotDue se o período já foi coberto/está fora da janela;
+// store.ErrTransactionNotFound se a regra não é do usuário ou está inativa.
+func (s *Service) RegisterOccurrence(ctx context.Context, userID, ruleID string) (TransactionDetail, error) {
+	rule, err := s.store.GetRecurringRuleForRegister(ctx, userID, ruleID)
+	if err != nil {
+		return TransactionDetail{}, fmt.Errorf("transacoes: carregar recorrência: %w", err)
+	}
+	today := s.now()
+	if !isDue(rule.Frequency, rule.StartDate, rule.EndDate, rule.MaxOccurrences, rule.LastOccurredOn, rule.OccurrenceCount, today) {
+		return TransactionDetail{}, ErrOccurrenceNotDue
+	}
+	id, err := s.store.RegisterRecurringOccurrence(ctx, userID, ruleID, today)
+	if err != nil {
+		return TransactionDetail{}, fmt.Errorf("transacoes: registrar ocorrência: %w", err)
+	}
+	return s.detail(ctx, userID, id)
+}
+
+// RegisterRecurrenceHandler responde POST /recurring-rules/{id}/register lançando a ocorrência do
+// período corrente → 201 + a transação criada. Já registrada neste período / fora da janela → 409;
+// regra inexistente ou não é do usuário → 404.
+func RegisterRecurrenceHandler(svc *Service) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		userID, ok := authedUserID(w, r)
+		if !ok {
+			return
+		}
+		tx, err := svc.RegisterOccurrence(r.Context(), userID, r.PathValue("id"))
+		if err != nil {
+			if errors.Is(err, ErrOccurrenceNotDue) {
+				httpx.WriteError(w, http.StatusConflict, "esta recorrência já foi registrada neste período")
+				return
+			}
+			writeTransactionError(w, err, http.StatusNotFound, "recorrência não encontrada", "POST /recurring-rules/{id}/register", "erro ao registrar ocorrência")
+			return
+		}
+		httpx.WriteJSON(w, http.StatusCreated, tx)
 	})
 }

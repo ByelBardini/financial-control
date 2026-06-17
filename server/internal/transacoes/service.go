@@ -28,7 +28,9 @@ type TransacoesStore interface {
 	ListCategories(ctx context.Context, userID string) ([]store.CategoryRow, error)
 	CreateTransaction(ctx context.Context, userID string, in store.TransactionInput) (string, error)
 	CreateInstallmentPurchase(ctx context.Context, userID string, in store.InstallmentInput) (int64, error)
-	CreateRecurringRuleWithFirst(ctx context.Context, userID string, in store.RecurringRuleInput) (int64, error)
+	CreateRecurringRule(ctx context.Context, userID string, in store.RecurringRuleInput) (int64, error)
+	GetRecurringRuleForRegister(ctx context.Context, userID, ruleID string) (store.RecurringRuleRow, error)
+	RegisterRecurringOccurrence(ctx context.Context, userID, ruleID string, occurredOn time.Time) (string, error)
 	GetTransactionByID(ctx context.Context, userID, id string) (store.TransactionDetailRow, error)
 	UpdateTransaction(ctx context.Context, userID, id string, in store.TransactionInput) error
 	DeleteTransaction(ctx context.Context, userID, id string) error
@@ -48,16 +50,24 @@ type TransactionQuery struct {
 }
 
 // Service agrega as views da tela de Transações: junta o dado real do store com a
-// personalidade/formatação derivada. Sem estado além do store.
+// personalidade/formatação derivada. now é o relógio (injetável nos testes) usado pra decidir o
+// "devido" das recorrências; sem outro estado além do store.
 type Service struct {
 	store TransacoesStore
+	now   func() time.Time
 }
 
-// NewService injeta a dependência de dados.
+// NewService injeta a dependência de dados (relógio = time.Now).
 //
 //	svc := transacoes.NewService(st)
 func NewService(s TransacoesStore) *Service {
-	return &Service{store: s}
+	return NewServiceWithClock(s, time.Now)
+}
+
+// NewServiceWithClock injeta a dependência de dados + um relógio. Use nos testes pra fixar "hoje"
+// e exercitar o "devido" das recorrências de forma determinística.
+func NewServiceWithClock(s TransacoesStore, now func() time.Time) *Service {
+	return &Service{store: s, now: now}
 }
 
 // CashflowSummary monta o resumo do mês (inflow/outflow/net + barra) e a Previsão de Colapso.
@@ -193,12 +203,14 @@ func pageCount(total, size int) int {
 	return (total + size - 1) / size
 }
 
-// Recurrences devolve as recorrências ativas (sentido mapeado pro client).
+// Recurrences devolve as recorrências ativas (sentido mapeado pro client) + IsDue: se a
+// ocorrência do período corrente ainda está pendente de registro (decidido com o relógio injetado).
 func (s *Service) Recurrences(ctx context.Context, userID string) ([]Recurrence, error) {
 	rows, err := s.store.ListRecurringRules(ctx, userID)
 	if err != nil {
 		return nil, fmt.Errorf("transacoes: listar recorrências: %w", err)
 	}
+	today := s.now()
 	out := make([]Recurrence, 0, len(rows))
 	for _, r := range rows {
 		out = append(out, Recurrence{
@@ -208,6 +220,7 @@ func (s *Service) Recurrences(ctx context.Context, userID string) ([]Recurrence,
 			AmountCents: r.AmountCents,
 			Direction:   directionView(r.Direction),
 			Icon:        r.CategoryIcon,
+			IsDue:       isDue(r.Frequency, r.StartDate, r.EndDate, r.MaxOccurrences, r.LastOccurredOn, r.OccurrenceCount, today),
 		})
 	}
 	return out, nil

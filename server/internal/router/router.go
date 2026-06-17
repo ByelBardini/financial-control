@@ -83,6 +83,7 @@ func New(d Deps) http.Handler {
 	mux.Handle("POST /transactions", protected(transacoes.CreateHandler(d.Transacoes)))
 	mux.Handle("POST /transactions/installment-purchases", protected(transacoes.CreateInstallmentHandler(d.Transacoes)))
 	mux.Handle("POST /recurring-rules", protected(transacoes.CreateRecurringRuleHandler(d.Transacoes)))
+	mux.Handle("POST /recurring-rules/{id}/register", protected(transacoes.RegisterRecurrenceHandler(d.Transacoes)))
 	mux.Handle("GET /transactions/{id}", protected(transacoes.GetTransactionHandler(d.Transacoes)))
 	mux.Handle("PATCH /transactions/{id}", protected(transacoes.UpdateHandler(d.Transacoes)))
 	mux.Handle("DELETE /transactions/{id}", protected(transacoes.DeleteHandler(d.Transacoes)))
