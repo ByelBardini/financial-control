@@ -34,6 +34,7 @@ Leia o doc da área **antes** de abrir a fonte correspondente. Atualize-o após 
 | Área | Doc | Quando ler |
 |---|---|---|
 | Dinheiro / valores | `docs/context/money.md` | qualquer cálculo, storage ou exibição de valor monetário |
+| Transações (domínio) | `docs/context/transacoes.md` | conceito de transação: tipos/`kind`, sentido, recorrência, parcelamento, tags |
 | API Go | `docs/context/server-api.md` | endpoints, handlers, DTOs, validação no server |
 | Banco de dados | `docs/context/database.md` | schema, migrations, queries, pgx/sqlc |
 | App Expo | `docs/context/client-app.md` | telas, componentes, hooks, chamadas à API no client |
