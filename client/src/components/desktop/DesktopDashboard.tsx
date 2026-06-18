@@ -19,6 +19,7 @@ import {
   useMonthBalance,
   useTicker,
 } from '../../hooks/useDashboardQueries';
+import type { MenuAnchor } from '../transacoes/NewTransactionMenu';
 import type { AppRoute } from '../../navigation/routes';
 
 type DesktopDashboardProps = {
@@ -27,6 +28,7 @@ type DesktopDashboardProps = {
   route?: AppRoute;
   onNavigate?: (route: AppRoute) => void;
   onLogout?: () => void;
+  onCreate?: (anchor?: MenuAnchor) => void;
 };
 
 // Layout enterprise: rail fixo + grid de células com bordas finas. Cada célula é
@@ -38,6 +40,7 @@ export function DesktopDashboard({
   route = 'dashboard',
   onNavigate,
   onLogout,
+  onCreate,
 }: DesktopDashboardProps) {
   const balance = useMonthBalance();
   const accounts = useAccounts();
@@ -60,7 +63,7 @@ export function DesktopDashboard({
       />
       <SideNav currentRoute={route} onNavigate={onNavigate} onLogout={onLogout} />
       <ScrollView className="flex-1" contentContainerStyle={{ flexGrow: 1 }}>
-        <DesktopHeader hidden={hidden} onToggleHidden={onToggleHidden} />
+        <DesktopHeader hidden={hidden} onToggleHidden={onToggleHidden} onCreate={onCreate} />
         <View className="flex-1 border-t border-grid-line">
           <QuerySection query={balance} label="o saldo">
             {(data) => <SaldoHero balance={data} hidden={hidden} />}

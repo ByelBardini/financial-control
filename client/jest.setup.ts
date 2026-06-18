@@ -25,3 +25,8 @@ jest.mock('@react-native-async-storage/async-storage', () =>
   // eslint-disable-next-line @typescript-eslint/no-require-imports -- fábrica do jest.mock exige require
   require('@react-native-async-storage/async-storage/jest/async-storage-mock'),
 );
+
+// O DateTimePicker é módulo nativo (não roda no jest). Mockado como host component simples
+// — o DateField nativo só precisa que ele renderize quando aberto; o fluxo de data (from/to)
+// é coberto pelos testes do controlador/api.
+jest.mock('@react-native-community/datetimepicker', () => 'DateTimePicker');

@@ -20,6 +20,10 @@ linters:
         - validade
         - independente
         - convers
+        - progresso
+        - exclusivos
+        - anual
+        - essencial
   exclusions:
     generated: lax
     presets:

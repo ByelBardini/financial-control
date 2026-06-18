@@ -25,17 +25,18 @@ type Account struct {
 }
 
 type Category struct {
-	ID         pgtype.UUID
-	ParentID   pgtype.UUID
-	Name       string
-	Kind       string
-	Color      string
-	Icon       string
-	Tone       string
-	IsArchived bool
-	CreatedAt  pgtype.Timestamptz
-	UpdatedAt  pgtype.Timestamptz
-	UserID     pgtype.UUID
+	ID            pgtype.UUID
+	ParentID      pgtype.UUID
+	Name          string
+	Kind          string
+	Color         string
+	Icon          string
+	Tone          string
+	IsArchived    bool
+	CreatedAt     pgtype.Timestamptz
+	UpdatedAt     pgtype.Timestamptz
+	UserID        pgtype.UUID
+	Essentialness string
 }
 
 type RecurringRule struct {

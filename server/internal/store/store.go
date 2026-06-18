@@ -25,6 +25,11 @@ var ErrUserNotFound = errors.New("usuário não encontrado")
 // arquivada) nas operações escopadas por id+user — o handler a trata como 404.
 var ErrAccountNotFound = errors.New("conta não encontrada")
 
+// ErrTransactionNotFound sinaliza transação inexistente (ou de outro usuário), ou
+// conta/categoria inválida na criação — o handler a trata como 404 (leitura/edição/
+// exclusão) ou 400 (criação, quando a conta/categoria do corpo não é do usuário).
+var ErrTransactionNotFound = errors.New("transação não encontrada")
+
 // AccountRow é uma conta com o saldo já calculado em centavos.
 type AccountRow struct {
 	ID           string
@@ -78,6 +83,124 @@ type CreditAccountRow struct {
 	LimitCents   int64
 	Icon         string
 	DotColor     string
+}
+
+// TransactionRow é uma transação do log, com conta e categoria já juntadas (centavos).
+// OccurredOn é a data de competência (sem hora); a formatação do rótulo é feita no domínio.
+type TransactionRow struct {
+	ID            string
+	OccurredOn    time.Time
+	Description   string
+	AccountName   string
+	CategoryName  string
+	CategoryIcon  string
+	Direction     string
+	AmountCents   int64
+	Kind          string // 'standard'/'installment'/'transfer' — alimenta a tag (Parcelado)
+	IsRecurring   bool   // veio de uma regra (recurring_rule_id) — alimenta a tag (Fixo/Esperado)
+	Essentialness string // 'essential'/'discretionary' da categoria — alimenta a tag (Sobrevivência/Supérfluo)
+}
+
+// RecurringRuleRow é uma regra de recorrência ativa, com a categoria juntada (centavos) e os
+// sinais pro cálculo de "devido" no service: frequência/datas/limite + agregados das transações
+// ligadas (LastOccurredOn = MAX competência, nil se nunca lançada; OccurrenceCount = nº lançadas).
+type RecurringRuleRow struct {
+	ID              string
+	Description     string
+	CategoryName    string
+	CategoryIcon    string
+	Direction       string
+	AmountCents     int64
+	Frequency       string
+	StartDate       time.Time
+	EndDate         *time.Time
+	MaxOccurrences  *int
+	LastOccurredOn  *time.Time
+	OccurrenceCount int
+}
+
+// InstallmentDebtRow é uma compra parcelada agregada por purchase_group_id: progresso
+// (parcelas lançadas / total) + valor da parcela (centavos).
+type InstallmentDebtRow struct {
+	GroupID          string
+	Description      string
+	InstallmentTotal int
+	InstallmentsPaid int
+	InstallmentCents int64
+	CategoryIcon     string
+}
+
+// TransactionFilter são os filtros + paginação do log de transações. Since/Until nil = sem
+// recorte de tempo daquele lado; CategoryIDs vazio = todas as categorias (filtro OR entre
+// as informadas); Query "" = sem busca.
+type TransactionFilter struct {
+	Since       *time.Time
+	Until       *time.Time
+	CategoryIDs []string
+	Query       string
+	Limit       int
+	Offset      int
+}
+
+// CategoryRow é uma categoria do usuário (id + apresentação) p/ o filtro de categoria.
+type CategoryRow struct {
+	ID   string
+	Name string
+	Icon string
+	Kind string
+}
+
+// TransactionInput são os campos graváveis de uma transação 'standard'. Direction em
+// income/expense (mapeado no domínio a partir de inflow/outflow); dinheiro em centavos;
+// CategoryID nil = sem categoria; OccurredOn é a data de competência (sem hora).
+type TransactionInput struct {
+	AccountID   string
+	CategoryID  *string
+	Description string
+	Direction   string
+	AmountCents int64
+	OccurredOn  time.Time
+}
+
+// InstallmentInput é uma compra parcelada (sempre despesa): valor POR parcela + nº de
+// parcelas. A 1ª parcela cai em OccurredOn; as demais, mês a mês.
+type InstallmentInput struct {
+	AccountID   string
+	CategoryID  *string
+	Description string
+	AmountCents int64 // por parcela
+	Total       int
+	OccurredOn  time.Time
+}
+
+// RecurringRuleInput é uma regra de recorrência (Direction em income/expense). Fim opcional:
+// EndDate XOR MaxOccurrences (mutuamente exclusivos; nil/nil = permanente).
+type RecurringRuleInput struct {
+	AccountID      string
+	CategoryID     *string
+	Description    string
+	Direction      string
+	AmountCents    int64
+	Frequency      string // daily/weekly/monthly/yearly
+	IntervalCount  int
+	StartDate      time.Time
+	EndDate        *time.Time
+	MaxOccurrences *int
+}
+
+// TransactionDetailRow é a transação completa (escopada por id+user) com conta/categoria
+// juntadas, em centavos. CategoryID vazio = sem categoria.
+type TransactionDetailRow struct {
+	ID           string
+	AccountID    string
+	CategoryID   string
+	Description  string
+	Direction    string
+	AmountCents  int64
+	OccurredOn   time.Time
+	AccountName  string
+	CategoryName string
+	CategoryIcon string
 }
 
 // AccountDetail é a conta completa (escopada por id+user) com saldo derivado, em centavos.
@@ -293,6 +416,363 @@ func (s *Store) ListCreditAccounts(ctx context.Context, userID string) ([]Credit
 	return out, nil
 }
 
+// ListTransactionsFiltered devolve uma página de transações do usuário (centavos) com os
+// filtros aplicados, mais o total que casou o filtro (do COUNT window, lido da 1ª linha;
+// 0 linhas → total 0). Categoria malformada é ignorada (vira "sem filtro"), não erra.
+func (s *Store) ListTransactionsFiltered(ctx context.Context, userID string, f TransactionFilter) ([]TransactionRow, int, error) {
+	uid, err := uuidArg(userID)
+	if err != nil {
+		return nil, 0, err
+	}
+	rows, err := s.q.ListTransactionsFiltered(ctx, gen.ListTransactionsFilteredParams{
+		UserID:      uid,
+		Since:       dateArgN(f.Since),
+		Until:       dateArgN(f.Until),
+		CategoryIds: uuidSlice(f.CategoryIDs),
+		Q:           f.Query,
+		Lim:         int32(f.Limit),
+		Off:         int32(f.Offset),
+	})
+	if err != nil {
+		return nil, 0, fmt.Errorf("store: listar transações filtradas: %w", err)
+	}
+	out := make([]TransactionRow, 0, len(rows))
+	total := 0
+	for _, r := range rows {
+		total = int(r.TotalCount)
+		out = append(out, TransactionRow{
+			ID:            r.ID,
+			OccurredOn:    r.OccurredOn.Time,
+			Description:   r.Description,
+			AccountName:   r.AccountName,
+			CategoryName:  r.CategoryName,
+			CategoryIcon:  r.CategoryIcon,
+			Direction:     r.Direction,
+			AmountCents:   r.AmountCents,
+			Kind:          r.Kind,
+			IsRecurring:   r.IsRecurring,
+			Essentialness: r.Essentialness,
+		})
+	}
+	return out, total, nil
+}
+
+// ListCategories devolve as categorias ativas do usuário (alimenta o filtro de categoria).
+func (s *Store) ListCategories(ctx context.Context, userID string) ([]CategoryRow, error) {
+	uid, err := uuidArg(userID)
+	if err != nil {
+		return nil, err
+	}
+	rows, err := s.q.ListCategories(ctx, uid)
+	if err != nil {
+		return nil, fmt.Errorf("store: listar categorias: %w", err)
+	}
+	out := make([]CategoryRow, 0, len(rows))
+	for _, r := range rows {
+		out = append(out, CategoryRow{ID: r.ID, Name: r.Name, Icon: r.Icon, Kind: r.Kind})
+	}
+	return out, nil
+}
+
+// ListRecurringRules devolve as regras de recorrência ativas do usuário (centavos).
+func (s *Store) ListRecurringRules(ctx context.Context, userID string) ([]RecurringRuleRow, error) {
+	uid, err := uuidArg(userID)
+	if err != nil {
+		return nil, err
+	}
+	rows, err := s.q.ListActiveRecurringRules(ctx, uid)
+	if err != nil {
+		return nil, fmt.Errorf("store: listar recorrências: %w", err)
+	}
+	out := make([]RecurringRuleRow, 0, len(rows))
+	for _, r := range rows {
+		out = append(out, RecurringRuleRow{
+			ID:              r.ID,
+			Description:     r.Description,
+			CategoryName:    r.CategoryName,
+			CategoryIcon:    r.CategoryIcon,
+			Direction:       r.Direction,
+			AmountCents:     r.AmountCents,
+			Frequency:       r.Frequency,
+			StartDate:       r.StartDate.Time,
+			EndDate:         datePtr(r.EndDate),
+			MaxOccurrences:  int4Ptr(r.MaxOccurrences),
+			LastOccurredOn:  datePtr(r.LastOccurredOn),
+			OccurrenceCount: int(r.OccurrenceCount),
+		})
+	}
+	return out, nil
+}
+
+// ListInstallmentDebts devolve as compras parceladas do usuário agregadas por grupo (centavos).
+func (s *Store) ListInstallmentDebts(ctx context.Context, userID string) ([]InstallmentDebtRow, error) {
+	uid, err := uuidArg(userID)
+	if err != nil {
+		return nil, err
+	}
+	rows, err := s.q.ListInstallmentDebts(ctx, uid)
+	if err != nil {
+		return nil, fmt.Errorf("store: listar dívidas: %w", err)
+	}
+	out := make([]InstallmentDebtRow, 0, len(rows))
+	for _, r := range rows {
+		out = append(out, InstallmentDebtRow{
+			GroupID:          r.GroupID,
+			Description:      r.Description,
+			InstallmentTotal: int(r.InstallmentTotal),
+			InstallmentsPaid: int(r.InstallmentsPaid),
+			InstallmentCents: r.InstallmentCents,
+			CategoryIcon:     r.CategoryIcon,
+		})
+	}
+	return out, nil
+}
+
+// CreateTransaction cria a transação 'standard' do usuário e devolve o novo id. A query
+// só insere se a conta (e a categoria, se houver) são do usuário; 0 linhas →
+// ErrTransactionNotFound (o handler de criação responde 400). Saldo é derivado, então a
+// nova transação já entra nos cálculos de saldo/mês — sem cache pra atualizar.
+func (s *Store) CreateTransaction(ctx context.Context, userID string, in TransactionInput) (string, error) {
+	uid, err := uuidArg(userID)
+	if err != nil {
+		return "", err
+	}
+	aid, err := uuidArg(in.AccountID)
+	if err != nil {
+		return "", ErrTransactionNotFound
+	}
+	cid, err := uuidArgN(in.CategoryID)
+	if err != nil {
+		return "", ErrTransactionNotFound
+	}
+	id, err := s.q.CreateTransaction(ctx, gen.CreateTransactionParams{
+		UserID:      uid,
+		AccountID:   aid,
+		CategoryID:  cid,
+		Description: in.Description,
+		Direction:   in.Direction,
+		AmountCents: in.AmountCents,
+		OccurredOn:  dateArg(in.OccurredOn),
+	})
+	if errors.Is(err, pgx.ErrNoRows) {
+		return "", ErrTransactionNotFound
+	}
+	if err != nil {
+		return "", fmt.Errorf("store: criar transação: %w", err)
+	}
+	return id, nil
+}
+
+// CreateInstallmentPurchase cria as N parcelas (valor por parcela) numa só query atômica e
+// devolve o nº de linhas inseridas. 0 → conta/categoria não é do usuário (handler responde 400).
+func (s *Store) CreateInstallmentPurchase(ctx context.Context, userID string, in InstallmentInput) (int64, error) {
+	uid, err := uuidArg(userID)
+	if err != nil {
+		return 0, err
+	}
+	aid, err := uuidArg(in.AccountID)
+	if err != nil {
+		return 0, ErrTransactionNotFound
+	}
+	cid, err := uuidArgN(in.CategoryID)
+	if err != nil {
+		return 0, ErrTransactionNotFound
+	}
+	n, err := s.q.CreateInstallmentPurchase(ctx, gen.CreateInstallmentPurchaseParams{
+		UserID:      uid,
+		AccountID:   aid,
+		CategoryID:  cid,
+		Description: pgtype.Text{String: in.Description, Valid: true},
+		Total:       int32(in.Total),
+		AmountCents: in.AmountCents,
+		OccurredOn:  dateArg(in.OccurredOn),
+	})
+	if err != nil {
+		return 0, fmt.Errorf("store: criar compra parcelada: %w", err)
+	}
+	return n, nil
+}
+
+// CreateRecurringRule cria a regra de recorrência (modelo puro — NÃO lança transação; cada
+// ocorrência é registrada depois via RegisterRecurringOccurrence). Devolve o nº de regras criadas
+// (1 = ok; 0 = conta/categoria não é do usuário → handler responde 400).
+func (s *Store) CreateRecurringRule(ctx context.Context, userID string, in RecurringRuleInput) (int64, error) {
+	uid, err := uuidArg(userID)
+	if err != nil {
+		return 0, err
+	}
+	aid, err := uuidArg(in.AccountID)
+	if err != nil {
+		return 0, ErrTransactionNotFound
+	}
+	cid, err := uuidArgN(in.CategoryID)
+	if err != nil {
+		return 0, ErrTransactionNotFound
+	}
+	n, err := s.q.CreateRecurringRule(ctx, gen.CreateRecurringRuleParams{
+		UserID:         uid,
+		AccountID:      aid,
+		CategoryID:     cid,
+		Description:    in.Description,
+		Direction:      in.Direction,
+		AmountCents:    in.AmountCents,
+		Frequency:      in.Frequency,
+		IntervalCount:  int32(in.IntervalCount),
+		StartDate:      dateArg(in.StartDate),
+		EndDate:        dateArgN(in.EndDate),
+		MaxOccurrences: int4ArgN(in.MaxOccurrences),
+	})
+	if err != nil {
+		return 0, fmt.Errorf("store: criar recorrência: %w", err)
+	}
+	return n, nil
+}
+
+// GetRecurringRuleForRegister devolve uma regra ativa do usuário (escopada por id+user) com os
+// sinais de "devido" (frequência/datas/limite + agregados). ErrTransactionNotFound quando não
+// existe, não é do usuário ou está inativa.
+func (s *Store) GetRecurringRuleForRegister(ctx context.Context, userID, ruleID string) (RecurringRuleRow, error) {
+	uid, err := uuidArg(userID)
+	if err != nil {
+		return RecurringRuleRow{}, err
+	}
+	rid, err := uuidArg(ruleID)
+	if err != nil {
+		return RecurringRuleRow{}, ErrTransactionNotFound
+	}
+	r, err := s.q.GetRecurringRuleForRegister(ctx, gen.GetRecurringRuleForRegisterParams{ID: rid, UserID: uid})
+	if errors.Is(err, pgx.ErrNoRows) {
+		return RecurringRuleRow{}, ErrTransactionNotFound
+	}
+	if err != nil {
+		return RecurringRuleRow{}, fmt.Errorf("store: buscar recorrência por id: %w", err)
+	}
+	return RecurringRuleRow{
+		ID:              r.ID,
+		Description:     r.Description,
+		CategoryName:    r.CategoryName,
+		CategoryIcon:    r.CategoryIcon,
+		Direction:       r.Direction,
+		AmountCents:     r.AmountCents,
+		Frequency:       r.Frequency,
+		StartDate:       r.StartDate.Time,
+		EndDate:         datePtr(r.EndDate),
+		MaxOccurrences:  int4Ptr(r.MaxOccurrences),
+		LastOccurredOn:  datePtr(r.LastOccurredOn),
+		OccurrenceCount: int(r.OccurrenceCount),
+	}, nil
+}
+
+// RegisterRecurringOccurrence lança a transação 'standard' do período atual a partir de uma regra
+// (copia os campos dela; occurredOn = hoje, vindo do service) e devolve o id da nova transação.
+// ErrTransactionNotFound quando a regra não é do usuário ou está inativa.
+func (s *Store) RegisterRecurringOccurrence(ctx context.Context, userID, ruleID string, occurredOn time.Time) (string, error) {
+	uid, err := uuidArg(userID)
+	if err != nil {
+		return "", err
+	}
+	rid, err := uuidArg(ruleID)
+	if err != nil {
+		return "", ErrTransactionNotFound
+	}
+	id, err := s.q.RegisterRecurringOccurrence(ctx, gen.RegisterRecurringOccurrenceParams{
+		RuleID:     rid,
+		UserID:     uid,
+		OccurredOn: dateArg(occurredOn),
+	})
+	if errors.Is(err, pgx.ErrNoRows) {
+		return "", ErrTransactionNotFound
+	}
+	if err != nil {
+		return "", fmt.Errorf("store: registrar ocorrência da recorrência: %w", err)
+	}
+	return id, nil
+}
+
+// GetTransactionByID devolve a transação do usuário (escopada por id+user) com conta e
+// categoria juntadas. ErrTransactionNotFound quando não existe ou não é do usuário.
+func (s *Store) GetTransactionByID(ctx context.Context, userID, id string) (TransactionDetailRow, error) {
+	uid, err := uuidArg(userID)
+	if err != nil {
+		return TransactionDetailRow{}, err
+	}
+	tid, err := uuidArg(id)
+	if err != nil {
+		return TransactionDetailRow{}, ErrTransactionNotFound
+	}
+	row, err := s.q.GetTransactionByID(ctx, gen.GetTransactionByIDParams{ID: tid, UserID: uid})
+	if errors.Is(err, pgx.ErrNoRows) {
+		return TransactionDetailRow{}, ErrTransactionNotFound
+	}
+	if err != nil {
+		return TransactionDetailRow{}, fmt.Errorf("store: buscar transação por id: %w", err)
+	}
+	return TransactionDetailRow{
+		ID:           row.ID,
+		AccountID:    row.AccountID,
+		CategoryID:   row.CategoryID,
+		Description:  row.Description,
+		Direction:    row.Direction,
+		AmountCents:  row.AmountCents,
+		OccurredOn:   row.OccurredOn.Time,
+		AccountName:  row.AccountName,
+		CategoryName: row.CategoryName,
+		CategoryIcon: row.CategoryIcon,
+	}, nil
+}
+
+// UpdateTransaction edita a transação (escopada por id+user; não troca de conta).
+// ErrTransactionNotFound quando não existe (ou a categoria nova não é do usuário).
+func (s *Store) UpdateTransaction(ctx context.Context, userID, id string, in TransactionInput) error {
+	uid, err := uuidArg(userID)
+	if err != nil {
+		return err
+	}
+	tid, err := uuidArg(id)
+	if err != nil {
+		return ErrTransactionNotFound
+	}
+	cid, err := uuidArgN(in.CategoryID)
+	if err != nil {
+		return ErrTransactionNotFound
+	}
+	if _, err := s.q.UpdateTransaction(ctx, gen.UpdateTransactionParams{
+		CategoryID:  cid,
+		Description: in.Description,
+		Direction:   in.Direction,
+		AmountCents: in.AmountCents,
+		OccurredOn:  dateArg(in.OccurredOn),
+		ID:          tid,
+		UserID:      uid,
+	}); err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return ErrTransactionNotFound
+		}
+		return fmt.Errorf("store: editar transação: %w", err)
+	}
+	return nil
+}
+
+// DeleteTransaction exclui a transação (hard delete, escopada por id+user).
+// ErrTransactionNotFound quando não existe ou não é do usuário.
+func (s *Store) DeleteTransaction(ctx context.Context, userID, id string) error {
+	uid, err := uuidArg(userID)
+	if err != nil {
+		return err
+	}
+	tid, err := uuidArg(id)
+	if err != nil {
+		return ErrTransactionNotFound
+	}
+	if _, err := s.q.DeleteTransaction(ctx, gen.DeleteTransactionParams{ID: tid, UserID: uid}); err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return ErrTransactionNotFound
+		}
+		return fmt.Errorf("store: excluir transação: %w", err)
+	}
+	return nil
+}
+
 // CreateAccount cria a conta do usuário e devolve o novo id.
 func (s *Store) CreateAccount(ctx context.Context, userID string, in AccountInput) (string, error) {
 	uid, err := uuidArg(userID)
@@ -440,9 +920,68 @@ func uuidArg(s string) (pgtype.UUID, error) {
 	return u, nil
 }
 
+// uuidArgN converte um *string opcional no pgtype.UUID das queries (nil = NULL). Formato
+// inválido falha fechado (erro), pra não virar um NULL silencioso.
+func uuidArgN(s *string) (pgtype.UUID, error) {
+	if s == nil {
+		return pgtype.UUID{}, nil
+	}
+	return uuidArg(*s)
+}
+
+// uuidSlice converte ids (strings do client) em []pgtype.UUID, descartando os malformados.
+// Usado no filtro multi-categoria (`= ANY`): id inválido simplesmente não entra na lista.
+func uuidSlice(ids []string) []pgtype.UUID {
+	out := make([]pgtype.UUID, 0, len(ids))
+	for _, id := range ids {
+		if u, err := uuidArg(id); err == nil {
+			out = append(out, u)
+		}
+	}
+	return out
+}
+
 // dateArg converte um time.Time para o pgtype.Date esperado pelas queries de mês.
 func dateArg(t time.Time) pgtype.Date {
 	return pgtype.Date{Time: t, Valid: true}
+}
+
+// dateArgN converte um *time.Time opcional no pgtype.Date das queries (nil = NULL),
+// usado pelo filtro de período (Since) do log de transações.
+func dateArgN(t *time.Time) pgtype.Date {
+	if t == nil {
+		return pgtype.Date{}
+	}
+	return pgtype.Date{Time: *t, Valid: true}
+}
+
+// int4ArgN converte um *int opcional no pgtype.Int4 das queries (nil = NULL), usado pelo
+// max_occurrences (fim opcional) da regra de recorrência.
+func int4ArgN(n *int) pgtype.Int4 {
+	if n == nil {
+		return pgtype.Int4{}
+	}
+	return pgtype.Int4{Int32: int32(*n), Valid: true}
+}
+
+// datePtr lê um pgtype.Date nullable das queries num *time.Time (NULL → nil) — usado pelos
+// campos opcionais da regra de recorrência (end_date, last_occurred_on agregado).
+func datePtr(d pgtype.Date) *time.Time {
+	if !d.Valid {
+		return nil
+	}
+	t := d.Time
+	return &t
+}
+
+// int4Ptr lê um pgtype.Int4 nullable das queries num *int (NULL → nil) — usado pelo
+// max_occurrences da regra de recorrência.
+func int4Ptr(n pgtype.Int4) *int {
+	if !n.Valid {
+		return nil
+	}
+	v := int(n.Int32)
+	return &v
 }
 
 // textArg converte um *string opcional no pgtype.Text das queries (nil = NULL no banco).

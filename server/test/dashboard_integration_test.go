@@ -26,6 +26,7 @@ import (
 	"financial-control/server/internal/dashboard"
 	"financial-control/server/internal/router"
 	"financial-control/server/internal/store"
+	"financial-control/server/internal/transacoes"
 )
 
 // itestSecret assina os tokens nos testes de integração (bypassa o config.Load).
@@ -35,10 +36,11 @@ const itestSecret = "integration-test-secret-0123456789"
 func newServer(t *testing.T, st *store.Store) *httptest.Server {
 	t.Helper()
 	srv := httptest.NewServer(router.New(router.Deps{
-		Auth:      auth.NewService(st, auth.NewTokenIssuer(itestSecret), auth.TTLs{Default: time.Hour, Remember: time.Hour}),
-		Account:   account.NewService(st),
-		Dashboard: dashboard.NewService(st),
-		Contas:    contas.NewService(st),
+		Auth:       auth.NewService(st, auth.NewTokenIssuer(itestSecret), auth.TTLs{Default: time.Hour, Remember: time.Hour}),
+		Account:    account.NewService(st),
+		Dashboard:  dashboard.NewService(st),
+		Contas:     contas.NewService(st),
+		Transacoes: transacoes.NewService(st),
 	}))
 	t.Cleanup(srv.Close)
 	return srv

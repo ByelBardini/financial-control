@@ -30,6 +30,17 @@ describe('DesktopDashboard', () => {
     expect(onToggleHidden).toHaveBeenCalledTimes(1);
   });
 
+  it('encaminha onCreate do header ao tocar em "Nova transação"', async () => {
+    const onCreate = jest.fn();
+    await renderWithClient(
+      <DesktopDashboard hidden={false} onToggleHidden={jest.fn()} onCreate={onCreate} />,
+    );
+    await screen.findByText('Disponível para gastar'); // espera as queries assentarem
+
+    await userEvent.setup().press(screen.getByRole('button', { name: 'Nova transação' }));
+    expect(onCreate).toHaveBeenCalledTimes(1);
+  });
+
   it('isola erro de painel com dupla dependência (QuerySection2) sem derrubar o resto', async () => {
     // EsteMesPanel depende de esteMes + diagnosis; basta uma falhar pro painel virar erro
     jest.mocked(api.getEsteMes).mockRejectedValue(new Error('boom'));

@@ -9,7 +9,7 @@ type NavEntry = { label: string; icon: IconName; route?: AppRoute };
 // Destinos com route definida navegam; os demais ainda são decorativos.
 const NAV_ENTRIES: NavEntry[] = [
   { label: 'Início', icon: 'home', route: 'dashboard' },
-  { label: 'Transações', icon: 'swap_horiz' },
+  { label: 'Transações', icon: 'swap_horiz', route: 'transacoes' },
   { label: 'Contas', icon: 'account_balance_wallet', route: 'contas' },
   { label: 'Investimentos', icon: 'trending_up' },
   { label: 'Ajustes', icon: 'settings' },
