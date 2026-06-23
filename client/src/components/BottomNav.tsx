@@ -10,7 +10,7 @@ const NAV_ENTRIES: NavEntry[] = [
   { label: 'Início', icon: 'dashboard', route: 'dashboard' },
   { label: 'Transações', icon: 'receipt_long', route: 'transacoes' },
   { label: 'Contas', icon: 'account_balance_wallet', route: 'contas' },
-  { label: 'Investimentos', icon: 'trending_up' },
+  { label: 'Investimentos', icon: 'trending_up', route: 'investimentos' },
   { label: 'Ajustes', icon: 'settings' },
 ];
 
