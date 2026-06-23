@@ -36,11 +36,20 @@ describe('BottomNav', () => {
     expect(onNavigate).toHaveBeenCalledWith('transacoes');
   });
 
-  it('não navega ao tocar num destino decorativo', async () => {
+  it('navega para Investimentos ao tocar no destino', async () => {
     const onNavigate = jest.fn();
     await render(<BottomNav currentRoute="dashboard" onNavigate={onNavigate} />);
 
     await userEvent.setup().press(screen.getByRole('button', { name: 'Investimentos' }));
+
+    expect(onNavigate).toHaveBeenCalledWith('investimentos');
+  });
+
+  it('não navega ao tocar num destino decorativo', async () => {
+    const onNavigate = jest.fn();
+    await render(<BottomNav currentRoute="dashboard" onNavigate={onNavigate} />);
+
+    await userEvent.setup().press(screen.getByRole('button', { name: 'Ajustes' }));
 
     expect(onNavigate).not.toHaveBeenCalled();
   });
