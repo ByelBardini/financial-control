@@ -64,6 +64,12 @@ A fórmula "média só das compras" daria 6,40 (errado). Há teste de integraç�
 (posição recomputa + **cascata** a transação de caixa). O detalhe (`AssetDetail.trades[]`) traz o `accountId`
 de cada operação. DTOs e validação em `internal/investimentos/crud.go`.
 
+**UI de compra/venda (client):** o form **pré-preenche o preço unitário** com o `currentPrice` do ativo
+(editável). O usuário informa por **quantidade** (o total sai do preço) ou — toggle **só em cripto**, que
+abre nele — por **valor em R$** (a quantidade = valor ÷ preço é derivada **no client**, 8 casas). O corpo
+enviado é **sempre** `quantity` + `unitPriceCents` — o backend não muda; o `amount` (caixa) segue `qtd ×
+preço` em NUMERIC no SQL.
+
 **Não confundir** com os stubs do Dashboard (`/investments`, `/dashboard/investments-summary`,
 `/dashboard/ticker`) — são do bloco "Investimentos (Risos)" da Início, intactos e separados desta tela.
 
