@@ -340,7 +340,7 @@ func (s *Store) RecordTrade(ctx context.Context, userID, assetID, side, ticker s
 	if err != nil {
 		return fmt.Errorf("store: abrir transação: %w", err)
 	}
-	defer tx.Rollback(ctx)
+	defer func() { _ = tx.Rollback(ctx) }() // no-op após Commit; rollback só atua se retornarmos antes
 	q := s.q.WithTx(tx)
 
 	var tradeID string
