@@ -171,8 +171,8 @@ Valores `*Cents`/monetários são **int64 em centavos**.
 | `AssetPosition[]` | `/investimentos/assets` | metadados + `currentPriceCents`, `netQuantity` (**string**), `avgPriceCents`, `costBasisCents`, `currentValueCents`, `gainCents`, `gainPct`, `realizedCents` |
 | `CreateAssetInput` (req) | `POST /investimentos/assets` | `ticker`, `name`, `assetClass` (acoes/fiis/renda_fixa/cripto), `icon`, `currentPriceCents` |
 | `UpdateAssetInput` (req) | `PATCH /investimentos/assets/{id}` | igual ao Create **menos `assetClass`** (imutável) |
-| `CreateTradeInput` (req) | `POST /investimentos/assets/{id}/trades` | `side` (buy/sell), `quantity` (**string decimal**, até 8 casas, > 0), `unitPriceCents`, `tradedOn` (YYYY-MM-DD) |
-| `AssetDetail` | `GET/POST/PATCH /investimentos/assets/{id}` | `AssetPosition` + `trades[]` (`Trade`: `id`/`side`/`quantity`/`unitPriceCents`/`tradedOn`) |
+| `CreateTradeInput` (req) | `POST /investimentos/assets/{id}/trades` | `side` (buy/sell), `quantity` (**string decimal**, até 8 casas, > 0), `unitPriceCents`, `tradedOn` (YYYY-MM-DD), **`accountId`** (conta de liquidação, **obrigatória** — compra debita / venda credita) |
+| `AssetDetail` | `GET/POST/PATCH /investimentos/assets/{id}` | `AssetPosition` + `trades[]` (`Trade`: `id`/`side`/`quantity`/`unitPriceCents`/`tradedOn`/**`accountId`** — vazio nos trades legados/seed sem caixa) |
 | `Investment[]` | `/investments` | `id`, `name`, `valueCents`, `dailyChangePct`, `icon` — **stub `[]`** (bloco do Dashboard, separado da tela nova) |
 | `InvestmentsSummary` | `/dashboard/investments-summary` | `totalCents`, `changeCents`, `changePct` — **stub zerado** |
 | `Ticker` | `/dashboard/ticker` | `name`, `symbol`, `changePct24h`, `priceCents`, `positionCents` — **stub** com `name:"Bitcoin"`/`symbol:"B"`, resto zerado |
