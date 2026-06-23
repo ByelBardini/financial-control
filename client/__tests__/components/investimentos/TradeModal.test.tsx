@@ -4,6 +4,7 @@ import * as dashApi from '../../../src/api/dashboard';
 import { TradeModal } from '../../../src/components/investimentos/TradeModal';
 import { renderWithClient } from '../../_support/renderWithClient';
 import type { Account } from '../../../src/types/dashboard';
+import type { AssetDetail } from '../../../src/types/investimentos';
 
 jest.mock('../../../src/api/investimentos');
 jest.mock('../../../src/api/dashboard');
@@ -15,28 +16,43 @@ const accounts: Account[] = [
   { id: 'acc-2', name: 'Binance', balanceCents: 145000, icon: 'currency_bitcoin', tone: 'neutral', dotColor: '#f3ba2f' },
 ];
 
-describe('TradeModal — comprar', () => {
-  it('liquida a compra na conta pré-selecionada e fecha', async () => {
+const baseAsset: AssetDetail = {
+  id: 'a1',
+  ticker: 'WEGE3',
+  name: 'WEG ON',
+  assetClass: 'acoes',
+  icon: 'corporate_fare',
+  currentPriceCents: 5000,
+  netQuantity: '0.00000000',
+  avgPriceCents: 0,
+  costBasisCents: 0,
+  currentValueCents: 0,
+  gainCents: 0,
+  gainPct: 0,
+  realizedCents: 0,
+  trades: [],
+};
+
+describe('TradeModal — ação (modo quantidade)', () => {
+  it('usa o preço atual do ativo e liquida na conta pré-selecionada', async () => {
+    jest.mocked(api.getAsset).mockResolvedValue(baseAsset);
     jest.mocked(dashApi.getAccounts).mockResolvedValue(accounts);
     jest.mocked(api.createTrade).mockResolvedValue({} as never);
     const onClose = jest.fn();
-    await renderWithClient(
-      <TradeModal assetId="a1" ticker="WEGE3" side="buy" onClose={onClose} />,
-    );
+    await renderWithClient(<TradeModal assetId="a1" ticker="WEGE3" side="buy" onClose={onClose} />);
     const user = userEvent.setup();
 
-    await screen.findByLabelText('Quantidade'); // espera o form (contas carregaram)
-    expect(screen.getByRole('header', { name: 'Comprar WEGE3' })).toBeOnTheScreen();
-    await user.type(screen.getByLabelText('Quantidade'), '10');
-    await user.type(screen.getByLabelText('Preço unitário'), '1000');
-    await user.press(screen.getByRole('button', { name: 'Comprar WEGE3' }));
+    await screen.findByLabelText('Quantidade'); // espera asset + contas (sem toggle de modo)
+    expect(screen.queryByRole('button', { name: 'Por valor' })).toBeNull();
+    await user.type(screen.getByLabelText('Quantidade'), '10'); // não digita preço
 
+    await user.press(screen.getByRole('button', { name: 'Comprar WEGE3' }));
     expect(api.createTrade).toHaveBeenCalledWith(
       'a1',
       expect.objectContaining({
         side: 'buy',
         quantity: '10',
-        unitPriceCents: 1000,
+        unitPriceCents: 5000, // veio do ativo
         accountId: 'acc-1',
       }),
     );
@@ -44,26 +60,36 @@ describe('TradeModal — comprar', () => {
   });
 });
 
-describe('TradeModal — vender', () => {
-  it('mostra "Conta de destino" e escolhe outra conta antes de vender', async () => {
+describe('TradeModal — cripto (modo valor)', () => {
+  it('abre em "Por valor", deriva a quantidade do valor e submete na conta escolhida', async () => {
+    jest.mocked(api.getAsset).mockResolvedValue({
+      ...baseAsset,
+      ticker: 'BTC',
+      name: 'Bitcoin',
+      assetClass: 'cripto',
+      icon: 'currency_bitcoin',
+      currentPriceCents: 30000000, // R$ 300.000,00
+    });
     jest.mocked(dashApi.getAccounts).mockResolvedValue(accounts);
     jest.mocked(api.createTrade).mockResolvedValue({} as never);
     const onClose = jest.fn();
-    await renderWithClient(
-      <TradeModal assetId="a1" ticker="BTC" side="sell" onClose={onClose} />,
-    );
+    await renderWithClient(<TradeModal assetId="a1" ticker="BTC" side="buy" onClose={onClose} />);
     const user = userEvent.setup();
 
-    await screen.findByLabelText('Quantidade');
-    await user.type(screen.getByLabelText('Quantidade'), '0.5');
-    await user.type(screen.getByLabelText('Preço unitário'), '15000000');
-    await user.press(screen.getByLabelText('Conta de destino: Nubank'));
+    await screen.findByLabelText('Valor a investir'); // cripto abre em valor
+    await user.type(screen.getByLabelText('Valor a investir'), '10000'); // R$100,00 → 0.00033333 BTC
+    await user.press(screen.getByLabelText('Conta de origem: Nubank'));
     await user.press(screen.getByRole('menuitem', { name: 'Binance' }));
-    await user.press(screen.getByRole('button', { name: 'Vender BTC' }));
+    await user.press(screen.getByRole('button', { name: 'Comprar BTC' }));
 
     expect(api.createTrade).toHaveBeenCalledWith(
       'a1',
-      expect.objectContaining({ side: 'sell', quantity: '0.5', accountId: 'acc-2' }),
+      expect.objectContaining({
+        side: 'buy',
+        quantity: '0.00033333', // DERIVADA do valor
+        unitPriceCents: 30000000,
+        accountId: 'acc-2',
+      }),
     );
     await waitFor(() => expect(onClose).toHaveBeenCalledTimes(1));
   });

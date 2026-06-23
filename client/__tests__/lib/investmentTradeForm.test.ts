@@ -1,15 +1,29 @@
 import {
+  deriveQuantityFromValue,
   initialTradeValues,
   isPositiveDecimal,
+  resolveQuantity,
   toCreateTradeInput,
   validateTradeForm,
   type TradeFormValues,
 } from '../../src/lib/investmentTradeForm';
 
-const valid: TradeFormValues = {
+const byQuantity: TradeFormValues = {
   side: 'buy',
+  mode: 'quantity',
   quantity: '10.5',
+  amountCents: 0,
   unitPriceCents: 1000,
+  tradedOn: '2026-06-19',
+  accountId: 'acc-1',
+};
+
+const byValue: TradeFormValues = {
+  side: 'buy',
+  mode: 'value',
+  quantity: '',
+  amountCents: 10000, // R$ 100,00
+  unitPriceCents: 30000000, // BTC a R$ 300.000,00
   tradedOn: '2026-06-19',
   accountId: 'acc-1',
 };
@@ -24,48 +38,102 @@ describe('isPositiveDecimal (espelha o backend)', () => {
   });
 });
 
+describe('deriveQuantityFromValue', () => {
+  it('R$100 a R$300.000 → 0.00033333 (8 casas)', () => {
+    expect(deriveQuantityFromValue(10000, 30000000)).toBe('0.00033333');
+  });
+
+  it('tira zeros à direita (R$50 a R$100 → "0.5")', () => {
+    expect(deriveQuantityFromValue(5000, 10000)).toBe('0.5');
+  });
+
+  it('inteiro puro sem casas (R$200 a R$100 → "2")', () => {
+    expect(deriveQuantityFromValue(20000, 10000)).toBe('2');
+  });
+
+  it('vazio quando preço ou valor ≤ 0', () => {
+    expect(deriveQuantityFromValue(10000, 0)).toBe('');
+    expect(deriveQuantityFromValue(0, 10000)).toBe('');
+  });
+});
+
 describe('initialTradeValues', () => {
-  it('parte do lado dado, conta vazia e a data de hoje (injetada)', () => {
-    const v = initialTradeValues('sell', '2026-06-19');
-    expect(v).toEqual({
-      side: 'sell',
+  it('cripto abre em "valor" com o preço do ativo pré-preenchido', () => {
+    expect(initialTradeValues('buy', '2026-06-19', 30000000, true)).toEqual({
+      side: 'buy',
+      mode: 'value',
       quantity: '',
-      unitPriceCents: 0,
+      amountCents: 0,
+      unitPriceCents: 30000000,
       tradedOn: '2026-06-19',
       accountId: '',
     });
   });
+
+  it('não-cripto abre em "quantidade"', () => {
+    expect(initialTradeValues('sell', '2026-06-19', 5000, false).mode).toBe('quantity');
+  });
+});
+
+describe('resolveQuantity', () => {
+  it('modo quantidade usa a quantidade digitada (com trim)', () => {
+    expect(resolveQuantity({ ...byQuantity, quantity: ' 10.5 ' })).toBe('10.5');
+  });
+
+  it('modo valor deriva a quantidade do valor ÷ preço', () => {
+    expect(resolveQuantity(byValue)).toBe('0.00033333');
+  });
 });
 
 describe('validateTradeForm', () => {
-  it('sem erros quando tudo é válido', () => {
-    expect(validateTradeForm(valid)).toEqual({});
+  it('sem erros quando válido (quantidade)', () => {
+    expect(validateTradeForm(byQuantity)).toEqual({});
   });
 
-  it('cobra quantidade positiva', () => {
-    expect(validateTradeForm({ ...valid, quantity: '0' }).quantity).toBeDefined();
-    expect(validateTradeForm({ ...valid, quantity: '' }).quantity).toBeDefined();
+  it('sem erros quando válido (valor)', () => {
+    expect(validateTradeForm(byValue)).toEqual({});
   });
 
-  it('cobra preço maior que zero', () => {
-    expect(validateTradeForm({ ...valid, unitPriceCents: 0 }).unitPrice).toBeDefined();
+  it('modo quantidade cobra quantidade positiva', () => {
+    expect(validateTradeForm({ ...byQuantity, quantity: '0' }).quantity).toBeDefined();
   });
 
-  it('cobra a conta de liquidação', () => {
-    expect(validateTradeForm({ ...valid, accountId: '' }).account).toBeDefined();
+  it('modo valor cobra valor maior que zero', () => {
+    expect(validateTradeForm({ ...byValue, amountCents: 0 }).amount).toBeDefined();
   });
 
-  it('cobra data no formato AAAA-MM-DD', () => {
-    expect(validateTradeForm({ ...valid, tradedOn: '19/06/2026' }).date).toBeDefined();
+  it('modo valor acusa valor pequeno demais pro preço (qtd derivada zera nas 8 casas)', () => {
+    // R$0,01 a R$3.000.000 → 0.0000000033 → arredonda a 8 casas pra zero.
+    expect(validateTradeForm({ ...byValue, amountCents: 1, unitPriceCents: 300000000 }).amount).toBeDefined();
+  });
+
+  it('cobra preço maior que zero em ambos os modos', () => {
+    expect(validateTradeForm({ ...byQuantity, unitPriceCents: 0 }).unitPrice).toBeDefined();
+    expect(validateTradeForm({ ...byValue, unitPriceCents: 0 }).unitPrice).toBeDefined();
+  });
+
+  it('cobra a conta de liquidação e a data', () => {
+    expect(validateTradeForm({ ...byQuantity, accountId: '' }).account).toBeDefined();
+    expect(validateTradeForm({ ...byQuantity, tradedOn: '19/06/2026' }).date).toBeDefined();
   });
 });
 
 describe('toCreateTradeInput', () => {
-  it('serializa o corpo (quantidade trim, sem campos extras)', () => {
-    expect(toCreateTradeInput({ ...valid, quantity: ' 10.5 ' })).toEqual({
+  it('modo quantidade serializa a quantidade digitada', () => {
+    expect(toCreateTradeInput(byQuantity)).toEqual({
       side: 'buy',
       quantity: '10.5',
       unitPriceCents: 1000,
+      tradedOn: '2026-06-19',
+      accountId: 'acc-1',
+    });
+  });
+
+  it('modo valor serializa a quantidade DERIVADA (não o valor)', () => {
+    expect(toCreateTradeInput(byValue)).toEqual({
+      side: 'buy',
+      quantity: '0.00033333',
+      unitPriceCents: 30000000,
       tradedOn: '2026-06-19',
       accountId: 'acc-1',
     });
