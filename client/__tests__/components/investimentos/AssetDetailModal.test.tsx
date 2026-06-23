@@ -75,6 +75,17 @@ describe('AssetDetailModal', () => {
     expect(onEdit).toHaveBeenCalledTimes(1);
   });
 
+  it('lista vazia mostra "Sem operações ainda."', async () => {
+    jest.mocked(api.getAsset).mockResolvedValue({ ...detail, trades: [] });
+    await renderWithClient(
+      <AssetDetailModal assetId="a1" onClose={jest.fn()} onTrade={jest.fn()} onEdit={jest.fn()} />,
+    );
+
+    await screen.findByText('WEGE3');
+    expect(screen.getByText('Sem operações ainda.')).toBeOnTheScreen();
+    expect(screen.queryByText('Compra')).toBeNull();
+  });
+
   it('exclui uma operação (reverte o caixa via cascade)', async () => {
     const { onClose, onTrade, onEdit } = setup();
     jest.mocked(api.deleteTrade).mockResolvedValue(undefined);

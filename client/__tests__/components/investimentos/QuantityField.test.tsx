@@ -24,6 +24,26 @@ describe('sanitizeQuantity', () => {
   it('aceita inteiro puro', () => {
     expect(sanitizeQuantity('100')).toBe('100');
   });
+
+  it('vazio continua vazio', () => {
+    expect(sanitizeQuantity('')).toBe('');
+  });
+
+  it('preserva zeros à esquerda (sem normalizar)', () => {
+    expect(sanitizeQuantity('00123.45')).toBe('00123.45');
+  });
+
+  it('múltiplas vírgulas viram um único ponto', () => {
+    expect(sanitizeQuantity('1,2,3')).toBe('1.23');
+  });
+
+  it('trunca a 9ª casa pra 8', () => {
+    expect(sanitizeQuantity('0.000000001')).toBe('0.00000000');
+  });
+
+  it('só o ponto passa intacto (a validação é quem rejeita)', () => {
+    expect(sanitizeQuantity('.')).toBe('.');
+  });
 });
 
 describe('QuantityField', () => {

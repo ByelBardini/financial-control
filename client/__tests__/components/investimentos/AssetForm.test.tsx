@@ -82,4 +82,9 @@ describe('AssetForm — editar', () => {
     );
     expect(screen.getByRole('alert')).toHaveTextContent('Não rolou criar agora.');
   });
+
+  it('modo criar NÃO mostra arquivar', async () => {
+    await render(<AssetForm mode="create" initial={initialAssetValues()} onSubmit={jest.fn()} />);
+    expect(screen.queryByRole('button', { name: 'Arquivar ativo' })).toBeNull();
+  });
 });

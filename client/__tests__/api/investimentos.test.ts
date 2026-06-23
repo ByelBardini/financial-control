@@ -86,6 +86,33 @@ describe('api/investimentos — getRiskAssessment (derivado)', () => {
     expect(client.apiGet).toHaveBeenCalledWith('/investimentos/summary');
     expect(client.apiGet).toHaveBeenCalledWith('/investimentos/crypto');
   });
+
+  it('custo total 0 (carteira vazia) → 0% sem divisão por zero', async () => {
+    jest.mocked(client.apiGet).mockImplementation((path: string) => {
+      if (path === '/investimentos/summary') {
+        return Promise.resolve({
+          totalCents: 0,
+          gainCents: 0,
+          gainPct: 0,
+          title: '',
+          quip: '',
+        } as never);
+      }
+      if (path === '/investimentos/crypto') {
+        return Promise.resolve({
+          title: '',
+          subtotalCents: 0,
+          gainCents: 0,
+          gainPct: 0,
+          holdings: [],
+        } as never);
+      }
+      return Promise.resolve({} as never);
+    });
+
+    const risk = await getRiskAssessment();
+    expect(risk.resultPct).toBe(0);
+  });
 });
 
 // O recurso de ativo/operação: cada função é dona de um verbo+path literal (um typo aqui

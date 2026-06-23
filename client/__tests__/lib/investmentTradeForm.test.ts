@@ -55,6 +55,15 @@ describe('deriveQuantityFromValue', () => {
     expect(deriveQuantityFromValue(10000, 0)).toBe('');
     expect(deriveQuantityFromValue(0, 10000)).toBe('');
   });
+
+  it('vazio quando o valor é negativo', () => {
+    expect(deriveQuantityFromValue(-100, 10000)).toBe('');
+  });
+
+  it('arredonda pra zero quando o valor é pequeno demais pro preço', () => {
+    // R$0,01 a R$3.000.000 → 0.0000000033 → arredonda a 8 casas → "0"
+    expect(deriveQuantityFromValue(1, 300000000)).toBe('0');
+  });
 });
 
 describe('initialTradeValues', () => {
@@ -115,6 +124,22 @@ describe('validateTradeForm', () => {
   it('cobra a conta de liquidação e a data', () => {
     expect(validateTradeForm({ ...byQuantity, accountId: '' }).account).toBeDefined();
     expect(validateTradeForm({ ...byQuantity, tradedOn: '19/06/2026' }).date).toBeDefined();
+  });
+
+  it('venda no modo valor (resgatar) também é válida', () => {
+    expect(validateTradeForm({ ...byValue, side: 'sell' })).toEqual({});
+  });
+});
+
+describe('toCreateTradeInput — venda no modo valor', () => {
+  it('deriva a quantidade do valor mantendo side=sell', () => {
+    expect(toCreateTradeInput({ ...byValue, side: 'sell' })).toEqual({
+      side: 'sell',
+      quantity: '0.00033333',
+      unitPriceCents: 30000000,
+      tradedOn: '2026-06-19',
+      accountId: 'acc-1',
+    });
   });
 });
 

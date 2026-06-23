@@ -37,6 +37,16 @@ describe('assetClassMeta', () => {
   it('resolve o rótulo PT da classe', () => {
     expect(assetClassMeta('fiis').label).toBe('FIIs');
   });
+
+  it.each([
+    ['acoes', 'Ações', 'corporate_fare'],
+    ['fiis', 'FIIs', 'account_balance'],
+    ['renda_fixa', 'Renda Fixa', 'savings'],
+    ['cripto', 'Cripto', 'currency_bitcoin'],
+  ] as const)('classe %s → rótulo %s + ícone padrão %s', (value, label, icon) => {
+    expect(assetClassMeta(value)).toEqual({ value, label, defaultIcon: icon });
+    expect(initialAssetValues(value).icon).toBe(icon);
+  });
 });
 
 describe('validateAssetForm', () => {

@@ -94,3 +94,14 @@ describe('TradeModal — cripto (modo valor)', () => {
     await waitFor(() => expect(onClose).toHaveBeenCalledTimes(1));
   });
 });
+
+describe('TradeModal — gate de carregamento', () => {
+  it('mostra erro + "Tentar de novo" quando o ativo falha ao carregar', async () => {
+    jest.mocked(api.getAsset).mockRejectedValue(new Error('boom'));
+    jest.mocked(dashApi.getAccounts).mockResolvedValue(accounts);
+    await renderWithClient(<TradeModal assetId="a1" ticker="WEGE3" side="buy" onClose={jest.fn()} />);
+
+    expect(await screen.findByText('Não foi possível carregar a operação.')).toBeOnTheScreen();
+    expect(screen.getByRole('button', { name: 'Tentar de novo' })).toBeOnTheScreen();
+  });
+});

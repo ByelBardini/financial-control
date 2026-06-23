@@ -56,6 +56,26 @@ describe('TradeForm — ação (não-cripto)', () => {
     await user.type(screen.getByLabelText('Quantidade'), '10'); // 10 × R$50,00 = R$500,00
     expect(screen.getByText(/Total estimado:/)).toBeOnTheScreen();
   });
+
+  it('preço unitário 0 (ativo sem cotação) bloqueia o submit', async () => {
+    const onSubmit = jest.fn();
+    await render(
+      <TradeForm
+        ticker="WEGE3"
+        isCrypto={false}
+        initial={{ ...initialTradeValues('buy', '2026-06-19', 0, false), accountId: 'a1' }}
+        accounts={accounts}
+        onSubmit={onSubmit}
+      />,
+    );
+    const user = userEvent.setup();
+
+    await user.type(screen.getByLabelText('Quantidade'), '10'); // não digita preço (vem 0 do ativo)
+    await user.press(screen.getByRole('button', { name: 'Comprar WEGE3' }));
+
+    expect(onSubmit).not.toHaveBeenCalled();
+    expect(screen.getAllByRole('alert').length).toBeGreaterThan(0);
+  });
 });
 
 describe('TradeForm — cripto', () => {
@@ -117,5 +137,30 @@ describe('TradeForm — cripto', () => {
 
     expect(screen.getByLabelText('Valor a resgatar')).toBeOnTheScreen();
     expect(screen.getByLabelText('Conta de destino: Nubank')).toBeOnTheScreen();
+  });
+
+  it('venda no modo valor deriva a quantidade do "Valor a resgatar" e submete side=sell', async () => {
+    const onSubmit = jest.fn();
+    await render(
+      <TradeForm
+        ticker="BTC"
+        isCrypto={true}
+        initial={{ ...initialTradeValues('sell', '2026-06-19', 30000000, true), accountId: 'a1' }}
+        accounts={accounts}
+        onSubmit={onSubmit}
+      />,
+    );
+    const user = userEvent.setup();
+
+    await user.type(screen.getByLabelText('Valor a resgatar'), '15000000'); // R$150.000 ÷ 300.000 = 0,5 BTC
+    expect(screen.getByText('≈ 0.5 BTC')).toBeOnTheScreen();
+    await user.press(screen.getByRole('button', { name: 'Vender BTC' }));
+
+    expect(onSubmit.mock.calls[0][0]).toMatchObject({
+      side: 'sell',
+      mode: 'value',
+      amountCents: 15000000,
+      unitPriceCents: 30000000,
+    });
   });
 });
