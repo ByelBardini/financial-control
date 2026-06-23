@@ -76,7 +76,9 @@ export function deriveQuantityFromValue(amountCents: number, unitPriceCents: num
 // resolveQuantity devolve a quantidade canônica a submeter conforme o modo (digitada no modo
 // quantidade, derivada do valor no modo valor).
 export function resolveQuantity(v: TradeFormValues): string {
-  return v.mode === 'value' ? deriveQuantityFromValue(v.amountCents, v.unitPriceCents) : v.quantity.trim();
+  return v.mode === 'value'
+    ? deriveQuantityFromValue(v.amountCents, v.unitPriceCents)
+    : v.quantity.trim();
 }
 
 // Validação do client (o server revalida): preço > 0 sempre; no modo valor cobra valor > 0 (e que a

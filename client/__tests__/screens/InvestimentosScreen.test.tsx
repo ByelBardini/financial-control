@@ -99,7 +99,14 @@ describe('InvestimentosScreen (responsivo)', () => {
     mockUseIsDesktop.mockReturnValue(false);
     jest.mocked(investimentosApi.getAsset).mockResolvedValue(petr4Detail);
     const accounts: Account[] = [
-      { id: 'acc-1', name: 'Nubank', balanceCents: 1000, icon: 'account_balance', tone: 'neutral', dotColor: '#d0bcff' },
+      {
+        id: 'acc-1',
+        name: 'Nubank',
+        balanceCents: 1000,
+        icon: 'account_balance',
+        tone: 'neutral',
+        dotColor: '#d0bcff',
+      },
     ];
     jest.mocked(dashApi.getAccounts).mockResolvedValue(accounts);
     await renderWithClient(<InvestimentosScreen />);

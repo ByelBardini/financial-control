@@ -16,7 +16,10 @@ export function sanitizeQuantity(raw: string): string {
   const firstDot = cleaned.indexOf('.');
   if (firstDot === -1) return cleaned;
   const intPart = cleaned.slice(0, firstDot);
-  const decPart = cleaned.slice(firstDot + 1).replace(/\./g, '').slice(0, 8);
+  const decPart = cleaned
+    .slice(firstDot + 1)
+    .replace(/\./g, '')
+    .slice(0, 8);
   return `${intPart}.${decPart}`;
 }
 

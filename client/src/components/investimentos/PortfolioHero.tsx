@@ -19,7 +19,10 @@ export function PortfolioHero({ summary, hidden }: PortfolioHeroProps) {
       <Text className="font-geist-medium text-label-md uppercase text-on-surface-variant">
         Patrimônio em Ativos
       </Text>
-      <Text accessibilityRole="header" className="font-hanken-bold text-headline-md text-on-surface">
+      <Text
+        accessibilityRole="header"
+        className="font-hanken-bold text-headline-md text-on-surface"
+      >
         {summary.title}
       </Text>
       <MoneyText

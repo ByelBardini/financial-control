@@ -112,7 +112,9 @@ export function AssetForm({
                 accessibilityState={{ selected }}
                 accessibilityLabel={`Ícone ${name}`}
                 className={`h-11 w-11 items-center justify-center rounded-lg border ${
-                  selected ? 'border-primary bg-surface-container-highest' : 'border-outline-variant'
+                  selected
+                    ? 'border-primary bg-surface-container-highest'
+                    : 'border-outline-variant'
                 }`}
               >
                 <Icon

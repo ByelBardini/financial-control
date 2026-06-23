@@ -63,7 +63,8 @@ export function AssetFormModal({ mode, assetId, onClose }: AssetFormModalProps) 
 
   function renderEdit() {
     if (detail.isPending) return <SectionSkeleton />;
-    if (detail.isError) return <SectionError label="o ativo" onRetry={() => void detail.refetch()} />;
+    if (detail.isError)
+      return <SectionError label="o ativo" onRetry={() => void detail.refetch()} />;
     return (
       <AssetForm
         mode="edit"

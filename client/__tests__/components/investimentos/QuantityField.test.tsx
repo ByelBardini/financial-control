@@ -48,9 +48,7 @@ describe('sanitizeQuantity', () => {
 
 describe('QuantityField', () => {
   it('mostra o label e o valor controlado', async () => {
-    await render(
-      <QuantityField label="Quantidade" value="10.5" onChangeText={jest.fn()} />,
-    );
+    await render(<QuantityField label="Quantidade" value="10.5" onChangeText={jest.fn()} />);
     expect(screen.getByLabelText('Quantidade').props.value).toBe('10.5');
   });
 

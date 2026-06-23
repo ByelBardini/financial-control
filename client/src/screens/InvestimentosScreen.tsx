@@ -64,9 +64,7 @@ export function InvestimentosScreen({
   return (
     <>
       {layout}
-      {modal?.kind === 'createAsset' ? (
-        <AssetFormModal mode="create" onClose={close} />
-      ) : null}
+      {modal?.kind === 'createAsset' ? <AssetFormModal mode="create" onClose={close} /> : null}
       {modal?.kind === 'editAsset' ? (
         <AssetFormModal mode="edit" assetId={modal.assetId} onClose={close} />
       ) : null}
@@ -74,7 +72,9 @@ export function InvestimentosScreen({
         <AssetDetailModal
           assetId={modal.assetId}
           onClose={close}
-          onTrade={(side, ticker) => setModal({ kind: 'trade', assetId: modal.assetId, ticker, side })}
+          onTrade={(side, ticker) =>
+            setModal({ kind: 'trade', assetId: modal.assetId, ticker, side })
+          }
           onEdit={() => setModal({ kind: 'editAsset', assetId: modal.assetId })}
         />
       ) : null}

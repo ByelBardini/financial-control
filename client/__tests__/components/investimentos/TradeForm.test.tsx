@@ -9,7 +9,10 @@ const accounts = [
 
 // Preço já vem do ativo (pré-preenchido) → o caller injeta unitPriceCents no initial.
 const stockInitial = { ...initialTradeValues('buy', '2026-06-19', 5000, false), accountId: 'a1' };
-const cryptoInitial = { ...initialTradeValues('buy', '2026-06-19', 30000000, true), accountId: 'a1' };
+const cryptoInitial = {
+  ...initialTradeValues('buy', '2026-06-19', 30000000, true),
+  accountId: 'a1',
+};
 
 describe('TradeForm — ação (não-cripto)', () => {
   it('abre em quantidade, sem toggle, e submete com o preço pré-preenchido do ativo', async () => {

@@ -40,7 +40,12 @@ export function ModalSheet({ title, onClose, children }: ModalSheetProps) {
   const { height } = useWindowDimensions();
 
   return (
-    <Modal visible transparent animationType={isDesktop ? 'fade' : 'slide'} onRequestClose={onClose}>
+    <Modal
+      visible
+      transparent
+      animationType={isDesktop ? 'fade' : 'slide'}
+      onRequestClose={onClose}
+    >
       <View
         style={[StyleSheet.absoluteFill, overlayDim]}
         className={isDesktop ? 'items-center justify-center p-gutter' : 'justify-end'}

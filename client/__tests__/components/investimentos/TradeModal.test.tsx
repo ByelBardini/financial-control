@@ -12,8 +12,22 @@ jest.mock('../../../src/api/dashboard');
 beforeEach(() => jest.clearAllMocks());
 
 const accounts: Account[] = [
-  { id: 'acc-1', name: 'Nubank', balanceCents: 100000, icon: 'account_balance', tone: 'neutral', dotColor: '#d0bcff' },
-  { id: 'acc-2', name: 'Binance', balanceCents: 145000, icon: 'currency_bitcoin', tone: 'neutral', dotColor: '#f3ba2f' },
+  {
+    id: 'acc-1',
+    name: 'Nubank',
+    balanceCents: 100000,
+    icon: 'account_balance',
+    tone: 'neutral',
+    dotColor: '#d0bcff',
+  },
+  {
+    id: 'acc-2',
+    name: 'Binance',
+    balanceCents: 145000,
+    icon: 'currency_bitcoin',
+    tone: 'neutral',
+    dotColor: '#f3ba2f',
+  },
 ];
 
 const baseAsset: AssetDetail = {
@@ -99,7 +113,9 @@ describe('TradeModal — gate de carregamento', () => {
   it('mostra erro + "Tentar de novo" quando o ativo falha ao carregar', async () => {
     jest.mocked(api.getAsset).mockRejectedValue(new Error('boom'));
     jest.mocked(dashApi.getAccounts).mockResolvedValue(accounts);
-    await renderWithClient(<TradeModal assetId="a1" ticker="WEGE3" side="buy" onClose={jest.fn()} />);
+    await renderWithClient(
+      <TradeModal assetId="a1" ticker="WEGE3" side="buy" onClose={jest.fn()} />,
+    );
 
     expect(await screen.findByText('Não foi possível carregar a operação.')).toBeOnTheScreen();
     expect(screen.getByRole('button', { name: 'Tentar de novo' })).toBeOnTheScreen();

@@ -23,7 +23,14 @@ const detail: AssetDetail = {
   gainPct: 4,
   realizedCents: 0,
   trades: [
-    { id: 't1', side: 'buy', quantity: '10', unitPriceCents: 5000, tradedOn: '2026-06-01', accountId: 'acc-1' },
+    {
+      id: 't1',
+      side: 'buy',
+      quantity: '10',
+      unitPriceCents: 5000,
+      tradedOn: '2026-06-01',
+      accountId: 'acc-1',
+    },
   ],
 };
 

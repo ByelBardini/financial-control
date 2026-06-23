@@ -113,7 +113,9 @@ describe('validateTradeForm', () => {
 
   it('modo valor acusa valor pequeno demais pro preço (qtd derivada zera nas 8 casas)', () => {
     // R$0,01 a R$3.000.000 → 0.0000000033 → arredonda a 8 casas pra zero.
-    expect(validateTradeForm({ ...byValue, amountCents: 1, unitPriceCents: 300000000 }).amount).toBeDefined();
+    expect(
+      validateTradeForm({ ...byValue, amountCents: 1, unitPriceCents: 300000000 }).amount,
+    ).toBeDefined();
   });
 
   it('cobra preço maior que zero em ambos os modos', () => {

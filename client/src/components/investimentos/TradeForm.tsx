@@ -97,7 +97,9 @@ export function TradeForm({
                   accessibilityState={{ selected }}
                   accessibilityLabel={o.label}
                   className={`min-h-11 flex-1 items-center justify-center rounded-lg border py-stack-md ${
-                    selected ? 'border-primary bg-surface-container-highest' : 'border-outline-variant'
+                    selected
+                      ? 'border-primary bg-surface-container-highest'
+                      : 'border-outline-variant'
                   }`}
                 >
                   <Text
@@ -159,7 +161,11 @@ export function TradeForm({
       />
 
       <View className="gap-stack-sm">
-        <DateField label="Data" value={values.tradedOn} onChange={(tradedOn) => patch({ tradedOn })} />
+        <DateField
+          label="Data"
+          value={values.tradedOn}
+          onChange={(tradedOn) => patch({ tradedOn })}
+        />
         {errors.date ? (
           <Text accessibilityRole="alert" className="text-label-sm text-error">
             {errors.date}
