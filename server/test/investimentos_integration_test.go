@@ -249,6 +249,72 @@ func TestInvestimentosEndpointsComSeed(t *testing.T) {
 			t.Errorf("Binance após excluir a compra = %d, quero %d (cascade reverteu o caixa)", got, binBefore)
 		}
 	})
+
+	t.Run("preço 0 (bonificação): grava o trade mas NÃO mexe no caixa nem no extrato", func(t *testing.T) {
+		var asset investimentos.AssetDetail
+		body := `{"ticker":"BONUS","name":"Ativo Bonificado","assetClass":"acoes","icon":"savings","currentPriceCents":1000}`
+		if code := sendJSON(t, http.MethodPost, srv.URL+"/investimentos/assets", token, body, &asset); code != http.StatusCreated {
+			t.Fatalf("POST asset = %d, quero 201", code)
+		}
+		tradesURL := srv.URL + "/investimentos/assets/" + asset.ID + "/trades"
+		today := time.Now().Format("2006-01-02")
+
+		binBefore := accountBalanceCents(t, srv.URL, token, seedBinanceAcc)
+
+		// COMPRA 10 @ 0,00 (bonificação) na Binance → trade entra na posição, mas sem caixa.
+		buyBody := fmt.Sprintf(`{"side":"buy","quantity":"10","unitPriceCents":0,"tradedOn":%q,"accountId":%q}`, today, seedBinanceAcc)
+		var afterBuy investimentos.AssetDetail
+		if code := sendJSON(t, http.MethodPost, tradesURL, token, buyBody, &afterBuy); code != http.StatusCreated {
+			t.Fatalf("compra bonificada = %d, quero 201", code)
+		}
+		if afterBuy.NetQuantity != "10.00000000" || len(afterBuy.Trades) != 1 {
+			t.Errorf("após bonificação = {net %s, %d operações}, quero {10, 1}", afterBuy.NetQuantity, len(afterBuy.Trades))
+		}
+		if got := accountBalanceCents(t, srv.URL, token, seedBinanceAcc); got != binBefore {
+			t.Errorf("Binance após bonificação = %d, quero %d (preço 0 não mexe no caixa)", got, binBefore)
+		}
+
+		var page transacoes.TransactionPage
+		getJSON(t, srv.URL+"/transacoes/list", token, &page)
+		if findTransaction(page.Items, "Compra BONUS") != nil {
+			t.Error("preço 0 não deveria criar transação de caixa no extrato")
+		}
+	})
+
+	t.Run("conta de liquidação arquivada → 400 (guarda is_archived no SQL) sem persistir o trade", func(t *testing.T) {
+		// cria uma conta e arquiva (soft-delete) — ela existe (FK passa) mas falha a guarda
+		// EXISTS(... is_archived=false) do CreateInvestmentTransaction → ErrTradeAccountInvalid → 400.
+		var acc struct {
+			ID string `json:"id"`
+		}
+		accBody := `{"name":"Arquivada","accountType":"checking","openingBalanceCents":0,"icon":"account_balance","tone":"primary","dotColor":"#d0bcff"}`
+		if code := sendJSON(t, http.MethodPost, srv.URL+"/accounts", token, accBody, &acc); code != http.StatusCreated {
+			t.Fatalf("POST account = %d, quero 201", code)
+		}
+		if code := sendJSON(t, http.MethodDelete, srv.URL+"/accounts/"+acc.ID, token, "", nil); code != http.StatusNoContent {
+			t.Fatalf("DELETE (arquivar) account = %d, quero 204", code)
+		}
+
+		var asset investimentos.AssetDetail
+		body := `{"ticker":"NOACC","name":"Conta Arquivada","assetClass":"acoes","icon":"savings","currentPriceCents":1000}`
+		if code := sendJSON(t, http.MethodPost, srv.URL+"/investimentos/assets", token, body, &asset); code != http.StatusCreated {
+			t.Fatalf("POST asset = %d, quero 201", code)
+		}
+		tradesURL := srv.URL + "/investimentos/assets/" + asset.ID + "/trades"
+		today := time.Now().Format("2006-01-02")
+
+		buyBody := fmt.Sprintf(`{"side":"buy","quantity":"5","unitPriceCents":1000,"tradedOn":%q,"accountId":%q}`, today, acc.ID)
+		if code := sendJSON(t, http.MethodPost, tradesURL, token, buyBody, nil); code != http.StatusBadRequest {
+			t.Fatalf("compra com conta arquivada = %d, quero 400", code)
+		}
+
+		// o trade foi revertido (rollback atômico): a posição segue zerada.
+		var detail investimentos.AssetDetail
+		getJSON(t, srv.URL+"/investimentos/assets/"+asset.ID, token, &detail)
+		if len(detail.Trades) != 0 || detail.NetQuantity != "0.00000000" {
+			t.Errorf("após 400 = {net %s, %d operações}, quero {0, 0} (rollback atômico)", detail.NetQuantity, len(detail.Trades))
+		}
+	})
 }
 
 func findPosition(ps []investimentos.Position, ticker string) *investimentos.Position {

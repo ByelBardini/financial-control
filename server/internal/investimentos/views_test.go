@@ -152,6 +152,84 @@ func TestListasVaziasNaoQuebram(t *testing.T) {
 	}
 }
 
+// TestSummaryQuipPorLimiar dirige o summaryQuip pelos 4 limiares (via Summary, black-box): o quip
+// sai do gainPct = (valor − custo) / custo. Cobre as fronteiras 5.0 e -10.0 (inclusivas no ramo de cima).
+func TestSummaryQuipPorLimiar(t *testing.T) {
+	cases := []struct {
+		name        string
+		value, cost int64
+		wantPct     float64
+		wantQuip    string
+	}{
+		{"lucro forte (>=5, fronteira)", 105000, 100000, 5.0, "No azul. Aproveite antes que vire vermelho."},
+		{"lucro alto", 110000, 100000, 10.0, "No azul. Aproveite antes que vire vermelho."},
+		{"empate (0, fronteira)", 100000, 100000, 0.0, "Empatando com o tédio."},
+		{"lucro pequeno (<5)", 103000, 100000, 3.0, "Empatando com o tédio."},
+		{"queda leve (-10, fronteira)", 90000, 100000, -10.0, "Diversificado entre o tombo e o quase-tombo."},
+		{"queda média", 95000, 100000, -5.0, "Diversificado entre o tombo e o quase-tombo."},
+		{"sangria (<-10)", 80000, 100000, -20.0, "Sangrando em várias frentes."},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			fake := &fakeInvestimentosStore{positions: []store.PositionRow{
+				{ID: "a", Ticker: "X", AssetClass: "acoes", NetQuantity: "1.00000000", CostBasisCents: tc.cost, CurrentValueCents: tc.value},
+			}}
+			got, err := investimentos.NewService(fake).Summary(context.Background(), "u-1")
+			if err != nil {
+				t.Fatalf("erro inesperado: %v", err)
+			}
+			if !floatEq(got.GainPct, tc.wantPct) {
+				t.Errorf("gainPct = %v, quero %v", got.GainPct, tc.wantPct)
+			}
+			if got.Quip != tc.wantQuip {
+				t.Errorf("quip = %q, quero %q", got.Quip, tc.wantQuip)
+			}
+		})
+	}
+}
+
+// TestSummaryGainPctCustoZero crava a guarda de divisão: custo 0 → gainPct 0 (mesmo com ganho > 0),
+// pra não dividir por zero. Cenário de bonificação (recebeu o ativo sem custo).
+func TestSummaryGainPctCustoZero(t *testing.T) {
+	fake := &fakeInvestimentosStore{positions: []store.PositionRow{
+		{ID: "a", Ticker: "X", AssetClass: "acoes", NetQuantity: "1.00000000", CostBasisCents: 0, CurrentValueCents: 5000},
+	}}
+	got, err := investimentos.NewService(fake).Summary(context.Background(), "u-1")
+	if err != nil {
+		t.Fatalf("erro inesperado: %v", err)
+	}
+	if got.GainCents != 5000 || got.GainPct != 0 {
+		t.Errorf("custo 0 = {gain %d, pct %v}, quero {5000, 0} (guarda de divisão)", got.GainCents, got.GainPct)
+	}
+}
+
+// TestCryptoSubtitlePorQuantidade cobre o cryptoSubtitle nos extremos: 0 holdings → vazio (JSON omite),
+// 2 holdings → "2 ativos no picadeiro" (plural). O caso 1 já está em TestCryptoBlocoAParteComSerie.
+func TestCryptoSubtitlePorQuantidade(t *testing.T) {
+	semCripto := &fakeInvestimentosStore{positions: []store.PositionRow{
+		{ID: "petr", Ticker: "PETR4", AssetClass: "acoes", NetQuantity: "10.00000000", CostBasisCents: 1000, CurrentValueCents: 1000},
+	}}
+	got, err := investimentos.NewService(semCripto).Crypto(context.Background(), "u-1")
+	if err != nil {
+		t.Fatalf("erro inesperado: %v", err)
+	}
+	if len(got.Holdings) != 0 || got.Subtitle != "" {
+		t.Errorf("sem cripto = {holdings %d, subtitle %q}, quero {0, \"\"}", len(got.Holdings), got.Subtitle)
+	}
+
+	duasCriptos := &fakeInvestimentosStore{positions: []store.PositionRow{
+		{ID: "btc", Ticker: "BTC", AssetClass: "cripto", NetQuantity: "0.50000000", CostBasisCents: 30000, CurrentValueCents: 34000},
+		{ID: "eth", Ticker: "ETH", AssetClass: "cripto", NetQuantity: "2.00000000", CostBasisCents: 15000, CurrentValueCents: 13000},
+	}}
+	got2, err := investimentos.NewService(duasCriptos).Crypto(context.Background(), "u-1")
+	if err != nil {
+		t.Fatalf("erro inesperado: %v", err)
+	}
+	if len(got2.Holdings) != 2 || got2.Subtitle != "2 ativos no picadeiro" {
+		t.Errorf("2 criptos = {holdings %d, subtitle %q}, quero {2, \"2 ativos no picadeiro\"}", len(got2.Holdings), got2.Subtitle)
+	}
+}
+
 func TestPropagaErroDoStore(t *testing.T) {
 	svc := investimentos.NewService(&fakeInvestimentosStore{err: errors.New("falha no banco")})
 	if _, err := svc.Summary(context.Background(), "u-1"); err == nil {

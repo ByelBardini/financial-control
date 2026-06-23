@@ -179,3 +179,100 @@ func TestDeleteTradeHandler204(t *testing.T) {
 		t.Fatalf("status = %d, quero 204", rec.Code)
 	}
 }
+
+func TestUpdateAssetHandler200(t *testing.T) {
+	fake := &fakeInvestimentosStore{
+		metaRow: store.AssetMetaRow{ID: "a1", AssetClass: "acoes", CurrentPriceCents: 5000},
+		posRow:  store.PositionRow{ID: "a1", Ticker: "WEGE3", NetQuantity: "0.00000000"},
+	}
+	rec := doReq(t, investimentos.UpdateAssetHandler(investimentos.NewService(fake)), http.MethodPatch, "/investimentos/assets/a1",
+		`{"ticker":"WEGE3","name":"WEG ON","icon":"corporate_fare","currentPriceCents":5200}`, map[string]string{"id": "a1"})
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, quero 200", rec.Code)
+	}
+	if !fake.appendCalled || fake.appendPrice != 5200 {
+		t.Errorf("preço mudou (5000→5200): esperava histórico em 5200 (appendCalled=%v price=%d)", fake.appendCalled, fake.appendPrice)
+	}
+}
+
+func TestUpdateAssetHandlerCorpoInvalido400(t *testing.T) {
+	rec := doReq(t, investimentos.UpdateAssetHandler(investimentos.NewService(&fakeInvestimentosStore{})), http.MethodPatch, "/investimentos/assets/a1",
+		`{"ticker":"","name":"WEG ON","icon":"corporate_fare","currentPriceCents":5200}`, map[string]string{"id": "a1"})
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d, quero 400 (ticker vazio)", rec.Code)
+	}
+}
+
+func TestUpdateAssetHandler404(t *testing.T) {
+	fake := &fakeInvestimentosStore{metaErr: store.ErrAssetNotFound}
+	rec := doReq(t, investimentos.UpdateAssetHandler(investimentos.NewService(fake)), http.MethodPatch, "/investimentos/assets/nope",
+		`{"ticker":"WEGE3","name":"WEG ON","icon":"corporate_fare","currentPriceCents":5200}`, map[string]string{"id": "nope"})
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf("status = %d, quero 404", rec.Code)
+	}
+}
+
+func TestArchiveAssetHandler204(t *testing.T) {
+	rec := doReq(t, investimentos.ArchiveAssetHandler(investimentos.NewService(&fakeInvestimentosStore{})), http.MethodDelete, "/investimentos/assets/a1", "", map[string]string{"id": "a1"})
+	if rec.Code != http.StatusNoContent {
+		t.Fatalf("status = %d, quero 204", rec.Code)
+	}
+}
+
+func TestArchiveAssetHandler404(t *testing.T) {
+	fake := &fakeInvestimentosStore{archiveErr: store.ErrAssetNotFound}
+	rec := doReq(t, investimentos.ArchiveAssetHandler(investimentos.NewService(fake)), http.MethodDelete, "/investimentos/assets/nope", "", map[string]string{"id": "nope"})
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf("status = %d, quero 404", rec.Code)
+	}
+}
+
+func TestCreateAssetHandlerJSONInvalido400(t *testing.T) {
+	rec := doReq(t, investimentos.CreateAssetHandler(investimentos.NewService(&fakeInvestimentosStore{})), http.MethodPost, "/investimentos/assets",
+		`isto não é json`, nil)
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d, quero 400 (corpo não-JSON)", rec.Code)
+	}
+}
+
+func TestCreateAssetHandlerCamposInvalidos400(t *testing.T) {
+	cases := []struct {
+		name string
+		body string
+	}{
+		{"ticker vazio", `{"ticker":"  ","name":"WEG ON","assetClass":"acoes","icon":"corporate_fare","currentPriceCents":5000}`},
+		{"name vazio", `{"ticker":"WEGE3","name":"","assetClass":"acoes","icon":"corporate_fare","currentPriceCents":5000}`},
+		{"icon vazio", `{"ticker":"WEGE3","name":"WEG ON","assetClass":"acoes","icon":"","currentPriceCents":5000}`},
+		{"preço negativo", `{"ticker":"WEGE3","name":"WEG ON","assetClass":"acoes","icon":"corporate_fare","currentPriceCents":-1}`},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			rec := doReq(t, investimentos.CreateAssetHandler(investimentos.NewService(&fakeInvestimentosStore{})), http.MethodPost, "/investimentos/assets", tc.body, nil)
+			if rec.Code != http.StatusBadRequest {
+				t.Fatalf("status = %d, quero 400 (%s)", rec.Code, tc.name)
+			}
+		})
+	}
+}
+
+func TestTradeHandlerEntradaInvalida400(t *testing.T) {
+	cases := []struct {
+		name string
+		body string
+	}{
+		{"data mês/dia inválidos", `{"side":"buy","quantity":"1","unitPriceCents":1000,"tradedOn":"2026-13-32","accountId":"acc-1"}`},
+		{"data com separador errado", `{"side":"buy","quantity":"1","unitPriceCents":1000,"tradedOn":"2026/01/15","accountId":"acc-1"}`},
+		{"quantidade zero decimal", `{"side":"buy","quantity":"0.0","unitPriceCents":1000,"tradedOn":"2026-01-15","accountId":"acc-1"}`},
+		{"quantidade científica", `{"side":"buy","quantity":"1e5","unitPriceCents":1000,"tradedOn":"2026-01-15","accountId":"acc-1"}`},
+		{"quantidade 9 casas", `{"side":"buy","quantity":"1.123456789","unitPriceCents":1000,"tradedOn":"2026-01-15","accountId":"acc-1"}`},
+		{"side inválido", `{"side":"hold","quantity":"1","unitPriceCents":1000,"tradedOn":"2026-01-15","accountId":"acc-1"}`},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			rec := doReq(t, investimentos.TradeHandler(investimentos.NewService(&fakeInvestimentosStore{})), http.MethodPost, "/investimentos/assets/a1/trades", tc.body, map[string]string{"id": "a1"})
+			if rec.Code != http.StatusBadRequest {
+				t.Fatalf("status = %d, quero 400 (%s)", rec.Code, tc.name)
+			}
+		})
+	}
+}

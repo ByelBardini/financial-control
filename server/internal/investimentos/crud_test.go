@@ -126,6 +126,20 @@ func TestDeleteTradeInexistenteRetorna404(t *testing.T) {
 	}
 }
 
+func TestArchiveAssetOk(t *testing.T) {
+	if err := investimentos.NewService(&fakeInvestimentosStore{}).ArchiveAsset(context.Background(), "u-1", "a1"); err != nil {
+		t.Fatalf("erro inesperado: %v", err)
+	}
+}
+
+func TestArchiveAssetInexistenteRetorna404(t *testing.T) {
+	fake := &fakeInvestimentosStore{archiveErr: store.ErrAssetNotFound}
+	err := investimentos.NewService(fake).ArchiveAsset(context.Background(), "u-1", "nope")
+	if !errors.Is(err, store.ErrAssetNotFound) {
+		t.Errorf("erro = %v, quero ErrAssetNotFound (vira 404)", err)
+	}
+}
+
 func TestGetAssetMontaDetalheComOperacoes(t *testing.T) {
 	fake := &fakeInvestimentosStore{
 		posRow: store.PositionRow{ID: "a1", Ticker: "PETR4", Name: "Petrobras", AssetClass: "acoes", Icon: "local_gas_station", CurrentPriceCents: 950, NetQuantity: "150.00000000", AvgPriceCents: 1100, CostBasisCents: 165000, CurrentValueCents: 142500, RealizedCents: 10000},
