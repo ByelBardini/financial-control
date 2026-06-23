@@ -22,12 +22,18 @@ da API; no banco é `NUMERIC(14,2)`, convertido por cast no SQL (`(amount*100)::
 - Tinge o valor (`+`/`-`, verde/vermelho) e o ícone na tela. Valor sempre **positivo**; o sinal vem do sentido.
 
 ## `kind` (natureza da linha) — coluna `transactions.kind`
-CHECK `('standard','installment','transfer')`:
+CHECK `('standard','installment','transfer','investment')`:
 - **`standard`** — transação avulsa "normal" (a maioria). Inclui as ocorrências **registradas de uma
   recorrência** (que são `standard` + `recurring_rule_id` setado — ver abaixo).
 - **`installment`** — uma **parcela** de uma compra parcelada. Vem sempre em grupo: N linhas com o mesmo
   `purchase_group_id`, `installment_number`/`installment_total` e `purchase_total_amount`. CHECK
   `tx_installment_coherent` garante que esses campos só existem (e são coerentes) quando `kind='installment'`.
+- **`investment`** — **liquidação de uma operação da carteira** (migration `00006`): a cada compra/venda em
+  `/investimentos/assets/{id}/trades` o server cria, atômico, uma linha ligada via `investment_trade_id`
+  (compra→`expense`/debita, venda→`income`/credita, `amount = qtd × preço`). **Mexe no saldo** e aparece no
+  extrato (tag `Investimento`), mas é **excluído do resumo do mês** (`GetMonthSummary`/`ListCategorySpend`
+  filtram `kind <> 'investment'`). Excluir o trade **cascata** esta linha. Sem categoria; criada só pelo
+  domínio de investimentos (não há POST direto). Ver [investimentos.md](investimentos.md).
 - **`transfer`** — **reservado** (transferência entre contas = dupla entrada com `transfer_group_id`). Não
   implementado ainda (fora de escopo).
 
@@ -62,10 +68,11 @@ botão voltar. **Cuidado de fuso ao comparar períodos** — ver [gotchas.md](go
 ## Tags com significado (derivadas no server, single-badge)
 A `tag` de cada linha do log **não** é só income×expense — sai de sinais reais por **precedência**
 (`transactionTag` em `personality.go`):
-1. `kind='installment'` → **Parcelado** (tom `primary`).
-2. receita (`income`): recorrente → **Inflow Esperado**; avulsa → **Renda Extra** (tom `secondary`).
-3. despesa recorrente (`recurring_rule_id` setado) → **Fixo** (`primary`).
-4. despesa avulsa pela `essentialness` da categoria: `essential` → **Sobrevivência** (`error`);
+1. `kind='investment'` → **Investimento** (tom `neutral`) — aporte/resgate da carteira, precede tudo.
+2. `kind='installment'` → **Parcelado** (tom `primary`).
+3. receita (`income`): recorrente → **Inflow Esperado**; avulsa → **Renda Extra** (tom `secondary`).
+4. despesa recorrente (`recurring_rule_id` setado) → **Fixo** (`primary`).
+5. despesa avulsa pela `essentialness` da categoria: `essential` → **Sobrevivência** (`error`);
    `discretionary` → **Supérfluo** (`primary`).
 
 `isRecurring` = `recurring_rule_id IS NOT NULL`. Labels/tons são **derivados em tempo de leitura** (nada

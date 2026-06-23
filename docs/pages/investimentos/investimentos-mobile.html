@@ -1,0 +1,482 @@
+<!doctype html>
+
+<html class="dark" lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <meta content="width=device-width, initial-scale=1.0" name="viewport" />
+    <title>Pobrify Investimentos</title>
+    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+    <link
+      href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap"
+      rel="stylesheet"
+    />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;600;700&amp;family=Geist:wght@500;600&amp;display=swap"
+      rel="stylesheet"
+    />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap"
+      rel="stylesheet"
+    />
+    <script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            colors: {
+              "outline-variant": "#494454",
+              "inverse-on-surface": "#2f3035",
+              "primary-container": "#a078ff",
+              "on-surface": "#e2e2e8",
+              "on-background": "#e2e2e8",
+              "primary-fixed-dim": "#d0bcff",
+              primary: "#d0bcff",
+              "on-primary-container": "#340080",
+              "primary-fixed": "#e9ddff",
+              "secondary-container": "#83c300",
+              "on-primary": "#3c0091",
+              "on-tertiary": "#2c303d",
+              "inverse-primary": "#6d3bd7",
+              "tertiary-fixed": "#dfe2f4",
+              "surface-container": "#1e2024",
+              "secondary-fixed-dim": "#98da27",
+              "on-error": "#690005",
+              "secondary-fixed": "#b2f746",
+              "on-tertiary-fixed": "#171b28",
+              "on-secondary-container": "#304b00",
+              "on-secondary-fixed-variant": "#334f00",
+              "on-tertiary-container": "#252937",
+              secondary: "#9ddf2e",
+              "tertiary-container": "#8d90a0",
+              "surface-container-lowest": "#0c0e12",
+              "on-secondary": "#213600",
+              background: "#111317",
+              surface: "#111317",
+              "on-tertiary-fixed-variant": "#424655",
+              "inverse-surface": "#e2e2e8",
+              outline: "#958ea0",
+              "surface-dim": "#111317",
+              "surface-container-high": "#282a2e",
+              "on-primary-fixed-variant": "#5516be",
+              "on-secondary-fixed": "#121f00",
+              "on-primary-fixed": "#23005c",
+              "surface-bright": "#37393e",
+              "error-container": "#93000a",
+              error: "#ffb4ab",
+              "on-surface-variant": "#cbc3d7",
+              "on-error-container": "#ffdad6",
+              "surface-tint": "#d0bcff",
+              tertiary: "#c3c6d7",
+              "surface-variant": "#333539",
+              "surface-container-low": "#1a1c20",
+              "tertiary-fixed-dim": "#c3c6d7",
+              "surface-container-highest": "#333539",
+              "brand-purple": "#8B5CF6",
+              "brand-lime": "#9ddf2e",
+            },
+            borderRadius: {
+              DEFAULT: "0.125rem",
+              lg: "0.25rem",
+              xl: "0.5rem",
+              full: "0.75rem",
+            },
+            spacing: {
+              "stack-sm": "4px",
+              "stack-md": "12px",
+              base: "8px",
+              "container-margin": "24px",
+              "stack-lg": "24px",
+              gutter: "16px",
+            },
+            fontFamily: {
+              "display-lg-mobile": ["Hanken Grotesk"],
+              "body-lg": ["Hanken Grotesk"],
+              "display-lg": ["Hanken Grotesk"],
+              "label-sm": ["Geist"],
+              "headline-md": ["Hanken Grotesk"],
+              "body-md": ["Hanken Grotesk"],
+              "label-md": ["Geist"],
+              "headline-sm": ["Hanken Grotesk"],
+              "headline-sm-mobile": ["Hanken Grotesk"],
+            },
+            fontSize: {
+              "display-lg-mobile": [
+                "36px",
+                {
+                  lineHeight: "42px",
+                  letterSpacing: "-0.02em",
+                  fontWeight: "700",
+                },
+              ],
+              "body-lg": ["18px", { lineHeight: "28px", fontWeight: "400" }],
+              "display-lg": [
+                "48px",
+                {
+                  lineHeight: "56px",
+                  letterSpacing: "-0.02em",
+                  fontWeight: "700",
+                },
+              ],
+              "label-sm": ["12px", { lineHeight: "16px", fontWeight: "600" }],
+              "headline-md": [
+                "24px",
+                { lineHeight: "32px", fontWeight: "600" },
+              ],
+              "body-md": ["16px", { lineHeight: "24px", fontWeight: "400" }],
+              "label-md": [
+                "14px",
+                {
+                  lineHeight: "20px",
+                  letterSpacing: "0.05em",
+                  fontWeight: "500",
+                },
+              ],
+              "headline-sm": [
+                "20px",
+                { lineHeight: "28px", fontWeight: "600" },
+              ],
+              "headline-sm-mobile": [
+                "18px",
+                { lineHeight: "24px", fontWeight: "600" },
+              ],
+            },
+          },
+        },
+      };
+    </script>
+    <style>
+      body {
+        font-family: "Hanken Grotesk", sans-serif;
+      }
+      .glass-card {
+        background: rgba(23, 26, 33, 0.7);
+        backdrop-filter: blur(20px);
+        border: 1px solid rgba(245, 247, 250, 0.08);
+      }
+      .active-card {
+        border-color: #8b5cf6;
+      }
+      .critical-card {
+        border-color: #9ddf2e;
+      }
+      .hide-scrollbar::-webkit-scrollbar {
+        display: none;
+      }
+      .hide-scrollbar {
+        -ms-overflow-style: none;
+        scrollbar-width: none;
+      }
+    </style>
+    <style>
+      body {
+        min-height: max(884px, 100dvh);
+      }
+    </style>
+  </head>
+  <body class="bg-background text-on-background antialiased pb-24 md:pb-0">
+    <!-- TopAppBar -->
+    <header
+      class="fixed top-0 w-full z-50 border-b border-outline-variant/10 bg-background dark:bg-background h-16 flex justify-between items-center px-container-margin"
+    >
+      <div class="flex items-center gap-3">
+        <img
+          class="w-8 h-8 rounded-full object-cover border border-outline-variant/50"
+          data-alt="A highly detailed close-up portrait of a generic user avatar placeholder, professional yet slightly weary, reflecting the corporate financial struggle theme, high-contrast dark mode aesthetic with subtle purple neon backlighting, realistic rendering."
+          src="https://lh3.googleusercontent.com/aida-public/AB6AXuAq4Y61n0yCFWNKnkwFhB3X4VzDplitNx_SYQxjX2z8ss211UeD5-JfzBt_Hhi2UP778r9b2yY6q-8VSVbsxeMl5l9vT-y4GSMhgOjjqvuUOhRehanC94S5HTwGUqdxP7V5bhwHVtL1t2AyiaJyHmRqTt7ssH2sMmorv9f6H5bo4ZXlzlAjoncWmkj-Dwy6y8z7NHhVs2XaQazC3iod3rXjhEn01clSKTeOdOuueSstr1ZJaKpqQlHdb4jMtIA2CsmXsXAKkK6wx7BE"
+        />
+        <h1
+          class="font-display-lg-mobile text-display-lg-mobile font-bold text-primary dark:text-primary tracking-tighter"
+          style="font-size: 24px"
+        >
+          POBRIFY
+        </h1>
+      </div>
+      <button
+        class="text-primary dark:text-primary hover:opacity-80 transition-opacity active:scale-95 transition-transform"
+      >
+        <span class="material-symbols-outlined">monitoring</span>
+      </button>
+    </header>
+    <main class="pt-20 px-4 space-y-6">
+      <!-- Portfólio de Ilusões -->
+      <section class="glass-card rounded-xl p-4 active-card">
+        <header class="mb-4">
+          <span
+            class="font-label-sm text-label-sm text-surface-variant uppercase tracking-wider text-outline"
+            >Portfólio de Ilusões</span
+          >
+          <h2
+            class="font-display-lg-mobile text-display-lg-mobile mt-1 text-white"
+          >
+            R$ 14.302<span class="text-outline text-2xl">,45</span>
+          </h2>
+          <p
+            class="font-label-sm text-label-sm text-brand-lime mt-1 flex items-center gap-1"
+          >
+            <span class="material-symbols-outlined text-[16px]"
+              >trending_down</span
+            >
+            -R$ 2.450,00 (-14.5%) Hoje
+          </p>
+        </header>
+        <div class="space-y-2 mt-6">
+          <div
+            class="flex justify-between font-label-sm text-label-sm text-on-surface-variant mb-1"
+          >
+            <span>Ações (45%)</span>
+            <span>Cripto (30%)</span>
+            <span>Caixa (25%)</span>
+          </div>
+          <div
+            class="h-2 w-full flex rounded-full overflow-hidden bg-surface-container-highest"
+          >
+            <div class="bg-brand-purple h-full" style="width: 45%"></div>
+            <div class="bg-brand-lime h-full" style="width: 30%"></div>
+            <div class="bg-error h-full" style="width: 25%"></div>
+          </div>
+        </div>
+      </section>
+      <!-- Avaliação de Risco -->
+      <section
+        class="glass-card rounded-xl p-4 critical-card relative overflow-hidden"
+      >
+        <div
+          class="absolute -right-6 -top-6 text-surface-container-highest opacity-20"
+        >
+          <span
+            class="material-symbols-outlined text-9xl"
+            style="font-variation-settings: &quot;FILL&quot; 1"
+            >warning</span
+          >
+        </div>
+        <div class="relative z-10">
+          <span
+            class="font-label-sm text-label-sm text-surface-variant uppercase tracking-wider text-outline mb-2 block"
+            >Risco Sistêmico</span
+          >
+          <div
+            class="inline-flex items-center gap-2 bg-brand-lime text-black px-3 py-1 rounded-sm font-label-sm text-label-sm uppercase font-bold mb-3"
+          >
+            <span class="material-symbols-outlined text-[16px] animate-pulse"
+              >crisis_alert</span
+            >
+            ESTÁVEL (POR ENQUANTO)
+          </div>
+          <p class="font-body-md text-body-md text-on-surface-variant">
+            Volatilidade controlada pelo desespero estrutural.
+          </p>
+        </div>
+      </section>
+      <!-- O Circo da Volatilidade -->
+      <section>
+        <h3
+          class="font-headline-sm-mobile text-headline-sm-mobile text-on-surface mb-3 px-1"
+        >
+          O Circo da Volatilidade
+        </h3>
+        <div class="flex overflow-x-auto gap-4 pb-4 hide-scrollbar -mx-4 px-4">
+          <!-- BTC Card -->
+          <div
+            class="glass-card min-w-[240px] rounded-xl p-4 flex-shrink-0 relative overflow-hidden"
+          >
+            <div class="flex justify-between items-start mb-4">
+              <div class="flex items-center gap-2">
+                <div
+                  class="w-8 h-8 rounded-full bg-orange-500/20 flex items-center justify-center border border-orange-500/50"
+                >
+                  <span class="material-symbols-outlined text-orange-500"
+                    >currency_bitcoin</span
+                  >
+                </div>
+                <div>
+                  <h4
+                    class="font-headline-sm-mobile text-headline-sm-mobile leading-none"
+                  >
+                    BTC
+                  </h4>
+                  <span class="font-label-sm text-label-sm text-outline"
+                    >Bitcoin</span
+                  >
+                </div>
+              </div>
+              <span
+                class="font-label-sm text-label-sm text-brand-lime bg-brand-lime/10 px-2 py-0.5 rounded"
+                >+4.2%</span
+              >
+            </div>
+            <div class="mb-4">
+              <div class="font-headline-md text-headline-md">U$ 64.230</div>
+            </div>
+            <!-- Simplified Chart Visual -->
+            <div class="h-12 w-full flex items-end gap-1 opacity-70">
+              <div class="w-1/6 bg-brand-lime h-1/4 rounded-t-sm"></div>
+              <div class="w-1/6 bg-brand-lime h-2/4 rounded-t-sm"></div>
+              <div class="w-1/6 bg-brand-lime h-1/3 rounded-t-sm"></div>
+              <div class="w-1/6 bg-brand-lime h-3/4 rounded-t-sm"></div>
+              <div class="w-1/6 bg-brand-lime h-2/3 rounded-t-sm"></div>
+              <div class="w-1/6 bg-brand-lime h-full rounded-t-sm"></div>
+            </div>
+          </div>
+          <!-- ETH Card -->
+          <div
+            class="glass-card min-w-[240px] rounded-xl p-4 flex-shrink-0 relative overflow-hidden border-error/50"
+          >
+            <div class="flex justify-between items-start mb-4">
+              <div class="flex items-center gap-2">
+                <div
+                  class="w-8 h-8 rounded-full bg-blue-500/20 flex items-center justify-center border border-blue-500/50"
+                >
+                  <span class="material-symbols-outlined text-blue-400"
+                    >diamond</span
+                  >
+                </div>
+                <div>
+                  <h4
+                    class="font-headline-sm-mobile text-headline-sm-mobile leading-none"
+                  >
+                    ETH
+                  </h4>
+                  <span class="font-label-sm text-label-sm text-outline"
+                    >Ethereum</span
+                  >
+                </div>
+              </div>
+              <span
+                class="font-label-sm text-label-sm text-error bg-error/10 px-2 py-0.5 rounded"
+                >-1.8%</span
+              >
+            </div>
+            <div class="mb-4">
+              <div class="font-headline-md text-headline-md">U$ 3.420</div>
+            </div>
+            <!-- Simplified Chart Visual -->
+            <div class="h-12 w-full flex items-end gap-1 opacity-70">
+              <div class="w-1/6 bg-error h-full rounded-t-sm"></div>
+              <div class="w-1/6 bg-error h-3/4 rounded-t-sm"></div>
+              <div class="w-1/6 bg-error h-2/3 rounded-t-sm"></div>
+              <div class="w-1/6 bg-error h-1/2 rounded-t-sm"></div>
+              <div class="w-1/6 bg-error h-1/4 rounded-t-sm"></div>
+              <div class="w-1/6 bg-error h-1/3 rounded-t-sm"></div>
+            </div>
+          </div>
+        </div>
+      </section>
+      <!-- Registro de Quedas -->
+      <section class="pb-6">
+        <h3
+          class="font-headline-sm-mobile text-headline-sm-mobile text-on-surface mb-3 px-1"
+        >
+          Registro de Quedas
+        </h3>
+        <div class="space-y-3">
+          <div
+            class="glass-card rounded-lg p-3 flex justify-between items-center"
+          >
+            <div class="flex items-center gap-3">
+              <div
+                class="w-10 h-10 rounded bg-surface-container flex items-center justify-center border border-outline-variant/30"
+              >
+                <span class="material-symbols-outlined text-outline"
+                  >oil_barrel</span
+                >
+              </div>
+              <div>
+                <h4 class="font-label-md text-label-md font-bold">PETR4</h4>
+                <span class="font-label-sm text-label-sm text-outline"
+                  >Petrobras PN</span
+                >
+              </div>
+            </div>
+            <div class="text-right">
+              <div class="font-label-md text-label-md">R$ 38,45</div>
+              <div class="font-label-sm text-label-sm text-error">-2.1%</div>
+            </div>
+          </div>
+          <div
+            class="glass-card rounded-lg p-3 flex justify-between items-center"
+          >
+            <div class="flex items-center gap-3">
+              <div
+                class="w-10 h-10 rounded bg-surface-container flex items-center justify-center border border-outline-variant/30"
+              >
+                <span class="material-symbols-outlined text-outline"
+                  >landscape</span
+                >
+              </div>
+              <div>
+                <h4 class="font-label-md text-label-md font-bold">VALE3</h4>
+                <span class="font-label-sm text-label-sm text-outline"
+                  >Vale ON</span
+                >
+              </div>
+            </div>
+            <div class="text-right">
+              <div class="font-label-md text-label-md">R$ 62,10</div>
+              <div class="font-label-sm text-label-sm text-brand-lime">
+                +0.5%
+              </div>
+            </div>
+          </div>
+          <div
+            class="glass-card rounded-lg p-3 flex justify-between items-center"
+          >
+            <div class="flex items-center gap-3">
+              <div
+                class="w-10 h-10 rounded bg-surface-container flex items-center justify-center border border-outline-variant/30"
+              >
+                <span class="material-symbols-outlined text-outline"
+                  >account_balance</span
+                >
+              </div>
+              <div>
+                <h4 class="font-label-md text-label-md font-bold">ITUB4</h4>
+                <span class="font-label-sm text-label-sm text-outline"
+                  >Itaú Unibanco PN</span
+                >
+              </div>
+            </div>
+            <div class="text-right">
+              <div class="font-label-md text-label-md">R$ 34,80</div>
+              <div class="font-label-sm text-label-sm text-error">-0.8%</div>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+    <!-- BottomNavBar -->
+    <nav
+      class="fixed bottom-0 w-full z-50 rounded-t-full border-t border-outline-variant/10 bg-surface-container/80 backdrop-blur-xl flex justify-around items-center h-20 pb-safe px-base md:hidden"
+    >
+      <button
+        class="flex flex-col items-center justify-center text-on-surface-variant dark:text-on-surface-variant hover:text-primary transition-colors active:scale-90 transition-transform"
+      >
+        <span class="material-symbols-outlined mb-1">home</span>
+        <span class="font-label-sm text-label-sm">Início</span>
+      </button>
+      <button
+        class="flex flex-col items-center justify-center text-on-surface-variant dark:text-on-surface-variant hover:text-primary transition-colors active:scale-90 transition-transform"
+      >
+        <span class="material-symbols-outlined mb-1"
+          >account_balance_wallet</span
+        >
+        <span class="font-label-sm text-label-sm">Aportes</span>
+      </button>
+      <button
+        class="flex flex-col items-center justify-center text-secondary dark:text-secondary bg-secondary-container/10 rounded-xl px-3 py-1 hover:text-primary transition-colors active:scale-90 transition-transform"
+      >
+        <span
+          class="material-symbols-outlined mb-1"
+          style="font-variation-settings: &quot;FILL&quot; 1"
+          >query_stats</span
+        >
+        <span class="font-label-sm text-label-sm">Gráficos</span>
+      </button>
+      <button
+        class="flex flex-col items-center justify-center text-on-surface-variant dark:text-on-surface-variant hover:text-primary transition-colors active:scale-90 transition-transform"
+      >
+        <span class="material-symbols-outlined mb-1">person</span>
+        <span class="font-label-sm text-label-sm">Perfil</span>
+      </button>
+    </nav>
+  </body>
+</html>
