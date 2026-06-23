@@ -11,17 +11,30 @@ import (
 )
 
 type Querier interface {
+	// Grava um ponto de histórico de preço (centavos → NUMERIC). Só se o ativo é do usuário.
+	AppendPriceObservation(ctx context.Context, arg AppendPriceObservationParams) (int64, error)
 	// Soft-delete: marca a conta como arquivada (escopado por id + user_id). RETURNING
 	// vazio (ErrNoRows) quando não é do usuário ou já estava arquivada → 404 no service.
 	ArchiveAccount(ctx context.Context, arg ArchiveAccountParams) (string, error)
+	// Soft-delete do ativo (escopado por id + user). ErrNoRows → 404.
+	ArchiveAsset(ctx context.Context, arg ArchiveAssetParams) (string, error)
+	// Registra uma compra (liquida na conta account_id). Só insere se o ativo é do usuário.
+	// ErrNoRows → ativo inválido. Quantidade NUMERIC (string no Go); preço em centavos → NUMERIC.
+	BuyTrade(ctx context.Context, arg BuyTradeParams) (string, error)
 	// Cria conta do usuário. Dinheiro entra em centavos (bigint) e vira NUMERIC no insert.
 	CreateAccount(ctx context.Context, arg CreateAccountParams) (string, error)
+	// Cria um ativo do usuário (preço atual em centavos → NUMERIC na borda). Devolve o novo id.
+	CreateAsset(ctx context.Context, arg CreateAssetParams) (string, error)
 	// Cria uma compra parcelada: N linhas kind='installment' compartilhando um purchase_group_id
 	// (gerado uma vez no CTE), com "X/N" no fim da descrição, o valor POR PARCELA e occurred_on
 	// mês a mês a partir de occurred_on. purchase_total_amount = parcela × N. Só insere se a conta
 	// (e a categoria, se houver) são do usuário — 0 linhas afetadas → conta/categoria inválida.
 	// Statement único = atômico. Centavos → NUMERIC na borda.
 	CreateInstallmentPurchase(ctx context.Context, arg CreateInstallmentPurchaseParams) (int64, error)
+	// Cria a transação de caixa (kind='investment') ligada a um trade, na conta dele. amount =
+	// quantidade × preço (NUMERIC, 2 casas); direction 'expense' (compra) / 'income' (venda). ErrNoRows
+	// → conta do trade inválida/arquivada. investment_trade_id liga ao trade (cascade no delete dele).
+	CreateInvestmentTransaction(ctx context.Context, arg CreateInvestmentTransactionParams) (string, error)
 	// Cria uma regra de recorrência (modelo puro — NÃO lança transação; cada ocorrência, inclusive
 	// a do período atual, é registrada pelo botão via RegisterRecurringOccurrence). Só cria se a
 	// conta (e a categoria, se houver) são do usuário — 0 linhas afetadas = conta/categoria inválida.
@@ -31,6 +44,9 @@ type Querier interface {
 	// informada) pertencem ao usuário — impede anexar transação à conta de outro dono.
 	// 0 linhas (ErrNoRows no store) → conta/categoria inválida. Centavos → NUMERIC na borda.
 	CreateTransaction(ctx context.Context, arg CreateTransactionParams) (string, error)
+	// Exclui uma operação (escopada por id + asset + user). A posição recomputa no próximo read.
+	// ErrNoRows → 404.
+	DeleteTrade(ctx context.Context, arg DeleteTradeParams) (string, error)
 	// Exclui (hard delete — transação não tem soft-delete) escopada por id + user_id.
 	// RETURNING vazio (ErrNoRows → 404) quando não é do usuário.
 	DeleteTransaction(ctx context.Context, arg DeleteTransactionParams) (string, error)
@@ -40,6 +56,11 @@ type Querier interface {
 	// Conta única do usuário (escopada por id + user_id) com saldo derivado em centavos.
 	// Usada pra montar a resposta após criar/editar. ErrNoRows quando não é do usuário.
 	GetAccountByIDWithBalance(ctx context.Context, arg GetAccountByIDWithBalanceParams) (GetAccountByIDWithBalanceRow, error)
+	// Metadados do ativo (escopado por id + user). ErrNoRows quando não é do usuário ou arquivado.
+	GetAssetByID(ctx context.Context, arg GetAssetByIDParams) (GetAssetByIDRow, error)
+	// Quantidade líquida atual de um ativo (Σbuy − Σsell) como string — backstop de mensagem
+	// no erro de venda insuficiente. Sempre devolve uma linha (0 quando não há operações).
+	GetAssetNetQuantity(ctx context.Context, arg GetAssetNetQuantityParams) (string, error)
 	// "Carteira Física": saldo total das contas em espécie (cash) do usuário.
 	GetCashBalance(ctx context.Context, userID pgtype.UUID) (int64, error)
 	// Receitas e gastos do mês de @reference_date, em centavos (bigint). Mês vazio → 0.
@@ -76,12 +97,27 @@ type Querier interface {
 	// Cartões de crédito do usuário: saldo (negativo = dívida) + limite + apresentação,
 	// p/ a seção "Cartões" (por cartão) e o Raio-X (somado).
 	ListCreditAccounts(ctx context.Context, userID pgtype.UUID) ([]ListCreditAccountsRow, error)
+	// Histórico de preço (centavos) dos ativos de cripto do usuário, em ordem cronológica.
+	// O service agrupa por asset_id pra montar o `series` de cada CryptoHolding.
+	ListCryptoSeries(ctx context.Context, userID pgtype.UUID) ([]ListCryptoSeriesRow, error)
 	// Compras parceladas (kind='installment') do usuário agrupadas por purchase_group_id:
 	// progresso (parcelas vencidas / total), valor da parcela e ícone da categoria. As N parcelas
 	// são materializadas de uma vez (datas mês a mês), então "vencidas" = parcelas com competência
 	// no mês corrente ou antes (determinístico, independe do dia) — não COUNT(*) de todas as linhas.
 	// Em centavos. COALESCE em tudo p/ o sqlc gerar tipos não-nulos. Mais recentes primeiro.
 	ListInstallmentDebts(ctx context.Context, userID pgtype.UUID) ([]ListInstallmentDebtsRow, error)
+	// Queries da carteira de Investimentos. Dinheiro em centavos (bigint) com cast no SQL;
+	// QUANTIDADE é fracionária (numeric(28,8)) e trafega como STRING decimal (sqlc → pgtype.Numeric).
+	// A posição (preço médio móvel, custo, valor, realizado) é DERIVADA das operações via CTE
+	// recursiva — a venda remove ao preço médio do momento, então é path-dependent (não dá SUM).
+	// Tudo escopado por user_id (isolamento nos dois lados de cada join).
+	// Posição derivada de cada ativo (preço médio móvel). include_crypto/only_crypto separam o
+	// portfólio geral da cripto; asset_id (opcional) restringe a um ativo (detalhe). Dinheiro em
+	// centavos; net_quantity como string (8 casas). gainCents é calculado no Go (current - cost).
+	ListPositions(ctx context.Context, arg ListPositionsParams) ([]ListPositionsRow, error)
+	// Operações de um ativo (escopado por asset + user), em ordem cronológica. Quantidade como string.
+	// account_id = conta de liquidação (vazio nos trades legados/seed sem caixa).
+	ListTradesByAsset(ctx context.Context, arg ListTradesByAssetParams) ([]ListTradesByAssetRow, error)
 	// Queries da tela de Transações. Valores em centavos (bigint) com cast no SQL.
 	// Tudo escopado por user_id, com os joins filtrados pelo mesmo dono (isolamento nos
 	// dois lados). Personalidade (tag/colapso/notas) e labels de data são derivados em Go;
@@ -97,10 +133,17 @@ type Querier interface {
 	// insere se a regra é do usuário e está ativa — 0 linhas (ErrNoRows no store) → regra inexistente
 	// ou não é do usuário. A checagem de "devido" (1×/período) é feita no service antes desta query.
 	RegisterRecurringOccurrence(ctx context.Context, arg RegisterRecurringOccurrenceParams) (string, error)
+	// Registra uma venda (liquida na conta account_id) COM guarda de saldo no próprio INSERT: só
+	// insere se a quantidade vendida não excede a posição líquida (Σbuy − Σsell). ErrNoRows → ativo
+	// inválido OU quantidade insuficiente (o service decide 404 vs 400 carregando o ativo antes).
+	SellTrade(ctx context.Context, arg SellTradeParams) (string, error)
 	// Atualiza os campos mutáveis da conta (escopado por id + user_id). NÃO altera o
 	// opening_balance: saldo só muda via transações, nunca por edição manual. RETURNING
 	// vazio (ErrNoRows) quando a conta não é do usuário ou já está arquivada → 404.
 	UpdateAccount(ctx context.Context, arg UpdateAccountParams) (string, error)
+	// Edita metadados do ativo (NÃO troca asset_class) + o preço atual (escopado por id + user).
+	// RETURNING vazio (ErrNoRows → 404) quando não é do usuário ou está arquivado.
+	UpdateAsset(ctx context.Context, arg UpdateAssetParams) (string, error)
 	// Edita os campos mutáveis de uma transação 'standard' (escopada por id + user_id). Não
 	// troca de conta. A categoria nova precisa ser do usuário. RETURNING vazio (ErrNoRows →
 	// 404) quando a transação não é do usuário. Centavos → NUMERIC; direction flipa o signed_amount.

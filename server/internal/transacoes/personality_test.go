@@ -54,6 +54,8 @@ func TestTransactionTag(t *testing.T) {
 		{"despesa supérflua avulsa", "expense", "standard", "discretionary", false, "Supérfluo", "primary"},
 		{"despesa recorrente vira Fixo", "expense", "standard", "essential", true, "Fixo", "primary"},
 		{"parcela vira Parcelado (precede tudo)", "expense", "installment", "essential", true, "Parcelado", "primary"},
+		{"aporte vira Investimento (precede parcela)", "expense", "investment", "essential", true, "Investimento", "neutral"},
+		{"resgate vira Investimento", "income", "investment", "discretionary", false, "Investimento", "neutral"},
 		{"receita recorrente vira Inflow Esperado", "income", "standard", "discretionary", true, "Inflow Esperado", "secondary"},
 		{"receita avulsa vira Renda Extra", "income", "standard", "discretionary", false, "Renda Extra", "secondary"},
 	}

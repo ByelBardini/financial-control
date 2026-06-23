@@ -28,6 +28,15 @@ describe('SideNav', () => {
     expect(onNavigate).toHaveBeenCalledWith('dashboard');
   });
 
+  it('navega para Investimentos ao clicar no destino', async () => {
+    const onNavigate = jest.fn();
+    await render(<SideNav currentRoute="dashboard" onNavigate={onNavigate} />);
+
+    await userEvent.setup().press(screen.getByRole('button', { name: 'Investimentos' }));
+
+    expect(onNavigate).toHaveBeenCalledWith('investimentos');
+  });
+
   it('mostra o botão Sair quando onLogout é fornecido e o dispara', async () => {
     const onLogout = jest.fn();
     await render(<SideNav onLogout={onLogout} />);

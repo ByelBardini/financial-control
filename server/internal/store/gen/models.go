@@ -39,6 +39,40 @@ type Category struct {
 	Essentialness string
 }
 
+type InvestmentAsset struct {
+	ID           pgtype.UUID
+	UserID       pgtype.UUID
+	Ticker       string
+	Name         string
+	AssetClass   string
+	Icon         string
+	CurrentPrice pgtype.Numeric
+	IsArchived   bool
+	CreatedAt    pgtype.Timestamptz
+	UpdatedAt    pgtype.Timestamptz
+}
+
+type InvestmentPrice struct {
+	ID         pgtype.UUID
+	UserID     pgtype.UUID
+	AssetID    pgtype.UUID
+	Price      pgtype.Numeric
+	ObservedOn pgtype.Date
+	CreatedAt  pgtype.Timestamptz
+}
+
+type InvestmentTrade struct {
+	ID        pgtype.UUID
+	UserID    pgtype.UUID
+	AssetID   pgtype.UUID
+	Side      string
+	Quantity  pgtype.Numeric
+	UnitPrice pgtype.Numeric
+	TradedOn  pgtype.Date
+	CreatedAt pgtype.Timestamptz
+	AccountID pgtype.UUID
+}
+
 type RecurringRule struct {
 	ID             pgtype.UUID
 	AccountID      pgtype.UUID
@@ -77,6 +111,7 @@ type Transaction struct {
 	CreatedAt           pgtype.Timestamptz
 	UpdatedAt           pgtype.Timestamptz
 	UserID              pgtype.UUID
+	InvestmentTradeID   pgtype.UUID
 }
 
 type User struct {

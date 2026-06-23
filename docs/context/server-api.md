@@ -7,7 +7,7 @@
 - Config: `internal/config` lê `DATABASE_URL` (obrigatória), `JWT_SECRET` (obrigatória, ≥32 bytes), `PORT` (default `8080`) e `JWT_TTL_DEFAULT`/`JWT_TTL_REMEMBER` (defaults `24h`/`720h`).
 - Roteador: `internal/router/router.go` — `router.New(Deps)` injeta os serviços de domínio e registra as rotas.
 - Dados: `internal/store` abre o pool (`pgxpool`) e embrulha as queries geradas pelo **sqlc** (`internal/store/gen`), devolvendo tipos próprios em **centavos** (`NUMERIC` convertido via cast no SQL — nunca float).
-- Domínios: `health` (liveness), `auth` (login + sessão), `account` (contas com saldo + **CRUD**: create/update/archive em `account/crud.go`), `dashboard` (resumo do mês, categorias, este-mês, diagnóstico + stubs deferidos de investimentos/ticker), `contas` (views agregadas da tela de Contas: banks/cards/vouchers/cash/xray/tip, agrupando `accounts` por tipo + personalidade derivada), `transacoes` (views da tela de Transações: summary/list/recurrences/debts sobre `transactions`/`recurring_rules` + **CRUD** de transação `standard` em `/transactions`; labels/tag/colapso derivados em `personality.go`). Helper compartilhado em `internal/httpx` (`WriteJSON`/`WriteError`/`CORS` — CORS libera `GET, POST, PATCH, DELETE, OPTIONS`).
+- Domínios: `health` (liveness), `auth` (login + sessão), `account` (contas com saldo + **CRUD**: create/update/archive em `account/crud.go`), `dashboard` (resumo do mês, categorias, este-mês, diagnóstico + stubs deferidos de investimentos/ticker), `contas` (views agregadas da tela de Contas: banks/cards/vouchers/cash/xray/tip, agrupando `accounts` por tipo + personalidade derivada), `transacoes` (views da tela de Transações: summary/list/recurrences/debts sobre `transactions`/`recurring_rules` + **CRUD** de transação `standard` em `/transactions`; labels/tag/colapso derivados em `personality.go`), `investimentos` (carteira: views da tela — summary/positions/allocation/crypto — sobre `investment_assets`/`investment_trades`/`investment_prices` com **posição derivada** (preço médio móvel) via CTE recursiva + **CRUD** de ativo/operação em `/investimentos/assets`; cripto à parte; ver `investimentos.md`). Helper compartilhado em `internal/httpx` (`WriteJSON`/`WriteError`/`CORS` — CORS libera `GET, POST, PATCH, DELETE, OPTIONS`).
 - **Auth real, multi-usuário (`internal/auth`):** senha com **bcrypt**; sessão por **JWT HS256 alg-pinned** (claims `sub`/`iat`/`exp`; `exp` = 24h ou 30d conforme `rememberMe`). `RequireAuth` (middleware) exige `Authorization: Bearer`, valida assinatura/expiração + `is_active` (liveness) e injeta o `userID` no contexto — **fail-closed** (qualquer falha = 401, sem chamar o handler). O `userID` vem **só do token**, nunca de input do client. Só `GET /health` e `POST /auth/login` são públicos; **toda rota de dados** (inclusive os stubs) passa pelo `RequireAuth`. Login 401 genérico (e-mail/senha/inativo indistinguíveis) + bcrypt dummy (anti-enumeração). **Rate-limit anti-força-bruta** no `POST /auth/login` (`internal/ratelimit`): token-bucket em memória por IP (`ClientIP` do `RemoteAddr`), `5` tentativas/IP recarregando em `1min`; estourado → **429** com `Retry-After`, sem tocar no handler. É single-instance (estado em memória; atrás de réplicas cada uma limita sozinha) e confia no `RemoteAddr`, não no `X-Forwarded-For` — ponha um proxy confiável na frente se for encaminhar. Usuário padrão semeado na migration `00002`: `teste@teste.com` / `12345`.
 - **Isolamento por usuário:** todo handler de dados lê o `userID` do contexto e o repassa ao service → store; as queries filtram por `user_id` (ver `database.md`). Teste de fogo em `server/test/auth_integration_test.go` (usuário A não vê dados de B).
 - Banco plugado e servindo os dados reais do dashboard. Schema em `database.md`; dados de exemplo em `server/db/seed.sql` (pertencem ao usuário padrão). **Client interligado** via React Query (token no header `Authorization`).
@@ -32,6 +32,8 @@ server/
 │   ├── account/              # GET /accounts + CRUD (account.go + crud.go)
 │   ├── dashboard/            # GET /dashboard/* (dto+service+handlers)
 │   ├── contas/               # GET /contas/* (dto+personality+service+handlers)
+│   ├── transacoes/           # /transacoes/* views + /transactions CRUD
+│   ├── investimentos/        # /investimentos/* views + CRUD de ativo/operação (CTE recursiva)
 │   └── router/router.go      # router.New(Deps) → http.Handler
 └── test/                     # integração/e2e (HTTP real; tag `integration` para os que usam DB)
 ```
@@ -97,7 +99,18 @@ sempre em **centavos** (inteiro). **Toda rota abaixo exige `Authorization: Beare
 | POST | `/transactions/installment-purchases` | **compra parcelada**: cria N linhas `kind='installment'` (mesmo `purchase_group_id`, datadas mês a mês), valor **por parcela** → **201** `{created:N}`; **400** inválido ou conta não-própria | implementado |
 | POST | `/recurring-rules` | **transação fixa (modelo)**: registra só a regra em `recurring_rules` — **não lança transação** (cada ocorrência é registrada pelo botão) → **201** `{created:true}`; **400** inválido ou conta não-própria | implementado |
 | POST | `/recurring-rules/{id}/register` | **registra a ocorrência do período corrente**: lança a transação `standard` (copia conta/categoria/valor/sentido da regra, `recurring_rule_id` setado, `occurred_on=hoje`) → **201** + `TransactionDetail`; **409** já registrada neste período / fora da janela; **404** regra não-própria | implementado |
-| GET | `/investments` | lista de investimentos | stub deferido (`[]`) |
+| GET | `/investimentos/summary` | resumo do portfólio GERAL (cripto fora): patrimônio/ganho/% + título/quip | implementado |
+| GET | `/investimentos/positions` | posições abertas do portfólio geral (preço médio derivado) | implementado |
+| GET | `/investimentos/allocation` | alocação por classe (Ações/FIIs/Renda Fixa; percent = share) | implementado |
+| GET | `/investimentos/crypto` | bloco de cripto À PARTE (subtotal próprio + `series` do histórico) | implementado |
+| GET | `/investimentos/assets` | todos os ativos + posição derivada (gestão) | implementado |
+| POST | `/investimentos/assets` | cria ativo → **201** + `AssetDetail`; **400** inválido | implementado |
+| GET | `/investimentos/assets/{id}` | ativo completo (posição + operações) → **200**; **404** | implementado |
+| PATCH | `/investimentos/assets/{id}` | edita metadados + preço (classe imutável; preço novo grava histórico) → **200**; **404** | implementado |
+| DELETE | `/investimentos/assets/{id}` | arquiva ativo → **204**; **404** | implementado |
+| POST | `/investimentos/assets/{id}/trades` | compra/venda (`side` buy/sell, `quantity` string, centavos, **`accountId`** de liquidação) → **201** + ativo; liquida na conta (`kind='investment'`: compra debita / venda credita) atômico; **400** venda > posição / conta inválida; **404** ativo | implementado |
+| DELETE | `/investimentos/assets/{id}/trades/{tradeId}` | exclui operação (posição recomputa; **cascata** a transação de caixa) → **204**; **404** | implementado |
+| GET | `/investments` | lista de investimentos (bloco do Dashboard — separado da tela nova) | stub deferido (`[]`) |
 | GET | `/dashboard/investments-summary` | resumo da carteira | stub deferido (zerado) |
 | GET | `/dashboard/ticker` | cotação destacada (cripto) | stub deferido (zerado) |
 
@@ -106,9 +119,10 @@ sempre em **centavos** (inteiro). **Toda rota abaixo exige `Authorization: Beare
 > + notas de dívida e os `dateLabel`/`timeLabel` em **transacoes**) são computados nos respectivos
 > `service.go`/`personality.go` por regrinhas de limiar/formatação marcadas PLACEHOLDER. A `tag`/
 > `tagTone` de cada transação **deixou de ser placeholder**: é derivada de sinais reais por
-> precedência em `transactionTag(direction, kind, essentialness, isRecurring)` — `Parcelado`
-> (kind=installment) > `Fixo`/`Inflow Esperado` (recurring) > `Sobrevivência`/`Supérfluo`
-> (essentialness da categoria) / `Renda Extra` (receita avulsa). O CRUD de `/accounts` e
+> precedência em `transactionTag(direction, kind, essentialness, isRecurring)` — `Investimento`
+> (kind=investment, tom `neutral`) > `Parcelado` (kind=installment) > `Fixo`/`Inflow Esperado`
+> (recurring) > `Sobrevivência`/`Supérfluo` (essentialness da categoria) / `Renda Extra` (receita
+> avulsa). O CRUD de `/accounts` e
 > `/transactions` mora em `*/crud.go` (escrita em
 > **centavos** → NUMERIC no SQL; validação inválida → **400** com o valor ofensivo). Em
 > `transacoes`, `direction` do client (inflow/outflow) é mapeado pro banco (income/expense), e a
@@ -150,7 +164,16 @@ Valores `*Cents`/monetários são **int64 em centavos**.
 | `TransactionDetail` | `GET/POST/PATCH /transactions` | `id`, `accountId`, `categoryId`, `description`, `direction` (inflow/outflow), `amountCents`, `occurredOn`, `accountLabel`, `category`, `icon` |
 | `CreateInstallmentInput` (req) | `POST /transactions/installment-purchases` | `accountId`, `categoryId?`, `description`, `amountCents` (**por parcela**, > 0), `totalInstallments` (2..48), `occurredOn` (1ª parcela) — sempre despesa |
 | `CreateRecurringRuleInput` (req) | `POST /recurring-rules` | `accountId`, `categoryId?`, `description`, `direction` (inflow/outflow), `amountCents` (> 0), `frequency` (daily/weekly/monthly/yearly), `intervalCount` (≥1), `startDate`, `endDate?` **XOR** `maxOccurrences?` (ambos nulos = permanente) |
-| `Investment[]` | `/investments` | `id`, `name`, `valueCents`, `dailyChangePct`, `icon` — **stub `[]`** |
+| `PortfolioSummary` | `/investimentos/summary` | `totalCents`, `gainCents`, `gainPct`, `title`, `quip` (geral, cripto fora) |
+| `Position[]` | `/investimentos/positions` | `id`, `ticker`, `name`, `assetClass`, `icon`, `costBasisCents`, `currentValueCents`, `gainCents`, `gainPct`, `realizedCents` |
+| `AllocationSlice[]` | `/investimentos/allocation` | `assetClass`, `label`, `valueCents`, `percent`, `tone` |
+| `CryptoBlock` | `/investimentos/crypto` | `title`, `subtitle`, `subtotalCents`, `gainCents`, `gainPct`, `holdings[]` (`CryptoHolding`: `id`/`symbol`/`name`/`icon`/`costBasisCents`/`currentValueCents`/`gainCents`/`gainPct`/`series[]` em centavos) |
+| `AssetPosition[]` | `/investimentos/assets` | metadados + `currentPriceCents`, `netQuantity` (**string**), `avgPriceCents`, `costBasisCents`, `currentValueCents`, `gainCents`, `gainPct`, `realizedCents` |
+| `CreateAssetInput` (req) | `POST /investimentos/assets` | `ticker`, `name`, `assetClass` (acoes/fiis/renda_fixa/cripto), `icon`, `currentPriceCents` |
+| `UpdateAssetInput` (req) | `PATCH /investimentos/assets/{id}` | igual ao Create **menos `assetClass`** (imutável) |
+| `CreateTradeInput` (req) | `POST /investimentos/assets/{id}/trades` | `side` (buy/sell), `quantity` (**string decimal**, até 8 casas, > 0), `unitPriceCents`, `tradedOn` (YYYY-MM-DD), **`accountId`** (conta de liquidação, **obrigatória** — compra debita / venda credita) |
+| `AssetDetail` | `GET/POST/PATCH /investimentos/assets/{id}` | `AssetPosition` + `trades[]` (`Trade`: `id`/`side`/`quantity`/`unitPriceCents`/`tradedOn`/**`accountId`** — vazio nos trades legados/seed sem caixa) |
+| `Investment[]` | `/investments` | `id`, `name`, `valueCents`, `dailyChangePct`, `icon` — **stub `[]`** (bloco do Dashboard, separado da tela nova) |
 | `InvestmentsSummary` | `/dashboard/investments-summary` | `totalCents`, `changeCents`, `changePct` — **stub zerado** |
 | `Ticker` | `/dashboard/ticker` | `name`, `symbol`, `changePct24h`, `priceCents`, `positionCents` — **stub** com `name:"Bitcoin"`/`symbol:"B"`, resto zerado |
 

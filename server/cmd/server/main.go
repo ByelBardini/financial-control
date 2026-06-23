@@ -10,6 +10,7 @@ import (
 	"financial-control/server/internal/config"
 	"financial-control/server/internal/contas"
 	"financial-control/server/internal/dashboard"
+	"financial-control/server/internal/investimentos"
 	"financial-control/server/internal/router"
 	"financial-control/server/internal/store"
 	"financial-control/server/internal/transacoes"
@@ -34,11 +35,12 @@ func main() {
 		auth.TTLs{Default: cfg.JWTTTLDefault, Remember: cfg.JWTTTLRemember},
 	)
 	deps := router.Deps{
-		Auth:       authSvc,
-		Account:    account.NewService(st),
-		Dashboard:  dashboard.NewService(st),
-		Contas:     contas.NewService(st),
-		Transacoes: transacoes.NewService(st),
+		Auth:          authSvc,
+		Account:       account.NewService(st),
+		Dashboard:     dashboard.NewService(st),
+		Contas:        contas.NewService(st),
+		Transacoes:    transacoes.NewService(st),
+		Investimentos: investimentos.NewService(st),
 	}
 
 	addr := ":" + cfg.Port

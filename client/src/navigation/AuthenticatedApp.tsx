@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { ContasScreen } from '../screens/ContasScreen';
 import { DashboardScreen } from '../screens/DashboardScreen';
+import { InvestimentosScreen } from '../screens/InvestimentosScreen';
 import { TransacoesScreen } from '../screens/TransacoesScreen';
 import type { AppRoute } from './routes';
 
@@ -20,6 +21,9 @@ export function AuthenticatedApp({ onLogout }: AuthenticatedAppProps) {
   }
   if (route === 'transacoes') {
     return <TransacoesScreen route={route} onNavigate={setRoute} onLogout={onLogout} />;
+  }
+  if (route === 'investimentos') {
+    return <InvestimentosScreen route={route} onNavigate={setRoute} onLogout={onLogout} />;
   }
   return <DashboardScreen route={route} onNavigate={setRoute} onLogout={onLogout} />;
 }

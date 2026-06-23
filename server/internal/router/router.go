@@ -11,6 +11,7 @@ import (
 	"financial-control/server/internal/dashboard"
 	"financial-control/server/internal/health"
 	"financial-control/server/internal/httpx"
+	"financial-control/server/internal/investimentos"
 	"financial-control/server/internal/ratelimit"
 	"financial-control/server/internal/transacoes"
 )
@@ -24,11 +25,12 @@ const (
 
 // Deps reúne os serviços de domínio que os handlers precisam (injeção por parâmetro).
 type Deps struct {
-	Auth       *auth.Service
-	Account    *account.Service
-	Dashboard  *dashboard.Service
-	Contas     *contas.Service
-	Transacoes *transacoes.Service
+	Auth          *auth.Service
+	Account       *account.Service
+	Dashboard     *dashboard.Service
+	Contas        *contas.Service
+	Transacoes    *transacoes.Service
+	Investimentos *investimentos.Service
 }
 
 // New devolve o roteador com todas as rotas registradas. Só `GET /health` e
@@ -78,6 +80,22 @@ func New(d Deps) http.Handler {
 	mux.Handle("GET /transacoes/recurrences", protected(transacoes.RecurrencesHandler(d.Transacoes)))
 	mux.Handle("GET /transacoes/debts", protected(transacoes.DebtsHandler(d.Transacoes)))
 	mux.Handle("GET /categories", protected(transacoes.CategoriesHandler(d.Transacoes)))
+
+	// Views agregadas da tela de Investimentos (cripto à parte do portfólio geral).
+	mux.Handle("GET /investimentos/summary", protected(investimentos.SummaryHandler(d.Investimentos)))
+	mux.Handle("GET /investimentos/positions", protected(investimentos.PositionsHandler(d.Investimentos)))
+	mux.Handle("GET /investimentos/allocation", protected(investimentos.AllocationHandler(d.Investimentos)))
+	mux.Handle("GET /investimentos/crypto", protected(investimentos.CryptoHandler(d.Investimentos)))
+
+	// Recurso "investimentos" (CRUD): ativos + operações (compra/venda). Posição é derivada,
+	// então a escrita reflete nas views sem cache. Carteira isolada (não mexe no saldo das contas).
+	mux.Handle("GET /investimentos/assets", protected(investimentos.AssetsHandler(d.Investimentos)))
+	mux.Handle("POST /investimentos/assets", protected(investimentos.CreateAssetHandler(d.Investimentos)))
+	mux.Handle("GET /investimentos/assets/{id}", protected(investimentos.GetAssetHandler(d.Investimentos)))
+	mux.Handle("PATCH /investimentos/assets/{id}", protected(investimentos.UpdateAssetHandler(d.Investimentos)))
+	mux.Handle("DELETE /investimentos/assets/{id}", protected(investimentos.ArchiveAssetHandler(d.Investimentos)))
+	mux.Handle("POST /investimentos/assets/{id}/trades", protected(investimentos.TradeHandler(d.Investimentos)))
+	mux.Handle("DELETE /investimentos/assets/{id}/trades/{tradeId}", protected(investimentos.DeleteTradeHandler(d.Investimentos)))
 
 	// Recurso "transações" (CRUD): saldo é derivado, então a escrita reflete no mês/saldo.
 	mux.Handle("POST /transactions", protected(transacoes.CreateHandler(d.Transacoes)))
