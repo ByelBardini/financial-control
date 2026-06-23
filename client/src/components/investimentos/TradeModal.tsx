@@ -3,7 +3,7 @@ import { SectionError } from '../SectionError';
 import { SectionSkeleton } from '../SectionSkeleton';
 import { TradeForm } from './TradeForm';
 import { useAccounts } from '../../hooks/useDashboardQueries';
-import { useCreateTrade } from '../../hooks/useInvestmentMutations';
+import { useAsset, useCreateTrade } from '../../hooks/useInvestmentMutations';
 import {
   initialTradeValues,
   toCreateTradeInput,
@@ -24,9 +24,11 @@ function todayISO(): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
-// Modal de COMPRA/VENDA (lado fixo). Carrega as contas pro select de liquidação, monta a mutation
-// e fecha no sucesso. Título "Comprar <ticker>" / "Vender <ticker>". Casca via ModalSheet.
+// Modal de COMPRA/VENDA (lado fixo). Carrega o ativo (preço atual + classe, cache quente do detalhe)
+// pra pré-preencher o preço e decidir o modo (cripto abre "por valor") e as contas pro select de
+// liquidação; monta a mutation e fecha no sucesso. Título "Comprar <ticker>"/"Vender <ticker>".
 export function TradeModal({ assetId, ticker, side, onClose }: TradeModalProps) {
+  const assetQ = useAsset(assetId);
   const accountsQ = useAccounts();
   const createMut = useCreateTrade();
 
@@ -44,14 +46,29 @@ export function TradeModal({ assetId, ticker, side, onClose }: TradeModalProps) 
   );
 
   function renderBody() {
-    if (accountsQ.isPending) return <SectionSkeleton />;
-    if (accountsQ.isError)
-      return <SectionError label="as contas" onRetry={() => void accountsQ.refetch()} />;
+    if (assetQ.isPending || accountsQ.isPending) return <SectionSkeleton />;
+    if (assetQ.isError || accountsQ.isError)
+      return (
+        <SectionError
+          label="a operação"
+          onRetry={() => {
+            void assetQ.refetch();
+            void accountsQ.refetch();
+          }}
+        />
+      );
+    const asset = assetQ.data;
+    if (!asset) return null;
     const accounts = accountsQ.data ?? [];
-    const initial = { ...initialTradeValues(side, todayISO()), accountId: accounts[0]?.id ?? '' };
+    const isCrypto = asset.assetClass === 'cripto';
+    const initial = {
+      ...initialTradeValues(side, todayISO(), asset.currentPriceCents, isCrypto),
+      accountId: accounts[0]?.id ?? '',
+    };
     return (
       <TradeForm
         ticker={ticker}
+        isCrypto={isCrypto}
         initial={initial}
         accounts={accounts}
         submitting={submitting}
