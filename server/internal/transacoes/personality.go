@@ -38,11 +38,15 @@ func timeLabel(d time.Time) string {
 }
 
 // transactionTag deriva a etiqueta + tom (single-badge) a partir de sinais reais, por
-// precedência: parcela > recorrente > essencialidade da categoria. Despesa avulsa essencial
-// = Sobrevivência; supérflua = Supérfluo; recorrente = Fixo; parcela = Parcelado. Receita
-// recorrente = Inflow Esperado; avulsa = Renda Extra. dbDirection é "income"/"expense",
-// kind é "standard"/"installment"/"transfer", essentialness é "essential"/"discretionary".
+// precedência: aporte/resgate > parcela > recorrente > essencialidade da categoria. Despesa
+// avulsa essencial = Sobrevivência; supérflua = Supérfluo; recorrente = Fixo; parcela =
+// Parcelado; liquidação de investimento = Investimento. Receita recorrente = Inflow Esperado;
+// avulsa = Renda Extra. dbDirection é "income"/"expense", kind é
+// "standard"/"installment"/"transfer"/"investment", essentialness é "essential"/"discretionary".
 func transactionTag(dbDirection, kind, essentialness string, isRecurring bool) (tag, tone string) {
+	if kind == "investment" {
+		return "Investimento", "neutral"
+	}
 	if kind == "installment" {
 		return "Parcelado", "primary"
 	}

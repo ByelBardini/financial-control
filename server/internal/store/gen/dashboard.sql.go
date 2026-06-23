@@ -17,6 +17,7 @@ SELECT
     (COALESCE(SUM(amount) FILTER (WHERE direction = 'expense'), 0) * 100)::bigint AS gastos_cents
 FROM transactions
 WHERE user_id = $1
+  AND kind <> 'investment' -- aporte/resgate move saldo, mas não é gasto/renda do mês
   AND occurred_on >= date_trunc('month', $2::date)
   AND occurred_on <  date_trunc('month', $2::date) + interval '1 month'
 `
@@ -49,6 +50,7 @@ SELECT
 FROM transactions t
 JOIN categories c ON c.id = t.category_id AND c.user_id = t.user_id
 WHERE t.direction = 'expense'
+  AND t.kind <> 'investment' -- aporte não é gasto por categoria
   AND t.user_id = $1
   AND t.occurred_on >= date_trunc('month', $2::date)
   AND t.occurred_on <  date_trunc('month', $2::date) + interval '1 month'
