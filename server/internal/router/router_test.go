@@ -9,6 +9,7 @@ import (
 	"financial-control/server/internal/auth"
 	"financial-control/server/internal/contas"
 	"financial-control/server/internal/dashboard"
+	"financial-control/server/internal/investimentos"
 	"financial-control/server/internal/router"
 	"financial-control/server/internal/transacoes"
 )
@@ -18,11 +19,12 @@ import (
 func newTestRouter() http.Handler {
 	authSvc := auth.NewService(nil, auth.NewTokenIssuer("router-test-secret-0123456789-01"), auth.TTLs{})
 	return router.New(router.Deps{
-		Auth:       authSvc,
-		Account:    account.NewService(nil),
-		Dashboard:  dashboard.NewService(nil),
-		Contas:     contas.NewService(nil),
-		Transacoes: transacoes.NewService(nil),
+		Auth:          authSvc,
+		Account:       account.NewService(nil),
+		Dashboard:     dashboard.NewService(nil),
+		Contas:        contas.NewService(nil),
+		Transacoes:    transacoes.NewService(nil),
+		Investimentos: investimentos.NewService(nil),
 	})
 }
 
@@ -53,6 +55,12 @@ func TestRotasDeDadosExigemToken(t *testing.T) {
 		"/transacoes/debts",
 		"/categories",
 		"/transactions/t1",
+		"/investimentos/summary",
+		"/investimentos/positions",
+		"/investimentos/allocation",
+		"/investimentos/crypto",
+		"/investimentos/assets",
+		"/investimentos/assets/a1",
 	}
 	for _, p := range dataPaths {
 		rec := httptest.NewRecorder()
@@ -73,6 +81,11 @@ func TestRotasDeEscritaExigemToken(t *testing.T) {
 		{http.MethodPost, "/transactions"},
 		{http.MethodPatch, "/transactions/t1"},
 		{http.MethodDelete, "/transactions/t1"},
+		{http.MethodPost, "/investimentos/assets"},
+		{http.MethodPatch, "/investimentos/assets/a1"},
+		{http.MethodDelete, "/investimentos/assets/a1"},
+		{http.MethodPost, "/investimentos/assets/a1/trades"},
+		{http.MethodDelete, "/investimentos/assets/a1/trades/t1"},
 	}
 	for _, c := range cases {
 		rec := httptest.NewRecorder()
