@@ -21,12 +21,7 @@ export function CashflowMetric({
   return (
     <View className="gap-stack-sm">
       <Text className="font-geist-medium text-label-sm text-on-surface-variant">{label}</Text>
-      <MoneyText
-        cents={cents}
-        hidden={hidden}
-        tone={tone}
-        className="font-hanken-semibold text-headline-sm"
-      />
+      <MoneyText cents={cents} hidden={hidden} tone={tone} className="font-hanken text-body-lg" />
     </View>
   );
 }

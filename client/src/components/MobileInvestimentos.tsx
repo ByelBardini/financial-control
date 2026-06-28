@@ -1,4 +1,4 @@
-import { Pressable, ScrollView, View } from 'react-native';
+import { ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AllocationBar } from './investimentos/AllocationBar';
 import { CryptoSection } from './investimentos/CryptoSection';
@@ -7,7 +7,8 @@ import { PortfolioHero } from './investimentos/PortfolioHero';
 import { PositionRow } from './investimentos/PositionRow';
 import { RiskAssessmentCard } from './investimentos/RiskAssessmentCard';
 import { BottomNav } from './BottomNav';
-import { Icon } from './Icon';
+import { Fab } from './Fab';
+import { MobilePageHeader } from './MobilePageHeader';
 import { QuerySection } from './QuerySection';
 import { SectionHeading } from './SectionHeading';
 import { TopBar } from './TopBar';
@@ -59,6 +60,7 @@ export function MobileInvestimentos({
         className="flex-1"
         contentContainerStyle={{ gap: 24, paddingBottom: insets.bottom + 96 }}
       >
+        <MobilePageHeader eyebrow="Risco Máximo" title="Investimentos" />
         <QuerySection query={summary} label="o resumo do portfólio">
           {(data) => <PortfolioHero summary={data} hidden={hidden} />}
         </QuerySection>
@@ -104,15 +106,12 @@ export function MobileInvestimentos({
         </QuerySection>
       </ScrollView>
 
-      <Pressable
-        onPress={onCreateAsset}
-        accessibilityRole="button"
+      <Fab
+        iconName="add"
         accessibilityLabel="Novo ativo"
-        className="absolute right-6 h-14 w-14 items-center justify-center rounded-full bg-primary"
-        style={{ bottom: insets.bottom + 88 }}
-      >
-        <Icon name="add" size={28} color="#3c0091" />
-      </Pressable>
+        onPress={() => onCreateAsset?.()}
+        bottom={insets.bottom + 88}
+      />
 
       <View className="absolute bottom-0 left-0 right-0" style={{ paddingBottom: insets.bottom }}>
         <BottomNav currentRoute={route} onNavigate={onNavigate} />

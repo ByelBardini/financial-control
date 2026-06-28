@@ -6,6 +6,7 @@ import { BottomNav } from './BottomNav';
 import { CategorySpendSection } from './CategorySpendSection';
 import { DiagnosisCard } from './DiagnosisCard';
 import { InvestmentsSection } from './InvestmentsSection';
+import { MobilePageHeader } from './MobilePageHeader';
 import { QuerySection } from './QuerySection';
 import { TopBar } from './TopBar';
 import { TransactionSpeedDial } from './transacoes/TransactionSpeedDial';
@@ -53,6 +54,7 @@ export function MobileDashboard({
         className="flex-1"
         contentContainerStyle={{ gap: 24, paddingBottom: insets.bottom + 96 }}
       >
+        <MobilePageHeader eyebrow="Visão Geral" title="Bem-vindo de volta" />
         <QuerySection query={balance} label="o saldo">
           {(data) => <BalanceHero balance={data} hidden={hidden} />}
         </QuerySection>

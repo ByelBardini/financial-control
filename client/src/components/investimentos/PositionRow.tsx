@@ -1,5 +1,5 @@
 import { Text, View } from 'react-native';
-import { EditableCard } from '../EditableCard';
+import { Card } from '../Card';
 import { Icon } from '../Icon';
 import { MoneyText } from '../MoneyText';
 import { toneColor } from '../../theme/colors';
@@ -49,11 +49,7 @@ export function PositionRow({ position, hidden, variant = 'card', onPress }: Pos
 
   if (variant === 'row') {
     return (
-      <EditableCard
-        className="flex-row items-center border-b border-grid-line py-stack-md"
-        editLabel={editLabel}
-        onPress={onPress}
-      >
+      <Card variant="row" className="flex-row items-center" editLabel={editLabel} onPress={onPress}>
         {identity}
         <View className="w-32 items-end">
           <MoneyText
@@ -82,12 +78,13 @@ export function PositionRow({ position, hidden, variant = 'card', onPress }: Pos
             {formatPercent(position.gainPct)}
           </Text>
         </View>
-      </EditableCard>
+      </Card>
     );
   }
 
   return (
-    <EditableCard
+    <Card
+      variant="plain"
       className="flex-row items-center justify-between py-stack-md"
       editLabel={editLabel}
       onPress={onPress}
@@ -111,6 +108,6 @@ export function PositionRow({ position, hidden, variant = 'card', onPress }: Pos
           />
         </View>
       </View>
-    </EditableCard>
+    </Card>
   );
 }

@@ -1,5 +1,7 @@
 import { useState, type ReactNode } from 'react';
 import { Text, TextInput, View, type KeyboardTypeOptions, type TextInputProps } from 'react-native';
+import { FieldShell } from '../FieldShell';
+import { colors } from '../../theme/colors';
 
 type FormFieldProps = {
   label: string;
@@ -46,10 +48,7 @@ export function FormField({
       : 'border-outline-variant';
 
   return (
-    <View className="gap-stack-sm">
-      <Text className="font-geist-semibold text-label-sm uppercase text-on-surface-variant">
-        {label}
-      </Text>
+    <FieldShell label={label} error={error}>
       <View
         className={
           prefix
@@ -64,7 +63,7 @@ export function FormField({
           onFocus={() => setFocused(true)}
           onBlur={() => setFocused(false)}
           placeholder={placeholder}
-          placeholderTextColor="#958ea0"
+          placeholderTextColor={colors.outline}
           keyboardType={keyboardType}
           autoComplete={autoComplete}
           autoCapitalize={autoCapitalize}
@@ -81,11 +80,6 @@ export function FormField({
         />
         {rightSlot ? <View className="absolute right-1">{rightSlot}</View> : null}
       </View>
-      {error ? (
-        <Text accessibilityRole="alert" className="text-label-sm text-error">
-          {error}
-        </Text>
-      ) : null}
-    </View>
+    </FieldShell>
   );
 }

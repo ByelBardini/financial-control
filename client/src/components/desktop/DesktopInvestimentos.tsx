@@ -1,14 +1,13 @@
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { SideNav } from './SideNav';
+import { InvestimentosHeader } from './InvestimentosHeader';
 import { AllocationBar } from '../investimentos/AllocationBar';
 import { CryptoSection } from '../investimentos/CryptoSection';
 import { EvolutionSection } from '../investimentos/EvolutionSection';
 import { PortfolioHero } from '../investimentos/PortfolioHero';
 import { PositionRow } from '../investimentos/PositionRow';
 import { RiskAssessmentCard } from '../investimentos/RiskAssessmentCard';
-import { HideValuesToggle } from '../HideValuesToggle';
-import { Icon } from '../Icon';
 import { QuerySection } from '../QuerySection';
 import { SectionHeading } from '../SectionHeading';
 import {
@@ -68,31 +67,11 @@ export function DesktopInvestimentos({
       />
       <SideNav currentRoute={route} onNavigate={onNavigate} onLogout={onLogout} />
       <ScrollView className="flex-1" contentContainerStyle={{ flexGrow: 1 }}>
-        <View className="flex-row items-end justify-between border-b border-grid-line px-container-margin py-stack-lg">
-          <View className="gap-base">
-            <Text className="font-geist-semibold text-label-sm uppercase text-secondary">
-              Risco Máximo
-            </Text>
-            <Text
-              accessibilityRole="header"
-              className="font-hanken-bold text-display-lg text-on-surface"
-            >
-              Investimentos
-            </Text>
-          </View>
-          <View className="flex-row items-center gap-stack-md">
-            <HideValuesToggle hidden={hidden} onToggleHidden={onToggleHidden} />
-            <Pressable
-              onPress={onCreateAsset}
-              accessibilityRole="button"
-              accessibilityLabel="Novo ativo"
-              className="flex-row items-center gap-stack-sm rounded-lg bg-surface-container-highest px-stack-md py-base"
-            >
-              <Icon name="add" size={16} color="#d0bcff" />
-              <Text className="font-geist-semibold text-label-sm text-primary">NOVO ATIVO</Text>
-            </Pressable>
-          </View>
-        </View>
+        <InvestimentosHeader
+          hidden={hidden}
+          onToggleHidden={onToggleHidden}
+          onCreateAsset={onCreateAsset}
+        />
 
         <View className="flex-1 flex-row border-t border-grid-line">
           <View className="border-r border-grid-line" style={{ flex: 2 }}>

@@ -1,5 +1,5 @@
 import { Text, View } from 'react-native';
-import { EditableCard } from './EditableCard';
+import { Card } from './Card';
 import { Icon } from './Icon';
 import { MoneyText } from './MoneyText';
 import { ProgressBar } from './ProgressBar';
@@ -20,9 +20,6 @@ const statusTone: Record<VoucherStatus, Tone> = {
   estavel: 'neutral',
   critico: 'error',
 };
-
-const cardClass =
-  'gap-stack-md rounded-xl border border-outline-variant bg-surface-container-low p-stack-lg';
 
 // Cartão de vale (benefício): ícone + status, valor, barra de consumo e nota ácida.
 // Com onPress, vira um alvo "Editar conta" acessível.
@@ -53,8 +50,13 @@ export function VoucherCard({ voucher, hidden, onPress }: VoucherCardProps) {
   );
 
   return (
-    <EditableCard className={cardClass} editLabel={`Editar ${voucher.name}`} onPress={onPress}>
+    <Card
+      variant="outlined"
+      className="gap-stack-md bg-surface-container-low p-stack-lg"
+      editLabel={`Editar ${voucher.name}`}
+      onPress={onPress}
+    >
       {body}
-    </EditableCard>
+    </Card>
   );
 }

@@ -1,5 +1,5 @@
 import { Text, View } from 'react-native';
-import { EditableCard } from './EditableCard';
+import { Card } from './Card';
 import { Icon } from './Icon';
 import { MoneyText } from './MoneyText';
 import { toneColor } from '../theme/colors';
@@ -10,9 +10,6 @@ type BankAccountCardProps = {
   hidden: boolean;
   onPress?: () => void;
 };
-
-const cardClass =
-  'flex-row items-center justify-between rounded-xl border border-outline-variant bg-surface-container-high p-stack-md';
 
 // Card de conta bancária (layout mobile): tile da marca + nome + nota ácida + saldo.
 // Com onPress, vira um alvo "Editar conta" acessível.
@@ -46,8 +43,13 @@ export function BankAccountCard({ account, hidden, onPress }: BankAccountCardPro
   );
 
   return (
-    <EditableCard className={cardClass} editLabel={`Editar ${account.name}`} onPress={onPress}>
+    <Card
+      variant="outlined"
+      className="flex-row items-center justify-between bg-surface-container-high p-stack-md"
+      editLabel={`Editar ${account.name}`}
+      onPress={onPress}
+    >
       {body}
-    </EditableCard>
+    </Card>
   );
 }
