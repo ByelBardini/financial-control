@@ -103,7 +103,7 @@ sempre em **centavos** (inteiro). **Toda rota abaixo exige `Authorization: Beare
 | GET | `/investimentos/positions` | posições abertas do portfólio geral (preço médio derivado) | implementado |
 | GET | `/investimentos/allocation` | alocação por classe (Ações/FIIs/Renda Fixa; percent = share) | implementado |
 | GET | `/investimentos/crypto` | bloco de cripto À PARTE (subtotal próprio + `series` do histórico) | implementado |
-| GET | `/investimentos/evolution` | evolução do patrimônio geral (cripto fora): valor de mercado × custo acumulado por dia (forward-fill); `?range=` 1mo/3mo/6mo/1y/max (default 6mo) | implementado |
+| GET | `/investimentos/evolution` | evolução do patrimônio geral (cripto fora): valor de mercado × custo acumulado por dia (forward-fill; sem preço no ledger → cai no `current_price` manual, batendo com as posições); `?range=` 1mo/3mo/6mo/1y/max (default 6mo) | implementado |
 | POST | `/investimentos/backfill` | dispara (em background) o backfill de ~1 ano de histórico dos ativos JÁ cadastrados do usuário (classes cotáveis; renda_fixa fora) → **202** `{assets:N}` (quantos entraram na fila). Best-effort; rode 1× após configurar `BRAPI_TOKEN` | implementado |
 | GET | `/investimentos/assets` | todos os ativos + posição derivada (gestão) | implementado |
 | POST | `/investimentos/assets` | cria ativo → **201** + `AssetDetail`; **400** inválido (backfill de preço dispara em background) | implementado |
@@ -113,9 +113,8 @@ sempre em **centavos** (inteiro). **Toda rota abaixo exige `Authorization: Beare
 | DELETE | `/investimentos/assets/{id}` | arquiva ativo → **204**; **404** | implementado |
 | POST | `/investimentos/assets/{id}/trades` | compra/venda (`side` buy/sell, `quantity` string, centavos, **`accountId`** de liquidação) → **201** + ativo; liquida na conta (`kind='investment'`: compra debita / venda credita) atômico; **400** venda > posição / conta inválida; **404** ativo | implementado |
 | DELETE | `/investimentos/assets/{id}/trades/{tradeId}` | exclui operação (posição recomputa; **cascata** a transação de caixa) → **204**; **404** | implementado |
-| GET | `/investments` | lista de investimentos (bloco do Dashboard — separado da tela nova) | stub deferido (`[]`) |
-| GET | `/dashboard/investments-summary` | resumo da carteira | stub deferido (zerado) |
-| GET | `/dashboard/ticker` | cotação destacada (cripto) | stub deferido (zerado) |
+| GET | `/investments` | bloco "Investimentos" da Início — posições abertas da carteira real (deriva de `ListPositions`, carteira inteira) | implementado |
+| GET | `/dashboard/investments-summary` | resumo da carteira (valor atual + ganho/perda + %) da Início, da carteira real | implementado |
 
 > Os textos de personalidade (`statusLabel`/`quip`/`diagnosis` no dashboard; `note`/
 > `noteTone`/`status`/`quip`/labels do panic/`tip` em **contas**; `collapse` (Previsão de Colapso)
@@ -153,7 +152,7 @@ Valores `*Cents`/monetários são **int64 em centavos**.
 | `CashWallet` | `/contas/cash` | `balanceCents`, `quip`, `confidenceLabel`, `confidencePercent` |
 | `PovertyXray` | `/contas/xray` | `title`, `rows[]` (`label`/`cents`/`tone`), `panic` (`percent`/`levelLabel`/`levelTone`/`lowLabel`/`highLabel`/`note`) |
 | `ManagementTip` | `/contas/tip` | `title`, `body` |
-| `MonthBalance` | `/dashboard/summary` | `netCents`, `availableLabel`, `statusLabel`, `quip`, `receitasCents`, `gastosCents`, `investidoCents` (= 0 até investimentos entrarem) |
+| `MonthBalance` | `/dashboard/summary` | `netCents`, `availableLabel`, `statusLabel`, `quip`, `receitasCents`, `gastosCents`, `investidoCents` (valor atual da carteira — Σ posições abertas) |
 | `CategorySpend[]` | `/dashboard/categories` | `id`, `label`, `amountCents`, `percent` (share 0..100), `tone` |
 | `EsteMes` | `/dashboard/este-mes` | `spentPercent`, `biggestVillain` (categoria de maior gasto no mês) |
 | `Diagnosis` | `/dashboard/diagnosis` | `title`, `body` |
@@ -170,7 +169,7 @@ Valores `*Cents`/monetários são **int64 em centavos**.
 | `PortfolioSummary` | `/investimentos/summary` | `totalCents`, `gainCents`, `gainPct`, `title`, `quip` (geral, cripto fora) |
 | `Position[]` | `/investimentos/positions` | `id`, `ticker`, `name`, `assetClass`, `icon`, `costBasisCents`, `currentValueCents`, `gainCents`, `gainPct`, `realizedCents` |
 | `AllocationSlice[]` | `/investimentos/allocation` | `assetClass`, `label`, `valueCents`, `percent`, `tone` |
-| `CryptoBlock` | `/investimentos/crypto` | `title`, `subtitle`, `subtotalCents`, `gainCents`, `gainPct`, `holdings[]` (`CryptoHolding`: `id`/`symbol`/`name`/`icon`/`costBasisCents`/`currentValueCents`/`gainCents`/`gainPct`/`series[]` em centavos) |
+| `CryptoBlock` | `/investimentos/crypto` | `title`, `subtitle`, `subtotalCents`, `gainCents`, `gainPct`, `holdings[]` (`CryptoHolding`: `id`/`symbol`/`name`/`icon`/`costBasisCents`/`currentValueCents`/`gainCents`/`gainPct`/`series[]` de `{date, priceCents}` — mesmo shape do `PriceHistoryPoint`) |
 | `EvolutionPoint[]` | `/investimentos/evolution` | `date` (YYYY-MM-DD), `marketValueCents`, `costBasisCents` — o gap entre as duas linhas = ganho não-realizado |
 | `PriceHistoryPoint[]` | `/investimentos/assets/{id}/history` | `date` (YYYY-MM-DD), `priceCents` |
 | `AssetPosition[]` | `/investimentos/assets` | metadados + `currentPriceCents`, `netQuantity` (**string**), `avgPriceCents`, `costBasisCents`, `currentValueCents`, `gainCents`, `gainPct`, `realizedCents` |
@@ -178,9 +177,8 @@ Valores `*Cents`/monetários são **int64 em centavos**.
 | `UpdateAssetInput` (req) | `PATCH /investimentos/assets/{id}` | igual ao Create **menos `assetClass`** (imutável) |
 | `CreateTradeInput` (req) | `POST /investimentos/assets/{id}/trades` | `side` (buy/sell), `quantity` (**string decimal**, até 8 casas, > 0), `unitPriceCents`, `tradedOn` (YYYY-MM-DD), **`accountId`** (conta de liquidação, **obrigatória** — compra debita / venda credita) |
 | `AssetDetail` | `GET/POST/PATCH /investimentos/assets/{id}` | `AssetPosition` + `trades[]` (`Trade`: `id`/`side`/`quantity`/`unitPriceCents`/`tradedOn`/**`accountId`** — vazio nos trades legados/seed sem caixa) |
-| `Investment[]` | `/investments` | `id`, `name`, `valueCents`, `dailyChangePct`, `icon` — **stub `[]`** (bloco do Dashboard, separado da tela nova) |
-| `InvestmentsSummary` | `/dashboard/investments-summary` | `totalCents`, `changeCents`, `changePct` — **stub zerado** |
-| `Ticker` | `/dashboard/ticker` | `name`, `symbol`, `changePct24h`, `priceCents`, `positionCents` — **stub** com `name:"Bitcoin"`/`symbol:"B"`, resto zerado |
+| `Investment[]` | `/investments` | `id`, `name` (ticker), `valueCents` (valor atual), `dailyChangePct` (= ganho% acumulado — sem cotação diária), `icon` — derivado das posições da carteira |
+| `InvestmentsSummary` | `/dashboard/investments-summary` | `totalCents`, `changeCents`, `changePct` — agregado das posições da carteira |
 
 ## Decisões em aberto
 - [x] Layout de pacotes: `cmd/` + `internal/<domínio>/` + `test/`.

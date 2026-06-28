@@ -59,9 +59,11 @@ A fórmula "média só das compras" daria 6,40 (errado). Há teste de integraç�
 
 **Views (alimentam a tela; shape 1:1 com `client/src/types/investimentos.ts`):**
 `GET /summary` (PortfolioSummary, geral), `/positions` (Position[] abertas, geral), `/allocation`
-(AllocationSlice[], geral), `/crypto` (CryptoBlock à parte, `series` do histórico), `/evolution`
-(EvolutionPoint[] — **valor de mercado × custo acumulado** por dia, com **forward-fill** em dias sem pregão;
-exclui cripto; `?range=` 1mo/3mo/6mo/1y/max, default 6mo — é o gráfico de "valorizou ou não?").
+(AllocationSlice[], geral), `/crypto` (CryptoBlock à parte; `series` agora é `{date, priceCents}[]` — data +
+preço por ponto), `/evolution` (EvolutionPoint[] — **valor de mercado × custo acumulado** por dia, com
+**forward-fill** em dias sem pregão; **sem preço no ledger, o mercado cai no `current_price`** (manual) pra
+bater com as posições, em vez de zerar; exclui cripto; `?range=` 1mo/3mo/6mo/1y/max, default 6mo — é o gráfico
+de "valorizou ou não?").
 
 **Recurso (gestão + compra/venda):** `GET/POST /assets`, `GET/PATCH/DELETE /assets/{id}`,
 `GET /assets/{id}/history` (PriceHistoryPoint[] — série diária de preço do ativo; `?range=`)
@@ -77,8 +79,10 @@ abre nele — por **valor em R$** (a quantidade = valor ÷ preço é derivada **
 enviado é **sempre** `quantity` + `unitPriceCents` — o backend não muda; o `amount` (caixa) segue `qtd ×
 preço` em NUMERIC no SQL.
 
-**Não confundir** com os stubs do Dashboard (`/investments`, `/dashboard/investments-summary`,
-`/dashboard/ticker`) — são do bloco "Investimentos (Risos)" da Início, intactos e separados desta tela.
+**Bloco "Investimentos" da Início** (`/investments`, `/dashboard/investments-summary` + o `investidoCents`
+do `/dashboard/summary`) agora **deriva desta carteira** (o `dashboard.Service` lê `ListPositions`,
+carteira inteira) — não são mais stubs. O stub `/dashboard/ticker` foi **removido**. Essa tela
+(`/investimentos/*`) segue sendo a fonte; a Início é um resumo dela.
 
 ## Camadas / arquivos
 
@@ -99,6 +103,6 @@ recebe o `cotacao.Resolver` por `ComBackfill` (sem ele, cadastro não busca pre�
 dia em **data de Brasília** (`cotacao.DataBRT`, não UTC).
 
 ## Fora de escopo (v1)
-Taxas/corretagem; cotação ao vivo (cripto/B3); materialização de proventos/dividendos; editar trade via
-PATCH (hoje só criar/excluir — a posição recomputa de qualquer jeito); ligar o `investidoCents` do Dashboard
-e os stubs `/investments`/ticker à carteira real.
+Taxas/corretagem; materialização de proventos/dividendos; editar trade via PATCH (hoje só criar/excluir — a
+posição recomputa de qualquer jeito). Cotação ao vivo intradiária (B3/cripto) segue fora — o que há é o
+fechamento EOD do job + backfill (ver `cotacao.md`).
