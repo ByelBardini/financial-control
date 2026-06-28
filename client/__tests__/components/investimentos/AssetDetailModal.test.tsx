@@ -36,6 +36,7 @@ const detail: AssetDetail = {
 
 function setup() {
   jest.mocked(api.getAsset).mockResolvedValue(detail);
+  jest.mocked(api.getPriceHistory).mockResolvedValue([]); // a seção de histórico é uma query à parte
   const onClose = jest.fn();
   const onTrade = jest.fn();
   const onEdit = jest.fn();

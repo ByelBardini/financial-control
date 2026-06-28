@@ -15,7 +15,7 @@ describe('CryptoCard', () => {
     expect(screen.getByText(formatBRL(holding.currentValueCents))).toBeOnTheScreen();
     expect(screen.getByText(formatBRL(holding.gainCents))).toBeOnTheScreen();
     expect(screen.getByText(formatPercent(holding.gainPct))).toBeOnTheScreen();
-    expect(screen.getByTestId('crypto-chart')).toBeOnTheScreen();
+    expect(screen.getByTestId('price-sparkline')).toBeOnTheScreen();
   });
 
   it('mascara os valores quando hidden', async () => {

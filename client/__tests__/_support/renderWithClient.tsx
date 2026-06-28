@@ -62,6 +62,7 @@ export function mockInvestimentosApi(snapshot: InvestimentosSnapshot = investime
   jest.mocked(investimentosApi.getAllocation).mockResolvedValue(snapshot.allocation);
   jest.mocked(investimentosApi.getCryptoBlock).mockResolvedValue(snapshot.crypto);
   jest.mocked(investimentosApi.getRiskAssessment).mockResolvedValue(snapshot.risk);
+  jest.mocked(investimentosApi.getPortfolioEvolution).mockResolvedValue([]);
 }
 
 // Renderiza ui dentro de um QueryClient de teste (retry off, gcTime 0 pra não

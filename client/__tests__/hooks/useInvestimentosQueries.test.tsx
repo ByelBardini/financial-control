@@ -9,6 +9,7 @@ import {
   useInvestmentPositions,
   useInvestmentRisk,
   useInvestmentSummary,
+  usePortfolioEvolution,
 } from '../../src/hooks/useInvestimentosQueries';
 
 jest.mock('../../src/api/investimentos');
@@ -72,5 +73,21 @@ describe('demais seções de Investimentos', () => {
     const { result } = await renderHook(() => useInvestmentRisk(), { wrapper: makeWrapper() });
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
     expect(result.current.data?.level).toBe(investimentosSnapshot.risk.level);
+  });
+
+  it('usePortfolioEvolution entrega a série de evolução pelo range', async () => {
+    jest
+      .mocked(api.getPortfolioEvolution)
+      .mockResolvedValue([
+        { date: '2026-06-16', marketValueCents: 240000, costBasisCents: 220000 },
+      ]);
+
+    const { result } = await renderHook(() => usePortfolioEvolution('6mo'), {
+      wrapper: makeWrapper(),
+    });
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+
+    expect(api.getPortfolioEvolution).toHaveBeenCalledWith('6mo');
+    expect(result.current.data?.[0]?.marketValueCents).toBe(240000);
   });
 });
