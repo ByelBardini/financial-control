@@ -6,7 +6,7 @@ import { toneColor } from '../../theme/colors';
 import { areaPath, chartPoints, linePath, nearestIndex } from '../../lib/cryptoChart';
 import type { Tone } from '../../types/dashboard';
 
-type CryptoChartProps = {
+type PriceSparklineProps = {
   series: number[];
   tone: Tone;
   hidden: boolean;
@@ -18,11 +18,11 @@ type PointerLike = { nativeEvent: { offsetX?: number; locationX?: number } };
 const HEIGHT = 72;
 const TOOLTIP_W = 96;
 
-// Gráfico de linha/área do "preço" da cripto com crosshair + tooltip que segue o cursor (hover no
-// PC, arrastar no toque). Sem cotação ao vivo: a série vem do mock/backend e o tooltip mostra o
-// valor do ponto. A geometria é pura (lib/cryptoChart); aqui medimos a largura (onLayout) e
-// desenhamos com react-native-svg.
-export function CryptoChart({ series, tone, hidden }: CryptoChartProps) {
+// Gráfico de linha/área de PREÇO (série única, centavos) com crosshair + tooltip que segue o cursor
+// (hover no PC, arrastar no toque). Genérico: usado pela cripto (`CryptoCard`) e pelo histórico de
+// preço de qualquer ativo (`AssetHistorySection`). A geometria é pura (lib/cryptoChart); aqui medimos
+// a largura (onLayout) e desenhamos com react-native-svg.
+export function PriceSparkline({ series, tone, hidden }: PriceSparklineProps) {
   const [width, setWidth] = useState(0);
   const [active, setActive] = useState<number | null>(null);
   const color = toneColor(tone);
@@ -38,7 +38,7 @@ export function CryptoChart({ series, tone, hidden }: CryptoChartProps) {
 
   return (
     <View
-      testID="crypto-chart"
+      testID="price-sparkline"
       className="w-full"
       style={{ height: HEIGHT }}
       onLayout={onLayout}
@@ -49,12 +49,12 @@ export function CryptoChart({ series, tone, hidden }: CryptoChartProps) {
         <>
           <Svg width={width} height={HEIGHT} pointerEvents="none">
             <Defs>
-              <LinearGradient id="cryptoArea" x1="0" y1="0" x2="0" y2="1">
+              <LinearGradient id="priceArea" x1="0" y1="0" x2="0" y2="1">
                 <Stop offset="0" stopColor={color} stopOpacity={0.25} />
                 <Stop offset="1" stopColor={color} stopOpacity={0} />
               </LinearGradient>
             </Defs>
-            <Path d={areaPath(points, HEIGHT)} fill="url(#cryptoArea)" />
+            <Path d={areaPath(points, HEIGHT)} fill="url(#priceArea)" />
             <Path d={linePath(points)} stroke={color} strokeWidth={2} fill="none" />
             {activePoint ? (
               <>

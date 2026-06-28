@@ -44,7 +44,7 @@ export interface AllocationSlice {
 }
 
 // Posição de cripto (pilar à parte). Mesma ideia de ganho/perda manual da Position.
-// series = pontos de preço/valor (centavos) ao longo do tempo pro gráfico do card (CryptoChart);
+// series = pontos de preço/valor (centavos) ao longo do tempo pro gráfico do card (PriceSparkline);
 // o tooltip mostra o valor do ponto. Sem cotação ao vivo: vem do mock/backend.
 export interface CryptoHolding {
   id: string;
@@ -67,6 +67,21 @@ export interface CryptoBlock {
   gainCents: number;
   gainPct: number;
   holdings: CryptoHolding[];
+}
+
+// Ponto da evolução do patrimônio GERAL (cripto fora): valor de mercado × custo acumulado por dia.
+// O gap entre as duas linhas = ganho não-realizado (padrão de mercado pra "valorizou ou não?").
+// Centavos inteiros; date AAAA-MM-DD.
+export interface EvolutionPoint {
+  date: string;
+  marketValueCents: number;
+  costBasisCents: number;
+}
+
+// Ponto da série diária de preço de um ativo (gráfico de histórico no detalhe). Centavos inteiros.
+export interface PriceHistoryPoint {
+  date: string;
+  priceCents: number;
 }
 
 // Avaliação de Risco = veredito de DESEMPENHO no estilo do mockup (SEM barra/medidor): status
