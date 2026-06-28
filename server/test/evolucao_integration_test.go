@@ -101,3 +101,54 @@ func TestPortfolioEvolutionForwardFill(t *testing.T) {
 		}
 	}
 }
+
+// Sem nenhum preço no ledger, o valor de mercado cai no current_price (manual) em vez de zerar —
+// assim a linha de mercado bate com a tabela de posições (que usa current_price).
+func TestPortfolioEvolutionFallbackCurrentPrice(t *testing.T) {
+	dsn := os.Getenv("DATABASE_URL")
+	if dsn == "" {
+		t.Skip("DATABASE_URL não definido; pulando integração (precisa do Postgres)")
+	}
+	ctx := context.Background()
+	applySeed(t, ctx, dsn)
+
+	pool, err := pgxpool.New(ctx, dsn)
+	if err != nil {
+		t.Fatalf("pgxpool: %v", err)
+	}
+	defer pool.Close()
+
+	const uid = "ef000000-0000-0000-0000-000000000002"
+	if _, err := pool.Exec(ctx, `INSERT INTO users (id, email, password_hash) VALUES ($1, 'evol2@test.local', 'x') ON CONFLICT (id) DO NOTHING`, uid); err != nil {
+		t.Fatalf("inserir user: %v", err)
+	}
+
+	st, err := store.Open(ctx, dsn)
+	if err != nil {
+		t.Fatalf("store.Open: %v", err)
+	}
+	defer st.Close()
+
+	// Ativo COM current_price (R$ 15,00) e SEM nenhuma linha em investment_prices.
+	aid, err := st.CreateAsset(ctx, uid, store.AssetInput{Ticker: "EVOL2", Name: "Sem ledger", AssetClass: "acoes", CurrentPriceCents: 1500})
+	if err != nil {
+		t.Fatalf("CreateAsset: %v", err)
+	}
+	if _, err := pool.Exec(ctx, `
+		INSERT INTO investment_trades (user_id, asset_id, side, quantity, unit_price, traded_on)
+		VALUES ($1,$2,'buy',100,10.00,'2026-06-10')`, uid, aid); err != nil {
+		t.Fatalf("inserir trade: %v", err)
+	}
+
+	d := func(day int) time.Time { return time.Date(2026, 6, day, 12, 0, 0, 0, time.UTC) }
+	pts, err := st.PortfolioEvolution(ctx, uid, d(10), d(12))
+	if err != nil {
+		t.Fatalf("PortfolioEvolution: %v", err)
+	}
+	for _, p := range pts {
+		// mercado = 100 × R$15,00 (current_price) = 150000c; custo = 100 × R$10,00 = 100000c.
+		if p.MarketValueCents != 150000 || p.CostBasisCents != 100000 {
+			t.Errorf("%s = mercado %d / custo %d, quero 150000 / 100000 (fallback current_price)", p.OnDate.Format("2006-01-02"), p.MarketValueCents, p.CostBasisCents)
+		}
+	}
+}

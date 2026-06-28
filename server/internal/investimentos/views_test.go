@@ -5,6 +5,7 @@ import (
 	"errors"
 	"math"
 	"testing"
+	"time"
 
 	"financial-control/server/internal/investimentos"
 	"financial-control/server/internal/store"
@@ -100,8 +101,8 @@ func TestCryptoBlocoAParteComSerie(t *testing.T) {
 	fake := &fakeInvestimentosStore{
 		positions: generalAndCrypto(),
 		series: []store.CryptoSeriesRow{
-			{AssetID: "btc", PriceCents: 32000000},
-			{AssetID: "btc", PriceCents: 34125000},
+			{AssetID: "btc", ObservedOn: time.Date(2026, 6, 22, 0, 0, 0, 0, time.UTC), PriceCents: 32000000},
+			{AssetID: "btc", ObservedOn: time.Date(2026, 6, 23, 0, 0, 0, 0, time.UTC), PriceCents: 34125000},
 		},
 	}
 	got, err := investimentos.NewService(fake).Crypto(context.Background(), "u-1")
@@ -121,8 +122,11 @@ func TestCryptoBlocoAParteComSerie(t *testing.T) {
 	if h.Symbol != "BTC" || h.CurrentValueCents != 34125 || h.GainCents != 4125 || !floatEq(h.GainPct, 13.75) {
 		t.Errorf("BTC = %+v, quero value 34125 / gain 4125 / pct 13.75", h)
 	}
-	if len(h.Series) != 2 || h.Series[0] != 32000000 || h.Series[1] != 34125000 {
-		t.Errorf("série = %v, quero [32000000 34125000]", h.Series)
+	if len(h.Series) != 2 || h.Series[0].PriceCents != 32000000 || h.Series[1].PriceCents != 34125000 {
+		t.Errorf("série = %v, quero priceCents [32000000 34125000]", h.Series)
+	}
+	if h.Series[0].Date != "2026-06-22" || h.Series[1].Date != "2026-06-23" {
+		t.Errorf("datas da série = %q/%q, quero 2026-06-22/2026-06-23", h.Series[0].Date, h.Series[1].Date)
 	}
 	if got.SubtotalCents != 34125 || got.GainCents != 4125 {
 		t.Errorf("subtotal/gain = %d/%d, quero 34125/4125", got.SubtotalCents, got.GainCents)
