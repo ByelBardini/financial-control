@@ -59,6 +59,58 @@ func CryptoHandler(svc *Service) http.Handler {
 	})
 }
 
+// EvolutionHandler responde GET /investimentos/evolution?range=... com a evolução do patrimônio
+// geral (valor de mercado × custo acumulado).
+func EvolutionHandler(svc *Service) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		userID, ok := authedUserID(w, r)
+		if !ok {
+			return
+		}
+		out, err := svc.Evolution(r.Context(), userID, r.URL.Query().Get("range"))
+		if err != nil {
+			log.Printf("GET /investimentos/evolution: %v", err)
+			httpx.WriteError(w, http.StatusInternalServerError, "erro ao montar evolução")
+			return
+		}
+		httpx.WriteJSON(w, http.StatusOK, out)
+	})
+}
+
+// BackfillHandler responde POST /investimentos/backfill disparando, em segundo plano, o backfill de
+// histórico dos ativos JÁ cadastrados do usuário (classes cotáveis) → 202 + {assets:N} (quantos
+// entraram na fila). Útil uma vez após configurar o BRAPI_TOKEN, pra os ativos antigos ganharem série.
+func BackfillHandler(svc *Service) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		userID, ok := authedUserID(w, r)
+		if !ok {
+			return
+		}
+		n, err := svc.BackfillExistentes(r.Context(), userID)
+		if err != nil {
+			writeAssetError(w, err, "POST /investimentos/backfill", "erro ao iniciar backfill")
+			return
+		}
+		httpx.WriteJSON(w, http.StatusAccepted, map[string]int{"assets": n})
+	})
+}
+
+// PriceHistoryHandler responde GET /investimentos/assets/{id}/history?range=... com a série de preço.
+func PriceHistoryHandler(svc *Service) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		userID, ok := authedUserID(w, r)
+		if !ok {
+			return
+		}
+		out, err := svc.PriceHistory(r.Context(), userID, r.PathValue("id"), r.URL.Query().Get("range"))
+		if err != nil {
+			writeAssetError(w, err, "GET /investimentos/assets/{id}/history", "erro ao buscar histórico de preço")
+			return
+		}
+		httpx.WriteJSON(w, http.StatusOK, out)
+	})
+}
+
 // --- Recurso CRUD (ativos + operações) ---
 
 // writeInput é o corpo de escrita que se autovalida (criar ativo, editar, operar).

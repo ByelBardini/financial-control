@@ -4,10 +4,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log"
 	"regexp"
 	"strings"
 	"time"
 
+	"financial-control/server/internal/cotacao"
 	"financial-control/server/internal/store"
 )
 
@@ -191,13 +193,69 @@ func (s *Service) GetAsset(ctx context.Context, userID, id string) (AssetDetail,
 	return s.assetDetail(ctx, userID, id)
 }
 
-// CreateAsset cria o ativo e devolve o recurso (posição derivada, ainda sem operações).
+// CreateAsset cria o ativo e devolve o recurso (posição derivada, ainda sem operações). Se houver
+// cotador, dispara o backfill do histórico de preço em segundo plano — best-effort, NÃO bloqueia o
+// cadastro num request externo (o gráfico aparece alguns segundos depois).
 func (s *Service) CreateAsset(ctx context.Context, userID string, in CreateAssetInput) (AssetDetail, error) {
 	id, err := s.store.CreateAsset(ctx, userID, in.toStore())
 	if err != nil {
 		return AssetDetail{}, fmt.Errorf("investimentos: criar ativo: %w", err)
 	}
+	if s.cotador != nil {
+		go s.backfillPreco(userID, id, in.Ticker, in.AssetClass)
+	}
 	return s.assetDetail(ctx, userID, id)
+}
+
+// BackfillExistentes dispara o backfill de histórico dos ativos JÁ cadastrados do usuário (classes
+// cotáveis — renda_fixa fica de fora), em segundo plano e SEQUENCIAL (gentil com o rate limit das
+// APIs grátis). Best-effort: erros viram log. Devolve quantos ativos entraram na fila. Sem cotador
+// (cotação automática desligada), não faz nada e devolve 0. Idempotente (o gravar é upsert).
+func (s *Service) BackfillExistentes(ctx context.Context, userID string) (int, error) {
+	if s.cotador == nil {
+		return 0, nil
+	}
+	rows, err := s.store.ListPositions(ctx, userID, true, false)
+	if err != nil {
+		return 0, fmt.Errorf("investimentos: listar ativos p/ backfill: %w", err)
+	}
+	type alvo struct{ id, ticker, class string }
+	alvos := make([]alvo, 0, len(rows))
+	for _, r := range rows {
+		if r.AssetClass == "renda_fixa" {
+			continue
+		}
+		alvos = append(alvos, alvo{id: r.ID, ticker: r.Ticker, class: r.AssetClass})
+	}
+	go func() {
+		for _, a := range alvos {
+			s.backfillPreco(userID, a.id, a.ticker, a.class)
+		}
+	}()
+	return len(alvos), nil
+}
+
+// backfillPreco puxa ~1 ano de histórico do provedor e grava no ledger. Roda em goroutine própria,
+// com contexto/timeout próprios (o request já respondeu) — best-effort: erro vira só log.
+func (s *Service) backfillPreco(userID, assetID, ticker, class string) {
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	ate := time.Now()
+	pts, err := s.cotador.Historico(ctx, ticker, class, ate.AddDate(-1, 0, 0), ate)
+	if err != nil {
+		log.Printf("investimentos: backfill de preço de %s falhou: %v", ticker, err)
+		return
+	}
+	if len(pts) == 0 {
+		return
+	}
+	out := make([]store.PricePoint, 0, len(pts))
+	for _, p := range pts {
+		out = append(out, store.PricePoint{ObservedOn: p.ObservedOn, PriceCents: p.PriceCents, Source: p.Source})
+	}
+	if _, err := s.store.UpsertDailyPrices(ctx, userID, assetID, out); err != nil {
+		log.Printf("investimentos: gravar backfill de %s falhou: %v", ticker, err)
+	}
 }
 
 // UpdateAsset edita metadados + preço atual (classe imutável). Se o preço mudou, grava um ponto
@@ -212,7 +270,8 @@ func (s *Service) UpdateAsset(ctx context.Context, userID, id string, in UpdateA
 	}
 	if in.CurrentPriceCents != current.CurrentPriceCents {
 		// best-effort: o ponto de histórico é secundário; falhar aqui não invalida a edição já aplicada.
-		_, _ = s.store.AppendPriceObservation(ctx, userID, id, in.CurrentPriceCents, time.Now())
+		// observed_on = dia de pregão em Brasília (não UTC) — mesma regra de fuso do provider (cotacao).
+		_, _ = s.store.AppendPriceObservation(ctx, userID, id, in.CurrentPriceCents, cotacao.DataBRT(time.Now()))
 	}
 	return s.assetDetail(ctx, userID, id)
 }
