@@ -10,11 +10,15 @@ Carteira de investimentos no mesmo princípio do resto do app: **derivar, nunca 
 é derivada das **operações** (compras/vendas). Três tabelas (migration `00005`):
 
 - **`investment_assets`** — o ativo: `ticker`, `name`, `asset_class` (`acoes`/`fiis`/`renda_fixa`/`cripto`),
-  `icon`, `current_price` (NUMERIC — "último preço" **manual**, sem cotação ao vivo), `is_archived`.
+  `icon`, `current_price` (NUMERIC — **último fechamento**: para classes cotadas é o **cache** do close do
+  job diário; PATCH manual é override que vale até o próximo run; **renda_fixa é sempre manual**), `is_archived`.
 - **`investment_trades`** — **fatos crus**: `side` (`buy`/`sell`), `quantity` (`NUMERIC(28,8)`, fracionária
   p/ cripto), `unit_price`, `traded_on`. Append-only; editar/excluir é livre (a posição recomputa no read).
-- **`investment_prices`** — histórico de preço (alimenta o `series` do gráfico da cripto); uma linha é
-  gravada quando o `current_price` muda (PATCH do ativo).
+- **`investment_prices`** — **ledger de preço diário (EOD)**: no máximo **1 fechamento por ativo por dia**
+  (`UNIQUE(asset_id, observed_on)`, migration `00007`), com `source` (`manual`/`brapi`/`coingecko`) e
+  `as_of` (instante da cotação do provedor). Alimenta o `series` do gráfico da cripto e o histórico de
+  preço. Gravação é **upsert** (`AppendPriceObservation` no PATCH manual, `UpsertDailyPrice`/`RecordDailyClose`
+  na cotação automática) — editar 2× no mesmo dia atualiza a linha, não duplica. Ver `cotacao.md`.
 
 ## Posição derivada (preço médio móvel) — o ponto técnico
 
@@ -55,9 +59,12 @@ A fórmula "média só das compras" daria 6,40 (errado). Há teste de integraç�
 
 **Views (alimentam a tela; shape 1:1 com `client/src/types/investimentos.ts`):**
 `GET /summary` (PortfolioSummary, geral), `/positions` (Position[] abertas, geral), `/allocation`
-(AllocationSlice[], geral), `/crypto` (CryptoBlock à parte, `series` do histórico).
+(AllocationSlice[], geral), `/crypto` (CryptoBlock à parte, `series` do histórico), `/evolution`
+(EvolutionPoint[] — **valor de mercado × custo acumulado** por dia, com **forward-fill** em dias sem pregão;
+exclui cripto; `?range=` 1mo/3mo/6mo/1y/max, default 6mo — é o gráfico de "valorizou ou não?").
 
-**Recurso (gestão + compra/venda):** `GET/POST /assets`, `GET/PATCH/DELETE /assets/{id}`
+**Recurso (gestão + compra/venda):** `GET/POST /assets`, `GET/PATCH/DELETE /assets/{id}`,
+`GET /assets/{id}/history` (PriceHistoryPoint[] — série diária de preço do ativo; `?range=`)
 (PATCH edita metadados + `current_price`; classe **imutável**; preço novo grava `investment_prices`),
 `POST /assets/{id}/trades` (buy/sell — corpo exige **`accountId`** (conta de liquidação); venda > posição →
 **400**, guarda no próprio INSERT; conta inválida/arquivada → **400**), `DELETE /assets/{id}/trades/{tradeId}`
@@ -76,11 +83,20 @@ preço` em NUMERIC no SQL.
 ## Camadas / arquivos
 
 `internal/investimentos/`: `investimentos.go` (Service + interface `InvestimentosStore` + DTOs de view +
-Summary/Positions/Allocation/Crypto), `crud.go` (DTOs de escrita + validação + CRUD de ativo/operação;
-`Trade` carrega o ativo p/ 404 + ticker e delega ao store), `personality.go` (títulos/labels/tons/quips —
-PLACEHOLDER), `handlers.go` (handlers + mapeamento de erro: 404 ativo/operação, 400 venda insuficiente /
-conta inválida). Dados em `internal/store/investimentos.go` (`RecordTrade` abre a `pgx.Tx`: insere o trade +
-a transação de caixa, commit atômico) + `db/queries/investimentos.sql`.
+Summary/Positions/Allocation/Crypto + `NewService(store, ...Option)` com `ComBackfill`), `crud.go` (DTOs de
+escrita + validação + CRUD de ativo/operação; `Trade` carrega o ativo p/ 404 + ticker e delega ao store),
+`personality.go` (títulos/labels/tons/quips — PLACEHOLDER), `handlers.go` (handlers + mapeamento de erro: 404
+ativo/operação, 400 venda insuficiente / conta inválida). Dados em `internal/store/investimentos.go`
+(`RecordTrade` abre a `pgx.Tx`: insere o trade + a transação de caixa, commit atômico) + `db/queries/investimentos.sql`.
+
+**Cotação automática (provider `internal/cotacao`, ver `cotacao.md`):** ao **criar** um ativo, `CreateAsset`
+dispara um **backfill assíncrono** (goroutine, contexto próprio, **best-effort** — não bloqueia o request nem
+falha o cadastro) que puxa ~1 ano de histórico (`Cotador.Historico`) e grava via `UpsertDailyPrices`. Ativos
+**já existentes** (de antes da feature) ganham série via `POST /investimentos/backfill` (`BackfillExistentes`:
+itera os cotáveis do usuário em background, sequencial; rodar 1× após configurar o token). O `Service`
+recebe o `cotacao.Resolver` por `ComBackfill` (sem ele, cadastro não busca preço). Config: `BRAPI_TOKEN` e
+`COINGECKO_API_KEY` (ambos **fail-soft** — ausentes não impedem o server subir). PATCH de preço grava o ponto do
+dia em **data de Brasília** (`cotacao.DataBRT`, não UTC).
 
 ## Fora de escopo (v1)
 Taxas/corretagem; cotação ao vivo (cripto/B3); materialização de proventos/dividendos; editar trade via

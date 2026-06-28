@@ -103,9 +103,12 @@ sempre em **centavos** (inteiro). **Toda rota abaixo exige `Authorization: Beare
 | GET | `/investimentos/positions` | posições abertas do portfólio geral (preço médio derivado) | implementado |
 | GET | `/investimentos/allocation` | alocação por classe (Ações/FIIs/Renda Fixa; percent = share) | implementado |
 | GET | `/investimentos/crypto` | bloco de cripto À PARTE (subtotal próprio + `series` do histórico) | implementado |
+| GET | `/investimentos/evolution` | evolução do patrimônio geral (cripto fora): valor de mercado × custo acumulado por dia (forward-fill); `?range=` 1mo/3mo/6mo/1y/max (default 6mo) | implementado |
+| POST | `/investimentos/backfill` | dispara (em background) o backfill de ~1 ano de histórico dos ativos JÁ cadastrados do usuário (classes cotáveis; renda_fixa fora) → **202** `{assets:N}` (quantos entraram na fila). Best-effort; rode 1× após configurar `BRAPI_TOKEN` | implementado |
 | GET | `/investimentos/assets` | todos os ativos + posição derivada (gestão) | implementado |
-| POST | `/investimentos/assets` | cria ativo → **201** + `AssetDetail`; **400** inválido | implementado |
+| POST | `/investimentos/assets` | cria ativo → **201** + `AssetDetail`; **400** inválido (backfill de preço dispara em background) | implementado |
 | GET | `/investimentos/assets/{id}` | ativo completo (posição + operações) → **200**; **404** | implementado |
+| GET | `/investimentos/assets/{id}/history` | série diária de preço do ativo; `?range=` 1mo/3mo/6mo/1y/max (default 6mo) → **200** `PriceHistoryPoint[]` | implementado |
 | PATCH | `/investimentos/assets/{id}` | edita metadados + preço (classe imutável; preço novo grava histórico) → **200**; **404** | implementado |
 | DELETE | `/investimentos/assets/{id}` | arquiva ativo → **204**; **404** | implementado |
 | POST | `/investimentos/assets/{id}/trades` | compra/venda (`side` buy/sell, `quantity` string, centavos, **`accountId`** de liquidação) → **201** + ativo; liquida na conta (`kind='investment'`: compra debita / venda credita) atômico; **400** venda > posição / conta inválida; **404** ativo | implementado |
@@ -168,6 +171,8 @@ Valores `*Cents`/monetários são **int64 em centavos**.
 | `Position[]` | `/investimentos/positions` | `id`, `ticker`, `name`, `assetClass`, `icon`, `costBasisCents`, `currentValueCents`, `gainCents`, `gainPct`, `realizedCents` |
 | `AllocationSlice[]` | `/investimentos/allocation` | `assetClass`, `label`, `valueCents`, `percent`, `tone` |
 | `CryptoBlock` | `/investimentos/crypto` | `title`, `subtitle`, `subtotalCents`, `gainCents`, `gainPct`, `holdings[]` (`CryptoHolding`: `id`/`symbol`/`name`/`icon`/`costBasisCents`/`currentValueCents`/`gainCents`/`gainPct`/`series[]` em centavos) |
+| `EvolutionPoint[]` | `/investimentos/evolution` | `date` (YYYY-MM-DD), `marketValueCents`, `costBasisCents` — o gap entre as duas linhas = ganho não-realizado |
+| `PriceHistoryPoint[]` | `/investimentos/assets/{id}/history` | `date` (YYYY-MM-DD), `priceCents` |
 | `AssetPosition[]` | `/investimentos/assets` | metadados + `currentPriceCents`, `netQuantity` (**string**), `avgPriceCents`, `costBasisCents`, `currentValueCents`, `gainCents`, `gainPct`, `realizedCents` |
 | `CreateAssetInput` (req) | `POST /investimentos/assets` | `ticker`, `name`, `assetClass` (acoes/fiis/renda_fixa/cripto), `icon`, `currentPriceCents` |
 | `UpdateAssetInput` (req) | `PATCH /investimentos/assets/{id}` | igual ao Create **menos `assetClass`** (imutável) |
