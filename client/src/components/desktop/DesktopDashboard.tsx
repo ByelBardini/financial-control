@@ -7,7 +7,6 @@ import { EsteMesPanel } from './EsteMesPanel';
 import { InvestimentosPanel } from './InvestimentosPanel';
 import { SaldoHero } from './SaldoHero';
 import { SideNav } from './SideNav';
-import { TickerPanel } from './TickerPanel';
 import { QuerySection, QuerySection2 } from '../QuerySection';
 import {
   useAccounts,
@@ -17,7 +16,6 @@ import {
   useInvestments,
   useInvestmentsSummary,
   useMonthBalance,
-  useTicker,
 } from '../../hooks/useDashboardQueries';
 import type { MenuAnchor } from '../transacoes/NewTransactionMenu';
 import type { AppRoute } from '../../navigation/routes';
@@ -49,7 +47,6 @@ export function DesktopDashboard({
   const esteMes = useEsteMes();
   const diagnosis = useDiagnosis();
   const categories = useCategories();
-  const ticker = useTicker();
 
   return (
     <View className="flex-1 flex-row bg-surface-container-lowest">
@@ -93,17 +90,10 @@ export function DesktopDashboard({
             </View>
           </View>
 
-          <View className="flex-1 flex-row">
-            <View className="border-r border-grid-line" style={{ flex: 2 }}>
-              <QuerySection query={categories} label="as categorias">
-                {(data) => <CategoriasPanel categories={data} hidden={hidden} />}
-              </QuerySection>
-            </View>
-            <View className="flex-1">
-              <QuerySection query={ticker} label="o ticker">
-                {(data) => <TickerPanel ticker={data} hidden={hidden} />}
-              </QuerySection>
-            </View>
+          <View className="flex-1">
+            <QuerySection query={categories} label="as categorias">
+              {(data) => <CategoriasPanel categories={data} hidden={hidden} />}
+            </QuerySection>
           </View>
         </View>
       </ScrollView>

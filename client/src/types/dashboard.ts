@@ -50,14 +50,6 @@ export interface EsteMes {
   biggestVillain: string; // categoria que mais pesou
 }
 
-export interface Ticker {
-  name: string; // "Bitcoin"
-  symbol: string; // "B"
-  changePct24h: number;
-  priceCents: number;
-  positionCents: number; // posição do usuário
-}
-
 export interface Diagnosis {
   title: string;
   body: string;
@@ -70,6 +62,5 @@ export interface DashboardSnapshot {
   investmentsSummary: InvestmentsSummary;
   categories: CategorySpend[];
   esteMes: EsteMes;
-  ticker: Ticker;
   diagnosis: Diagnosis;
 }

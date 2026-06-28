@@ -7,7 +7,6 @@ import type {
   Investment,
   InvestmentsSummary,
   MonthBalance,
-  Ticker,
 } from '../types/dashboard';
 
 // month opcional vira ?month=YYYY-MM; omitido = mês corrente (default do server).
@@ -31,5 +30,3 @@ export const getInvestments = () => apiGet<Investment[]>('/investments');
 
 export const getInvestmentsSummary = () =>
   apiGet<InvestmentsSummary>('/dashboard/investments-summary');
-
-export const getTicker = () => apiGet<Ticker>('/dashboard/ticker');

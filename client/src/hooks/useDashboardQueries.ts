@@ -7,7 +7,6 @@ import {
   getInvestments,
   getInvestmentsSummary,
   getMonthBalance,
-  getTicker,
 } from '../api/dashboard';
 
 // Hooks por recurso: cada um é um useQuery com chave estável (o mês entra na chave
@@ -48,6 +47,3 @@ export const useInvestmentsSummary = () =>
     queryKey: ['dashboard', 'investments-summary'],
     queryFn: () => getInvestmentsSummary(),
   });
-
-export const useTicker = () =>
-  useQuery({ queryKey: ['dashboard', 'ticker'], queryFn: () => getTicker() });
