@@ -64,7 +64,6 @@ func New(d Deps) http.Handler {
 	mux.Handle("GET /dashboard/diagnosis", protected(dashboard.DiagnosisHandler(d.Dashboard)))
 	mux.Handle("GET /investments", protected(dashboard.InvestmentsHandler(d.Dashboard)))
 	mux.Handle("GET /dashboard/investments-summary", protected(dashboard.InvestmentsSummaryHandler(d.Dashboard)))
-	mux.Handle("GET /dashboard/ticker", protected(dashboard.TickerHandler(d.Dashboard)))
 
 	// Views agregadas da tela de Contas.
 	mux.Handle("GET /contas/banks", protected(contas.BanksHandler(d.Contas)))
