@@ -59,7 +59,9 @@ describe('AssetForm — criar', () => {
   it('escolher uma sugestão preenche ticker, nome e preço', async () => {
     jest
       .mocked(api.getAssetCatalog)
-      .mockResolvedValue([{ ticker: 'PETR4', name: 'Petrobras PN', priceCents: 3806, logoUrl: 'u' }]);
+      .mockResolvedValue([
+        { ticker: 'PETR4', name: 'Petrobras PN', priceCents: 3806, logoUrl: 'u' },
+      ]);
     const onSubmit = jest.fn();
     await render(<AssetForm mode="create" initial={initialAssetValues()} onSubmit={onSubmit} />, {
       wrapper: makeWrapper(),

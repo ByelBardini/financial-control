@@ -37,7 +37,9 @@ describe('useAssetSearch', () => {
   it('busca e entrega os itens quando habilitado (classe cotável + termo >= 2)', async () => {
     jest
       .mocked(api.getAssetCatalog)
-      .mockResolvedValue([{ ticker: 'PETR4', name: 'Petrobras PN', priceCents: 3806, logoUrl: 'u' }]);
+      .mockResolvedValue([
+        { ticker: 'PETR4', name: 'Petrobras PN', priceCents: 3806, logoUrl: 'u' },
+      ]);
 
     const { result } = await renderHook(() => useAssetSearch('acoes', 'PETR'), {
       wrapper: makeWrapper(),

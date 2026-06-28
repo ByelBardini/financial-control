@@ -39,7 +39,9 @@ describe('TickerAutocomplete', () => {
   it('digita, mostra as sugestões e escolher chama onPick com o item', async () => {
     jest
       .mocked(api.getAssetCatalog)
-      .mockResolvedValue([{ ticker: 'PETR4', name: 'Petrobras PN', priceCents: 3806, logoUrl: 'u' }]);
+      .mockResolvedValue([
+        { ticker: 'PETR4', name: 'Petrobras PN', priceCents: 3806, logoUrl: 'u' },
+      ]);
     const onPick = jest.fn();
     await render(<Harness onPick={onPick} />, { wrapper: makeWrapper() });
     const user = userEvent.setup();

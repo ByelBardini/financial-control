@@ -66,7 +66,9 @@ function SearchDropdown({
       {search.isLoading ? (
         <DropdownMessage spinner>Buscando…</DropdownMessage>
       ) : search.isError ? (
-        <DropdownMessage alert>Não deu pra buscar agora — pode digitar o ticker manualmente.</DropdownMessage>
+        <DropdownMessage alert>
+          Não deu pra buscar agora — pode digitar o ticker manualmente.
+        </DropdownMessage>
       ) : search.items.length === 0 ? (
         <DropdownMessage>Nenhum ativo encontrado — confira o código (ex.: PETR4).</DropdownMessage>
       ) : (
