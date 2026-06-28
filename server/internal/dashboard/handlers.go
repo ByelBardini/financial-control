@@ -72,23 +72,35 @@ func DiagnosisHandler(svc *Service) http.Handler {
 	})
 }
 
-// InvestmentsHandler responde GET /investments (stub deferido: lista vazia).
+// userHandler centraliza o user autenticado (do token), a chamada ao service e a resposta JSON,
+// para visões que não dependem do mês (ex.: carteira de investimentos). Sem userID → 401.
+func userHandler(label string, fn func(context.Context, string) (any, error)) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		userID, ok := auth.UserIDFromContext(r.Context())
+		if !ok {
+			httpx.WriteError(w, http.StatusUnauthorized, "não autenticado")
+			return
+		}
+		out, err := fn(r.Context(), userID)
+		if err != nil {
+			log.Printf("GET %s: %v", label, err)
+			httpx.WriteError(w, http.StatusInternalServerError, "erro ao montar "+label)
+			return
+		}
+		httpx.WriteJSON(w, http.StatusOK, out)
+	})
+}
+
+// InvestmentsHandler responde GET /investments com a carteira do usuário (posições abertas).
 func InvestmentsHandler(svc *Service) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		httpx.WriteJSON(w, http.StatusOK, svc.Investments())
+	return userHandler("os investimentos", func(ctx context.Context, userID string) (any, error) {
+		return svc.Investments(ctx, userID)
 	})
 }
 
-// InvestmentsSummaryHandler responde GET /dashboard/investments-summary (stub zerado).
+// InvestmentsSummaryHandler responde GET /dashboard/investments-summary com o resumo da carteira.
 func InvestmentsSummaryHandler(svc *Service) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		httpx.WriteJSON(w, http.StatusOK, svc.InvestmentsSummary())
-	})
-}
-
-// TickerHandler responde GET /dashboard/ticker (stub: rótulo estático, valores zerados).
-func TickerHandler(svc *Service) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		httpx.WriteJSON(w, http.StatusOK, svc.Ticker())
+	return userHandler("o resumo dos investimentos", func(ctx context.Context, userID string) (any, error) {
+		return svc.InvestmentsSummary(ctx, userID)
 	})
 }

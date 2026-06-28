@@ -3,6 +3,7 @@ package dashboard
 import (
 	"context"
 	"fmt"
+	"math"
 	"time"
 
 	"financial-control/server/internal/pct"
@@ -19,6 +20,7 @@ const diagnosisTitle = "Diagnóstico Pobrify"
 type DashboardStore interface {
 	GetMonthSummary(ctx context.Context, userID string, month time.Time) (store.MonthSummaryRow, error)
 	ListCategorySpend(ctx context.Context, userID string, month time.Time) ([]store.CategorySpendRow, error)
+	ListPositions(ctx context.Context, userID string, includeCrypto, onlyCrypto bool) ([]store.PositionRow, error)
 }
 
 // Service monta as visões do dashboard a partir do store.
@@ -33,11 +35,16 @@ func NewService(s DashboardStore) *Service {
 	return &Service{store: s}
 }
 
-// MonthBalance devolve o resumo do mês que contém month, do usuário.
+// MonthBalance devolve o resumo do mês que contém month, do usuário. investidoCents é o valor
+// atual da carteira (derivado das posições — não mais stub).
 func (s *Service) MonthBalance(ctx context.Context, userID string, month time.Time) (MonthBalance, error) {
 	sum, err := s.store.GetMonthSummary(ctx, userID, month)
 	if err != nil {
 		return MonthBalance{}, fmt.Errorf("dashboard: resumo do mês: %w", err)
+	}
+	positions, err := s.store.ListPositions(ctx, userID, true, false)
+	if err != nil {
+		return MonthBalance{}, fmt.Errorf("dashboard: investido do mês: %w", err)
 	}
 	label, quip := statusFor(pct.Round(sum.GastosCents, sum.ReceitasCents))
 	return MonthBalance{
@@ -47,7 +54,7 @@ func (s *Service) MonthBalance(ctx context.Context, userID string, month time.Ti
 		Quip:           quip,
 		ReceitasCents:  sum.ReceitasCents,
 		GastosCents:    sum.GastosCents,
-		InvestidoCents: 0,
+		InvestidoCents: investedTotal(positions),
 	}, nil
 }
 
@@ -103,15 +110,73 @@ func (s *Service) Diagnosis(ctx context.Context, userID string, month time.Time)
 	return Diagnosis{Title: diagnosisTitle, Body: diagnosisBody(sum.ReceitasCents - sum.GastosCents)}, nil
 }
 
-// Investments é um stub: a feature de investimentos ainda não tem tabela (migration futura).
-// Devolve slice vazia (não nil) para o JSON virar [] e o contrato do client ficar honesto.
-func (s *Service) Investments() []Investment { return []Investment{} }
+// Investments lista os ativos da carteira do usuário (posições abertas, carteira inteira) pro bloco
+// "Investimentos" da Início. Derivado das operações — DailyChangePct carrega o ganho% acumulado
+// (não há cotação diária confiável; ver investimentos.md).
+func (s *Service) Investments(ctx context.Context, userID string) ([]Investment, error) {
+	rows, err := s.store.ListPositions(ctx, userID, true, false)
+	if err != nil {
+		return nil, fmt.Errorf("dashboard: investimentos: %w", err)
+	}
+	out := make([]Investment, 0, len(rows))
+	for _, r := range rows {
+		if !isOpenRow(r) {
+			continue
+		}
+		gain := r.CurrentValueCents - r.CostBasisCents
+		out = append(out, Investment{
+			ID:             r.ID,
+			Name:           r.Ticker,
+			ValueCents:     r.CurrentValueCents,
+			DailyChangePct: changePct(gain, r.CostBasisCents),
+			Icon:           r.Icon,
+		})
+	}
+	return out, nil
+}
 
-// InvestmentsSummary é um stub deferido: resumo zerado até existir tabela de investimentos.
-func (s *Service) InvestmentsSummary() InvestmentsSummary { return InvestmentsSummary{} }
+// InvestmentsSummary resume a carteira do usuário (valor atual, ganho/perda e %) pro painel da Início.
+func (s *Service) InvestmentsSummary(ctx context.Context, userID string) (InvestmentsSummary, error) {
+	rows, err := s.store.ListPositions(ctx, userID, true, false)
+	if err != nil {
+		return InvestmentsSummary{}, fmt.Errorf("dashboard: resumo dos investimentos: %w", err)
+	}
+	var total, cost int64
+	for _, r := range rows {
+		if !isOpenRow(r) {
+			continue
+		}
+		total += r.CurrentValueCents
+		cost += r.CostBasisCents
+	}
+	gain := total - cost
+	return InvestmentsSummary{TotalCents: total, ChangeCents: gain, ChangePct: changePct(gain, cost)}, nil
+}
 
-// Ticker é um stub deferido: só o rótulo, valores zerados até integrar cotação externa.
-func (s *Service) Ticker() Ticker { return Ticker{Name: "Bitcoin", Symbol: "B"} }
+// zeroQuantity é a quantidade líquida (string, 8 casas) de uma posição totalmente vendida.
+const zeroQuantity = "0.00000000"
+
+// isOpenRow diz se a posição ainda tem quantidade (não foi zerada).
+func isOpenRow(r store.PositionRow) bool { return r.NetQuantity != zeroQuantity }
+
+// investedTotal soma o valor atual das posições abertas (patrimônio investido).
+func investedTotal(rows []store.PositionRow) int64 {
+	var total int64
+	for _, r := range rows {
+		if isOpenRow(r) {
+			total += r.CurrentValueCents
+		}
+	}
+	return total
+}
+
+// changePct é o ganho/perda em % (2 casas), guardando contra custo zero. Só display.
+func changePct(gainCents, costCents int64) float64 {
+	if costCents == 0 {
+		return 0
+	}
+	return math.Round(float64(gainCents)/float64(costCents)*10000) / 100
+}
 
 // diagnosisBody escolhe o texto do diagnóstico pelo sinal do saldo líquido.
 // PLACEHOLDER: textos ajustáveis livremente.

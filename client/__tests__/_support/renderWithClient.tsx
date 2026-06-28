@@ -24,7 +24,6 @@ export function mockDashboardApi(snapshot: DashboardSnapshot = dashboardSnapshot
   jest.mocked(api.getDiagnosis).mockResolvedValue(snapshot.diagnosis);
   jest.mocked(api.getInvestments).mockResolvedValue(snapshot.investments);
   jest.mocked(api.getInvestmentsSummary).mockResolvedValue(snapshot.investmentsSummary);
-  jest.mocked(api.getTicker).mockResolvedValue(snapshot.ticker);
 }
 
 // Idem para src/api/contas (cada view resolve a fatia correspondente do snapshot).
@@ -62,6 +61,7 @@ export function mockInvestimentosApi(snapshot: InvestimentosSnapshot = investime
   jest.mocked(investimentosApi.getAllocation).mockResolvedValue(snapshot.allocation);
   jest.mocked(investimentosApi.getCryptoBlock).mockResolvedValue(snapshot.crypto);
   jest.mocked(investimentosApi.getRiskAssessment).mockResolvedValue(snapshot.risk);
+  jest.mocked(investimentosApi.getPortfolioEvolution).mockResolvedValue([]);
 }
 
 // Renderiza ui dentro de um QueryClient de teste (retry off, gcTime 0 pra não

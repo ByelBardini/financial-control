@@ -24,6 +24,7 @@ linters:
         - exclusivos
         - anual
         - essencial
+        - eles
   exclusions:
     generated: lax
     presets:

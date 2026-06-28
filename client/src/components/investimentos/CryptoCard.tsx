@@ -1,5 +1,5 @@
 import { Text, View } from 'react-native';
-import { CryptoChart } from './CryptoChart';
+import { PriceSparkline } from './PriceSparkline';
 import { EditableCard } from '../EditableCard';
 import { Icon } from '../Icon';
 import { MoneyText } from '../MoneyText';
@@ -55,7 +55,12 @@ export function CryptoCard({ holding, hidden, onPress }: CryptoCardProps) {
           className="font-geist-medium text-label-sm"
         />
       </View>
-      <CryptoChart series={holding.series} tone={tone} hidden={hidden} />
+      <PriceSparkline
+        series={holding.series.map((p) => p.priceCents)}
+        labels={holding.series.map((p) => p.date)}
+        tone={tone}
+        hidden={hidden}
+      />
     </EditableCard>
   );
 }

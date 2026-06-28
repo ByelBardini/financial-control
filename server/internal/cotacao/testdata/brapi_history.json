@@ -1,0 +1,12 @@
+{
+  "results": [
+    {
+      "symbol": "PETR4",
+      "historicalDataPrice": [
+        { "date": 1781899200, "open": 37.0, "high": 38.0, "low": 36.8, "close": 37.80, "adjustedClose": 37.10, "volume": 1000 },
+        { "date": 1782158400, "open": 37.9, "high": 38.6, "low": 37.5, "close": 38.50, "adjustedClose": 37.80, "volume": 1200 },
+        { "date": 1782244800, "open": 38.6, "high": 39.4, "low": 38.4, "close": 39.10, "adjustedClose": 38.40, "volume": 1500 }
+      ]
+    }
+  ]
+}

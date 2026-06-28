@@ -66,13 +66,6 @@ export const dashboardSnapshot: DashboardSnapshot = {
     { id: 'assinaturas', label: 'Assinaturas', amountCents: 8500, percent: 10, tone: 'primary' },
   ],
   esteMes: { spentPercent: 59, biggestVillain: 'Alimentação' },
-  ticker: {
-    name: 'Bitcoin',
-    symbol: 'B',
-    changePct24h: 2.4,
-    priceCents: 34250000,
-    positionCents: 210000,
-  },
   diagnosis: {
     title: 'Diagnóstico Pobrify',
     body: 'Você ainda não está falido. Continue assim.',

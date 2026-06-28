@@ -119,18 +119,39 @@ func TestDashboardEndpointsComSeed(t *testing.T) {
 		}
 	})
 
-	t.Run("stubs-deferidos", func(t *testing.T) {
+	t.Run("investimentos-da-carteira", func(t *testing.T) {
 		var inv []dashboard.Investment
 		getJSON(t, srv.URL+"/investments", token, &inv)
-		if len(inv) != 0 {
-			t.Errorf("investments = %v, quero vazio", inv)
+		if len(inv) == 0 {
+			t.Fatal("investments vazio, quero as posições do seed")
 		}
-		var tk dashboard.Ticker
-		getJSON(t, srv.URL+"/dashboard/ticker", token, &tk)
-		if tk.Name != "Bitcoin" || tk.PriceCents != 0 {
-			t.Errorf("ticker = %+v", tk)
+		petr := findInvestment(inv, "PETR4")
+		if petr == nil || petr.ValueCents != 142500 { // seed: net 150 × R$ 9,50
+			t.Errorf("PETR4 = %+v, quero valueCents 142500", petr)
+		}
+
+		var summary dashboard.InvestmentsSummary
+		getJSON(t, srv.URL+"/dashboard/investments-summary", token, &summary)
+		if summary.TotalCents <= 0 {
+			t.Errorf("investments-summary totalCents = %d, quero > 0 (carteira do seed)", summary.TotalCents)
+		}
+
+		var bal dashboard.MonthBalance
+		getJSON(t, srv.URL+"/dashboard/summary", token, &bal)
+		if bal.InvestidoCents != summary.TotalCents {
+			t.Errorf("investidoCents = %d, quero == totalCents da carteira (%d)", bal.InvestidoCents, summary.TotalCents)
 		}
 	})
+}
+
+// findInvestment acha um ativo da lista do dashboard pelo nome (ticker), ou nil.
+func findInvestment(inv []dashboard.Investment, name string) *dashboard.Investment {
+	for i := range inv {
+		if inv[i].Name == name {
+			return &inv[i]
+		}
+	}
+	return nil
 }
 
 // applySeed roda o server/db/seed.sql (caminho relativo ao pacote test/).

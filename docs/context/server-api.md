@@ -57,7 +57,9 @@ server/
   - `httpx.CORS`: header no GET + chama o inner, preflight `OPTIONS`→204 sem chamar o inner, libera POST + Authorization, origem configurável.
   - `auth`: token round-trip + tabela de rejeição (`expirado`/`segredo errado`/`alg:none`/**`HS384`**/**`sem subject`**/lixo); login 401 genérico **byte-idêntico** entre falhas (anti-enumeração) + 400 em corpo inválido; middleware com **tabela de parsing do header** (esquema errado/token vazio/grudado → 401; `Bearer` case-insensitive + espaços aparados → segue) e injeção do `userID`; config exige `JWT_SECRET` (≥32, **com caso de limite 31/32**) + TTLs (**inválido → erro**).
   - `ratelimit`: token-bucket com relógio injetado — gasta o burst e nega, recarrega após a janela (parcial e total), chaves independentes, burst saneado p/ ≥1; middleware passa abaixo do limite e responde **429 + Retry-After** acima, sem chamar o next; `ClientIP` (ipv4/ipv6/sem porta); varredura (white-box) remove buckets ociosos.
-  - `router`: tabela com TODA rota de dados → 401 sem token (pega rota nova esquecida sem `RequireAuth`); `/health` e `/auth/login` públicos; **login martelado pelo mesmo IP → 429 (e outro IP é independente)**. Os fakes de `account`/`dashboard` asseram que receberam o `userID` (prova do escopo).
+  - `router`: tabela com TODA rota de dados → 401 sem token (pega rota nova esquecida sem `RequireAuth`, **inclui `/investimentos/catalogo`**); `/health` e `/auth/login` públicos; **login martelado pelo mesmo IP → 429 (e outro IP é independente)**. Os fakes de `account`/`dashboard` asseram que receberam o `userID` (prova do escopo).
+  - `cotacao` (busca de catálogo): `BuscarAtivos` (brapi mapeia `stock`/`name`/`close`/`logo`, **`close` null→0**; CoinGecko sem preço + símbolo→ticker maiúsculo + limite cortado no cliente), `Resolver.Buscar` por classe (acoes→`stock`/fiis→`fund`/cripto→`/search`; renda_fixa/desconhecida→`nil`). Um **server que grava a requisição** prova os params (`search`/`type`/`limit`/`query` + `brapiKind`) e a **degradação** (fonte que não busca → `(nil,nil)`).
+  - `investimentos` (catálogo): `Service.Catalogo` (mapeia itens + trim; renda_fixa / query <2 / sem buscador → `[]` **sem tocar a fonte**; classe inválida → `ErrClasseInvalida`) + `CatalogoHandler` (JSON golden, `[]` nunca `null`, **400** classe inválida, **401** sem usuário, **500** erro do provedor — fakes nomeados `fakeBuscador`).
 - **Integração (tag `integration`, opt-in):** `go test -tags integration ./test/...` aplica `db/seed.sql` (DESTRUTIVO: `TRUNCATE`) e bate nos endpoints reais; pula se `DATABASE_URL` não estiver setada. O seed ancora as transações no mês corrente (`date_trunc('month', now())`), então o teste não fica flaky com o tempo. Os GETs vão com `Authorization: Bearer` (token via `POST /auth/login` como o usuário padrão); `auth_integration_test.go` cria um 2º usuário e prova o **isolamento A×B** (A não vê dados de B e vice-versa; sem token → 401).
 
 ## Endpoints
@@ -103,16 +105,19 @@ sempre em **centavos** (inteiro). **Toda rota abaixo exige `Authorization: Beare
 | GET | `/investimentos/positions` | posições abertas do portfólio geral (preço médio derivado) | implementado |
 | GET | `/investimentos/allocation` | alocação por classe (Ações/FIIs/Renda Fixa; percent = share) | implementado |
 | GET | `/investimentos/crypto` | bloco de cripto À PARTE (subtotal próprio + `series` do histórico) | implementado |
+| GET | `/investimentos/evolution` | evolução do patrimônio geral (cripto fora): valor de mercado × custo acumulado por dia (forward-fill; sem preço no ledger → cai no `current_price` manual, batendo com as posições); `?range=` 1mo/3mo/6mo/1y/max (default 6mo) | implementado |
+| GET | `/investimentos/catalogo` | **autocomplete do cadastro**: busca ativos reais no catálogo externo. `?class=acoes\|fiis\|cripto` + `?q=` (após trim, ≥2 chars) → **200** `CatalogoItem[]` (sempre array). renda_fixa / q curto / sem buscador / sem match → `[]`; **400** classe fora de acoes\|fiis\|renda_fixa\|cripto. Fonte pela classe (brapi p/ ações/FIIs, CoinGecko p/ cripto); `limit` fixo 10 (cota das APIs grátis) | implementado |
+| POST | `/investimentos/backfill` | dispara (em background) o backfill de ~1 ano de histórico dos ativos JÁ cadastrados do usuário (classes cotáveis; renda_fixa fora) → **202** `{assets:N}` (quantos entraram na fila). Best-effort; rode 1× após configurar `BRAPI_TOKEN` | implementado |
 | GET | `/investimentos/assets` | todos os ativos + posição derivada (gestão) | implementado |
-| POST | `/investimentos/assets` | cria ativo → **201** + `AssetDetail`; **400** inválido | implementado |
+| POST | `/investimentos/assets` | cria ativo → **201** + `AssetDetail`; **400** inválido (backfill de preço dispara em background) | implementado |
 | GET | `/investimentos/assets/{id}` | ativo completo (posição + operações) → **200**; **404** | implementado |
+| GET | `/investimentos/assets/{id}/history` | série diária de preço do ativo; `?range=` 1mo/3mo/6mo/1y/max (default 6mo) → **200** `PriceHistoryPoint[]` | implementado |
 | PATCH | `/investimentos/assets/{id}` | edita metadados + preço (classe imutável; preço novo grava histórico) → **200**; **404** | implementado |
 | DELETE | `/investimentos/assets/{id}` | arquiva ativo → **204**; **404** | implementado |
 | POST | `/investimentos/assets/{id}/trades` | compra/venda (`side` buy/sell, `quantity` string, centavos, **`accountId`** de liquidação) → **201** + ativo; liquida na conta (`kind='investment'`: compra debita / venda credita) atômico; **400** venda > posição / conta inválida; **404** ativo | implementado |
 | DELETE | `/investimentos/assets/{id}/trades/{tradeId}` | exclui operação (posição recomputa; **cascata** a transação de caixa) → **204**; **404** | implementado |
-| GET | `/investments` | lista de investimentos (bloco do Dashboard — separado da tela nova) | stub deferido (`[]`) |
-| GET | `/dashboard/investments-summary` | resumo da carteira | stub deferido (zerado) |
-| GET | `/dashboard/ticker` | cotação destacada (cripto) | stub deferido (zerado) |
+| GET | `/investments` | bloco "Investimentos" da Início — posições abertas da carteira real (deriva de `ListPositions`, carteira inteira) | implementado |
+| GET | `/dashboard/investments-summary` | resumo da carteira (valor atual + ganho/perda + %) da Início, da carteira real | implementado |
 
 > Os textos de personalidade (`statusLabel`/`quip`/`diagnosis` no dashboard; `note`/
 > `noteTone`/`status`/`quip`/labels do panic/`tip` em **contas**; `collapse` (Previsão de Colapso)
@@ -150,7 +155,7 @@ Valores `*Cents`/monetários são **int64 em centavos**.
 | `CashWallet` | `/contas/cash` | `balanceCents`, `quip`, `confidenceLabel`, `confidencePercent` |
 | `PovertyXray` | `/contas/xray` | `title`, `rows[]` (`label`/`cents`/`tone`), `panic` (`percent`/`levelLabel`/`levelTone`/`lowLabel`/`highLabel`/`note`) |
 | `ManagementTip` | `/contas/tip` | `title`, `body` |
-| `MonthBalance` | `/dashboard/summary` | `netCents`, `availableLabel`, `statusLabel`, `quip`, `receitasCents`, `gastosCents`, `investidoCents` (= 0 até investimentos entrarem) |
+| `MonthBalance` | `/dashboard/summary` | `netCents`, `availableLabel`, `statusLabel`, `quip`, `receitasCents`, `gastosCents`, `investidoCents` (valor atual da carteira — Σ posições abertas) |
 | `CategorySpend[]` | `/dashboard/categories` | `id`, `label`, `amountCents`, `percent` (share 0..100), `tone` |
 | `EsteMes` | `/dashboard/este-mes` | `spentPercent`, `biggestVillain` (categoria de maior gasto no mês) |
 | `Diagnosis` | `/dashboard/diagnosis` | `title`, `body` |
@@ -167,15 +172,17 @@ Valores `*Cents`/monetários são **int64 em centavos**.
 | `PortfolioSummary` | `/investimentos/summary` | `totalCents`, `gainCents`, `gainPct`, `title`, `quip` (geral, cripto fora) |
 | `Position[]` | `/investimentos/positions` | `id`, `ticker`, `name`, `assetClass`, `icon`, `costBasisCents`, `currentValueCents`, `gainCents`, `gainPct`, `realizedCents` |
 | `AllocationSlice[]` | `/investimentos/allocation` | `assetClass`, `label`, `valueCents`, `percent`, `tone` |
-| `CryptoBlock` | `/investimentos/crypto` | `title`, `subtitle`, `subtotalCents`, `gainCents`, `gainPct`, `holdings[]` (`CryptoHolding`: `id`/`symbol`/`name`/`icon`/`costBasisCents`/`currentValueCents`/`gainCents`/`gainPct`/`series[]` em centavos) |
+| `CryptoBlock` | `/investimentos/crypto` | `title`, `subtitle`, `subtotalCents`, `gainCents`, `gainPct`, `holdings[]` (`CryptoHolding`: `id`/`symbol`/`name`/`icon`/`costBasisCents`/`currentValueCents`/`gainCents`/`gainPct`/`series[]` de `{date, priceCents}` — mesmo shape do `PriceHistoryPoint`) |
+| `EvolutionPoint[]` | `/investimentos/evolution` | `date` (YYYY-MM-DD), `marketValueCents`, `costBasisCents` — o gap entre as duas linhas = ganho não-realizado |
+| `PriceHistoryPoint[]` | `/investimentos/assets/{id}/history` | `date` (YYYY-MM-DD), `priceCents` |
+| `CatalogoItem[]` | `/investimentos/catalogo` | `ticker`, `name`, `priceCents` (0 quando a fonte não traz preço — cripto), `logoUrl?` (omitido vazio) |
 | `AssetPosition[]` | `/investimentos/assets` | metadados + `currentPriceCents`, `netQuantity` (**string**), `avgPriceCents`, `costBasisCents`, `currentValueCents`, `gainCents`, `gainPct`, `realizedCents` |
 | `CreateAssetInput` (req) | `POST /investimentos/assets` | `ticker`, `name`, `assetClass` (acoes/fiis/renda_fixa/cripto), `icon`, `currentPriceCents` |
 | `UpdateAssetInput` (req) | `PATCH /investimentos/assets/{id}` | igual ao Create **menos `assetClass`** (imutável) |
 | `CreateTradeInput` (req) | `POST /investimentos/assets/{id}/trades` | `side` (buy/sell), `quantity` (**string decimal**, até 8 casas, > 0), `unitPriceCents`, `tradedOn` (YYYY-MM-DD), **`accountId`** (conta de liquidação, **obrigatória** — compra debita / venda credita) |
 | `AssetDetail` | `GET/POST/PATCH /investimentos/assets/{id}` | `AssetPosition` + `trades[]` (`Trade`: `id`/`side`/`quantity`/`unitPriceCents`/`tradedOn`/**`accountId`** — vazio nos trades legados/seed sem caixa) |
-| `Investment[]` | `/investments` | `id`, `name`, `valueCents`, `dailyChangePct`, `icon` — **stub `[]`** (bloco do Dashboard, separado da tela nova) |
-| `InvestmentsSummary` | `/dashboard/investments-summary` | `totalCents`, `changeCents`, `changePct` — **stub zerado** |
-| `Ticker` | `/dashboard/ticker` | `name`, `symbol`, `changePct24h`, `priceCents`, `positionCents` — **stub** com `name:"Bitcoin"`/`symbol:"B"`, resto zerado |
+| `Investment[]` | `/investments` | `id`, `name` (ticker), `valueCents` (valor atual), `dailyChangePct` (= ganho% acumulado — sem cotação diária), `icon` — derivado das posições da carteira |
+| `InvestmentsSummary` | `/dashboard/investments-summary` | `totalCents`, `changeCents`, `changePct` — agregado das posições da carteira |
 
 ## Decisões em aberto
 - [x] Layout de pacotes: `cmd/` + `internal/<domínio>/` + `test/`.

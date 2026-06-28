@@ -11,7 +11,8 @@ import (
 )
 
 type Querier interface {
-	// Grava um ponto de histórico de preço (centavos → NUMERIC). Só se o ativo é do usuário.
+	// Grava o fechamento manual do dia (PATCH de preço). UPSERT: editar o preço 2x no mesmo dia
+	// atualiza a linha em vez de duplicar (ledger diário). Só se o ativo é do usuário.
 	AppendPriceObservation(ctx context.Context, arg AppendPriceObservationParams) (int64, error)
 	// Soft-delete: marca a conta como arquivada (escopado por id + user_id). RETURNING
 	// vazio (ErrNoRows) quando não é do usuário ou já estava arquivada → 404 no service.
@@ -97,8 +98,8 @@ type Querier interface {
 	// Cartões de crédito do usuário: saldo (negativo = dívida) + limite + apresentação,
 	// p/ a seção "Cartões" (por cartão) e o Raio-X (somado).
 	ListCreditAccounts(ctx context.Context, userID pgtype.UUID) ([]ListCreditAccountsRow, error)
-	// Histórico de preço (centavos) dos ativos de cripto do usuário, em ordem cronológica.
-	// O service agrupa por asset_id pra montar o `series` de cada CryptoHolding.
+	// Histórico de preço (centavos) + data dos ativos de cripto do usuário, em ordem cronológica.
+	// O service agrupa por asset_id pra montar o `series` (date + priceCents) de cada CryptoHolding.
 	ListCryptoSeries(ctx context.Context, userID pgtype.UUID) ([]ListCryptoSeriesRow, error)
 	// Compras parceladas (kind='installment') do usuário agrupadas por purchase_group_id:
 	// progresso (parcelas vencidas / total), valor da parcela e ícone da categoria. As N parcelas
@@ -115,6 +116,13 @@ type Querier interface {
 	// portfólio geral da cripto; asset_id (opcional) restringe a um ativo (detalhe). Dinheiro em
 	// centavos; net_quantity como string (8 casas). gainCents é calculado no Go (current - cost).
 	ListPositions(ctx context.Context, arg ListPositionsParams) ([]ListPositionsRow, error)
+	// Série diária de preço (centavos) de um ativo no intervalo [de, ate], cronológica. Alimenta o
+	// gráfico de histórico (qualquer classe) e a derivação da evolução do patrimônio.
+	ListPriceHistory(ctx context.Context, arg ListPriceHistoryParams) ([]ListPriceHistoryRow, error)
+	// Ativos elegíveis à cotação automática (ativos, classe != renda_fixa), de TODOS os usuários —
+	// é um job de sistema, não um request de usuário (por isso sem escopo de user_id). O worker
+	// agrupa por classe e busca em lote. user_id volta pra gravar o preço no dono certo.
+	ListQuotableAssets(ctx context.Context) ([]ListQuotableAssetsRow, error)
 	// Operações de um ativo (escopado por asset + user), em ordem cronológica. Quantidade como string.
 	// account_id = conta de liquidação (vazio nos trades legados/seed sem caixa).
 	ListTradesByAsset(ctx context.Context, arg ListTradesByAssetParams) ([]ListTradesByAssetRow, error)
@@ -128,6 +136,12 @@ type Querier interface {
 	ListTransactionsFiltered(ctx context.Context, arg ListTransactionsFilteredParams) ([]ListTransactionsFilteredRow, error)
 	// Contas "Vales": saldo atual + valor concedido (opening_balance) como baseline de 100%.
 	ListVoucherAccounts(ctx context.Context, userID pgtype.UUID) ([]ListVoucherAccountsRow, error)
+	// Evolução do patrimônio GERAL (exclui cripto) por dia em [de, ate]: duas linhas — valor de
+	// MERCADO (qty no dia × último preço <= dia, FORWARD-FILL em fim de semana/feriado) e CUSTO
+	// acumulado (preço médio móvel no dia). O gap entre elas = ganho não-realizado. Dinheiro em centavos.
+	// snaps = replay das operações guardando (qty, custo) APÓS cada trade + a data; para cada dia pega o
+	// último snapshot <= dia (custo/qty path-dependent, igual ListPositions) e o último preço <= dia.
+	PortfolioEvolution(ctx context.Context, arg PortfolioEvolutionParams) ([]PortfolioEvolutionRow, error)
 	// Lança a transação 'standard' do período atual a partir de uma regra existente (copia
 	// conta/categoria/descrição/sentido/valor da regra; occurred_on = hoje, vindo do service). Só
 	// insere se a regra é do usuário e está ativa — 0 linhas (ErrNoRows no store) → regra inexistente
@@ -144,10 +158,17 @@ type Querier interface {
 	// Edita metadados do ativo (NÃO troca asset_class) + o preço atual (escopado por id + user).
 	// RETURNING vazio (ErrNoRows → 404) quando não é do usuário ou está arquivado.
 	UpdateAsset(ctx context.Context, arg UpdateAssetParams) (string, error)
+	// Atualiza o "último fechamento" denormalizado do ativo (cache lido pela CTE de posição).
+	// Escopado por id + user; ativo arquivado não muda. 0 linhas = não é do usuário/arquivado.
+	UpdateAssetCurrentPrice(ctx context.Context, arg UpdateAssetCurrentPriceParams) (int64, error)
 	// Edita os campos mutáveis de uma transação 'standard' (escopada por id + user_id). Não
 	// troca de conta. A categoria nova precisa ser do usuário. RETURNING vazio (ErrNoRows →
 	// 404) quando a transação não é do usuário. Centavos → NUMERIC; direction flipa o signed_amount.
 	UpdateTransaction(ctx context.Context, arg UpdateTransactionParams) (string, error)
+	// Grava/atualiza o fechamento de um dia (backfill e job diário). Idempotente por
+	// (asset_id, observed_on). source = 'brapi'|'coingecko'|'manual'; as_of = instante do provedor
+	// (NULL no backfill histórico). Só se o ativo é do usuário e está ativo.
+	UpsertDailyPrice(ctx context.Context, arg UpsertDailyPriceParams) (int64, error)
 }
 
 var _ Querier = (*Queries)(nil)

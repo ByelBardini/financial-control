@@ -17,8 +17,7 @@ describe('DesktopDashboard', () => {
     expect(screen.getByRole('button', { name: 'Investimentos' })).toBeOnTheScreen();
     expect(await screen.findByText('Disponível para gastar')).toBeOnTheScreen();
     expect(await screen.findByText('Você gastou 59% da sua receita.')).toBeOnTheScreen();
-    expect(await screen.findByText('Bitcoin')).toBeOnTheScreen();
-    expect(await screen.findByText('R$ 2.734,50')).toBeOnTheScreen();
+    expect(await screen.findByText('CDB 110% CDI')).toBeOnTheScreen(); // painel Investimentos (carteira real)
   });
 
   it('dispara onToggleHidden a partir do header', async () => {
@@ -53,6 +52,6 @@ describe('DesktopDashboard', () => {
 
     // o resto do grid segue de pé
     expect(await screen.findByText('Disponível para gastar')).toBeOnTheScreen();
-    expect(await screen.findByText('Bitcoin')).toBeOnTheScreen();
+    expect(await screen.findByText('CDB 110% CDI')).toBeOnTheScreen();
   });
 });

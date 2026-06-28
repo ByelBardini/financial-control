@@ -120,15 +120,6 @@ func TestInvestmentsHandlerListaVazia(t *testing.T) {
 	}
 }
 
-func TestTickerHandlerStub(t *testing.T) {
-	svc := dashboard.NewService(&fakeDashStore{})
-	rec := do(t, dashboard.TickerHandler(svc), "/dashboard/ticker")
-	const want = `{"name":"Bitcoin","symbol":"B","changePct24h":0,"priceCents":0,"positionCents":0}` + "\n"
-	if got := rec.Body.String(); got != want {
-		t.Fatalf("body = %q, quero %q", got, want)
-	}
-}
-
 func TestInvestmentsSummaryHandlerZerado(t *testing.T) {
 	svc := dashboard.NewService(&fakeDashStore{})
 	rec := do(t, dashboard.InvestmentsSummaryHandler(svc), "/dashboard/investments-summary")

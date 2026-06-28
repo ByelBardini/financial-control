@@ -1,0 +1,7 @@
+{
+  "results": [
+    { "symbol": "PETR4", "currency": "BRL", "regularMarketPrice": 38.50, "regularMarketTime": "2026-06-23T20:07:00.000Z" },
+    { "symbol": "VALE3", "currency": "BRL", "regularMarketPrice": 61.2, "regularMarketTime": "2026-06-23T20:07:00.000Z" }
+  ],
+  "requestedAt": "2026-06-23T20:10:00.000Z"
+}

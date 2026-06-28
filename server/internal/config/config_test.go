@@ -80,6 +80,44 @@ func TestLoadJWTSecretNoLimite(t *testing.T) {
 	}
 }
 
+func TestLoadJobCotacaoDefaults(t *testing.T) {
+	withBase(t)
+	cfg, err := config.Load()
+	if err != nil {
+		t.Fatalf("erro inesperado: %v", err)
+	}
+	if cfg.QuoteJobEnabled {
+		t.Error("QuoteJobEnabled default deveria ser false (opt-in)")
+	}
+	if cfg.QuoteJobHour != 18 || cfg.QuoteJobMinute != 30 {
+		t.Errorf("horário default = %02d:%02d, quero 18:30", cfg.QuoteJobHour, cfg.QuoteJobMinute)
+	}
+}
+
+func TestLoadJobCotacaoOverrides(t *testing.T) {
+	withBase(t)
+	t.Setenv("QUOTE_JOB_ENABLED", "true")
+	t.Setenv("QUOTE_JOB_AT", "07:05")
+	cfg, err := config.Load()
+	if err != nil {
+		t.Fatalf("erro inesperado: %v", err)
+	}
+	if !cfg.QuoteJobEnabled {
+		t.Error("QUOTE_JOB_ENABLED=true deveria ligar o job")
+	}
+	if cfg.QuoteJobHour != 7 || cfg.QuoteJobMinute != 5 {
+		t.Errorf("horário = %02d:%02d, quero 07:05", cfg.QuoteJobHour, cfg.QuoteJobMinute)
+	}
+}
+
+func TestLoadRejeitaQuoteJobAtInvalido(t *testing.T) {
+	withBase(t)
+	t.Setenv("QUOTE_JOB_AT", "banana") // não é HH:MM
+	if _, err := config.Load(); err == nil {
+		t.Fatal("esperava erro com QUOTE_JOB_AT em formato inválido")
+	}
+}
+
 func TestLoadRespeitaOverrides(t *testing.T) {
 	withBase(t)
 	t.Setenv("PORT", "9090")

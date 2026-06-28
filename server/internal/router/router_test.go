@@ -40,7 +40,6 @@ func TestRotasDeDadosExigemToken(t *testing.T) {
 		"/dashboard/diagnosis",
 		"/investments",
 		"/dashboard/investments-summary",
-		"/dashboard/ticker",
 		"/auth/me",
 		"/accounts/a1",
 		"/contas/banks",
@@ -59,6 +58,7 @@ func TestRotasDeDadosExigemToken(t *testing.T) {
 		"/investimentos/positions",
 		"/investimentos/allocation",
 		"/investimentos/crypto",
+		"/investimentos/catalogo",
 		"/investimentos/assets",
 		"/investimentos/assets/a1",
 	}

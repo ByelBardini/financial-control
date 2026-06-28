@@ -22,7 +22,8 @@ describe('DesktopInvestimentos', () => {
 
     expect(await screen.findByRole('header', { name: 'Portfólio de Ilusões' })).toBeOnTheScreen();
     expect(await screen.findByRole('header', { name: 'Registro de Quedas' })).toBeOnTheScreen();
-    expect(screen.getByText('Investido')).toBeOnTheScreen();
+    // "Investido" aparece na coluna da tabela E na legenda da Evolução do Patrimônio (mesmo termo).
+    expect(screen.getAllByText('Investido').length).toBeGreaterThan(0);
     expect(screen.getByText('Valor Atual')).toBeOnTheScreen();
     expect(screen.getByText('Ganho/Perda')).toBeOnTheScreen();
     expect(await screen.findByText('PETR4')).toBeOnTheScreen();

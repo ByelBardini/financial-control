@@ -2,8 +2,10 @@ import { useQuery } from '@tanstack/react-query';
 import {
   getAllocation,
   getCryptoBlock,
+  getPortfolioEvolution,
   getPortfolioSummary,
   getPositions,
+  getPriceHistory,
   getRiskAssessment,
 } from '../api/investimentos';
 
@@ -25,3 +27,15 @@ export const useCryptoBlock = () =>
 
 export const useInvestmentRisk = () =>
   useQuery({ queryKey: ['investimentos', 'risk'], queryFn: () => getRiskAssessment() });
+
+export const usePortfolioEvolution = (range: string) =>
+  useQuery({
+    queryKey: ['investimentos', 'evolution', range],
+    queryFn: () => getPortfolioEvolution(range),
+  });
+
+export const usePriceHistory = (assetId: string, range: string) =>
+  useQuery({
+    queryKey: ['investimentos', 'price-history', assetId, range],
+    queryFn: () => getPriceHistory(assetId, range),
+  });

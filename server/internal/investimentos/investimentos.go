@@ -11,6 +11,7 @@ import (
 	"math"
 	"time"
 
+	"financial-control/server/internal/cotacao"
 	"financial-control/server/internal/pct"
 	"financial-control/server/internal/store"
 )
@@ -51,15 +52,15 @@ type AllocationSlice struct {
 
 // CryptoHolding é uma posição de cripto (pilar à parte) + a série de preços do gráfico.
 type CryptoHolding struct {
-	ID                string  `json:"id"`
-	Symbol            string  `json:"symbol"`
-	Name              string  `json:"name"`
-	Icon              string  `json:"icon"`
-	CostBasisCents    int64   `json:"costBasisCents"`
-	CurrentValueCents int64   `json:"currentValueCents"`
-	GainCents         int64   `json:"gainCents"`
-	GainPct           float64 `json:"gainPct"`
-	Series            []int64 `json:"series"`
+	ID                string              `json:"id"`
+	Symbol            string              `json:"symbol"`
+	Name              string              `json:"name"`
+	Icon              string              `json:"icon"`
+	CostBasisCents    int64               `json:"costBasisCents"`
+	CurrentValueCents int64               `json:"currentValueCents"`
+	GainCents         int64               `json:"gainCents"`
+	GainPct           float64             `json:"gainPct"`
+	Series            []PriceHistoryPoint `json:"series"`
 }
 
 // CryptoBlock é o bloco de cripto separado do portfólio geral (subtotal próprio).
@@ -70,6 +71,20 @@ type CryptoBlock struct {
 	GainCents     int64           `json:"gainCents"`
 	GainPct       float64         `json:"gainPct"`
 	Holdings      []CryptoHolding `json:"holdings"`
+}
+
+// PriceHistoryPoint é um ponto da série de preço de um ativo (data AAAA-MM-DD + preço em centavos).
+type PriceHistoryPoint struct {
+	Date       string `json:"date"`
+	PriceCents int64  `json:"priceCents"`
+}
+
+// EvolutionPoint é um ponto da evolução do patrimônio geral: valor de mercado × custo acumulado
+// (o gap entre eles = ganho não-realizado). Dinheiro em centavos; data AAAA-MM-DD.
+type EvolutionPoint struct {
+	Date             string `json:"date"`
+	MarketValueCents int64  `json:"marketValueCents"`
+	CostBasisCents   int64  `json:"costBasisCents"`
 }
 
 // InvestimentosStore é a dependência de dados do domínio (escopada por usuário). As views
@@ -85,19 +100,52 @@ type InvestimentosStore interface {
 	UpdateAsset(ctx context.Context, userID, assetID string, in store.AssetInput) error
 	ArchiveAsset(ctx context.Context, userID, assetID string) error
 	AppendPriceObservation(ctx context.Context, userID, assetID string, priceCents int64, observedOn time.Time) (int64, error)
+	UpsertDailyPrices(ctx context.Context, userID, assetID string, pts []store.PricePoint) (int64, error)
+	ListPriceHistory(ctx context.Context, userID, assetID string, de, ate time.Time) ([]store.PricePoint, error)
+	PortfolioEvolution(ctx context.Context, userID string, de, ate time.Time) ([]store.EvolutionRow, error)
 	RecordTrade(ctx context.Context, userID, assetID, side, ticker string, in store.TradeInput) error
 	DeleteTrade(ctx context.Context, userID, assetID, tradeID string) error
 }
 
-// Service agrega as views da carteira e orquestra o recurso de ativos/operações. Sem estado
-// além do store.
-type Service struct {
-	store InvestimentosStore
+// Cotador busca o histórico inicial de preço de um ativo, para o backfill no cadastro.
+// *cotacao.Resolver implementa (escolhe a fonte pela classe). nil desliga o backfill.
+type Cotador interface {
+	Historico(ctx context.Context, ticker, class string, de, ate time.Time) ([]cotacao.PontoDePreco, error)
 }
 
-// NewService injeta a dependência de dados.
-func NewService(s InvestimentosStore) *Service {
-	return &Service{store: s}
+// Service agrega as views da carteira e orquestra o recurso de ativos/operações. Sem estado além
+// do store, do cotador (backfill de preço no cadastro) e do buscador (catálogo do autocomplete) —
+// ambos opcionais.
+type Service struct {
+	store    InvestimentosStore
+	cotador  Cotador  // nil = sem cotação automática (backfill desligado)
+	buscador Buscador // nil = sem autocomplete de catálogo (Catalogo devolve [])
+}
+
+// Option configura o Service na construção.
+type Option func(*Service)
+
+// ComBackfill liga a cotação automática: ao criar um ativo, o histórico de preço é puxado do
+// provedor em segundo plano (best-effort) e gravado no ledger. Sem ela, o cadastro não busca preço.
+func ComBackfill(c Cotador) Option {
+	return func(s *Service) { s.cotador = c }
+}
+
+// ComBusca liga o autocomplete do cadastro: o campo de ticker busca ativos reais no catálogo
+// externo (brapi/CoinGecko). Sem ela, Catalogo devolve [] (busca desligada).
+func ComBusca(b Buscador) Option {
+	return func(s *Service) { s.buscador = b }
+}
+
+// NewService injeta a dependência de dados; Options ligam recursos opcionais (ex.: ComBackfill).
+//
+//	svc := investimentos.NewService(store, investimentos.ComBackfill(resolver))
+func NewService(s InvestimentosStore, opts ...Option) *Service {
+	svc := &Service{store: s}
+	for _, o := range opts {
+		o(svc)
+	}
+	return svc
 }
 
 // Summary resume o portfólio GERAL (Ações/FIIs/Renda Fixa — cripto fora): patrimônio atual,
@@ -179,9 +227,12 @@ func (s *Service) Crypto(ctx context.Context, userID string) (CryptoBlock, error
 	if err != nil {
 		return CryptoBlock{}, fmt.Errorf("investimentos: série da cripto: %w", err)
 	}
-	seriesByAsset := make(map[string][]int64)
+	seriesByAsset := make(map[string][]PriceHistoryPoint)
 	for _, sr := range series {
-		seriesByAsset[sr.AssetID] = append(seriesByAsset[sr.AssetID], sr.PriceCents)
+		seriesByAsset[sr.AssetID] = append(seriesByAsset[sr.AssetID], PriceHistoryPoint{
+			Date:       sr.ObservedOn.Format(tradeDateLayout),
+			PriceCents: sr.PriceCents,
+		})
 	}
 	holdings := make([]CryptoHolding, 0, len(rows))
 	var subtotal, cost int64
@@ -192,7 +243,7 @@ func (s *Service) Crypto(ctx context.Context, userID string) (CryptoBlock, error
 		gain := r.CurrentValueCents - r.CostBasisCents
 		points := seriesByAsset[r.ID]
 		if points == nil {
-			points = []int64{}
+			points = []PriceHistoryPoint{}
 		}
 		holdings = append(holdings, CryptoHolding{
 			ID:                r.ID,
@@ -217,6 +268,60 @@ func (s *Service) Crypto(ctx context.Context, userID string) (CryptoBlock, error
 		GainPct:       gainPercent(blockGain, cost),
 		Holdings:      holdings,
 	}, nil
+}
+
+// PriceHistory devolve a série diária de preço de um ativo no período pedido (range). Alimenta o
+// gráfico de histórico por ativo.
+func (s *Service) PriceHistory(ctx context.Context, userID, assetID, rangeParam string) ([]PriceHistoryPoint, error) {
+	de, ate := rangeParaDatas(rangeParam)
+	rows, err := s.store.ListPriceHistory(ctx, userID, assetID, de, ate)
+	if err != nil {
+		return nil, fmt.Errorf("investimentos: histórico de preço: %w", err)
+	}
+	out := make([]PriceHistoryPoint, 0, len(rows))
+	for _, r := range rows {
+		out = append(out, PriceHistoryPoint{Date: r.ObservedOn.Format(tradeDateLayout), PriceCents: r.PriceCents})
+	}
+	return out, nil
+}
+
+// Evolution devolve a evolução diária do patrimônio geral (exclui cripto) no período: valor de
+// mercado × custo acumulado — o gráfico de "valorizou ou não?".
+func (s *Service) Evolution(ctx context.Context, userID, rangeParam string) ([]EvolutionPoint, error) {
+	de, ate := rangeParaDatas(rangeParam)
+	rows, err := s.store.PortfolioEvolution(ctx, userID, de, ate)
+	if err != nil {
+		return nil, fmt.Errorf("investimentos: evolução do patrimônio: %w", err)
+	}
+	out := make([]EvolutionPoint, 0, len(rows))
+	for _, r := range rows {
+		out = append(out, EvolutionPoint{
+			Date:             r.OnDate.Format(tradeDateLayout),
+			MarketValueCents: r.MarketValueCents,
+			CostBasisCents:   r.CostBasisCents,
+		})
+	}
+	return out, nil
+}
+
+// rangeParaDatas traduz o range pedido (1mo/3mo/6mo/1y/max) em [de, ate], com ate = hoje em BRT.
+// Default (vazio/desconhecido) = 6 meses.
+func rangeParaDatas(r string) (time.Time, time.Time) {
+	ate := cotacao.DataBRT(time.Now())
+	dias := 180
+	switch r {
+	case "1mo":
+		dias = 30
+	case "3mo":
+		dias = 90
+	case "6mo":
+		dias = 180
+	case "1y":
+		dias = 365
+	case "max":
+		dias = 3650
+	}
+	return ate.AddDate(0, 0, -dias), ate
 }
 
 // position mapeia a linha derivada do store no DTO de posição (gainCents = valor − custo).

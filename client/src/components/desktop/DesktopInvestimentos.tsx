@@ -3,6 +3,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { SideNav } from './SideNav';
 import { AllocationBar } from '../investimentos/AllocationBar';
 import { CryptoSection } from '../investimentos/CryptoSection';
+import { EvolutionSection } from '../investimentos/EvolutionSection';
 import { PortfolioHero } from '../investimentos/PortfolioHero';
 import { PositionRow } from '../investimentos/PositionRow';
 import { RiskAssessmentCard } from '../investimentos/RiskAssessmentCard';
@@ -16,6 +17,7 @@ import {
   useInvestmentPositions,
   useInvestmentRisk,
   useInvestmentSummary,
+  usePortfolioEvolution,
 } from '../../hooks/useInvestimentosQueries';
 import type { AppRoute } from '../../navigation/routes';
 
@@ -49,6 +51,7 @@ export function DesktopInvestimentos({
 }: DesktopInvestimentosProps) {
   const summary = useInvestmentSummary();
   const allocation = useInvestmentAllocation();
+  const evolution = usePortfolioEvolution('1mo');
   const positions = useInvestmentPositions();
   const crypto = useCryptoBlock();
   const risk = useInvestmentRisk();
@@ -100,6 +103,12 @@ export function DesktopInvestimentos({
             <View className="border-t border-grid-line py-stack-lg">
               <QuerySection query={allocation} label="a alocação">
                 {(data) => <AllocationBar allocation={data} hidden={hidden} />}
+              </QuerySection>
+            </View>
+
+            <View className="border-t border-grid-line">
+              <QuerySection query={evolution} label="a evolução do patrimônio">
+                {(data) => <EvolutionSection points={data} hidden={hidden} />}
               </QuerySection>
             </View>
 

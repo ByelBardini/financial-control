@@ -64,7 +64,6 @@ func New(d Deps) http.Handler {
 	mux.Handle("GET /dashboard/diagnosis", protected(dashboard.DiagnosisHandler(d.Dashboard)))
 	mux.Handle("GET /investments", protected(dashboard.InvestmentsHandler(d.Dashboard)))
 	mux.Handle("GET /dashboard/investments-summary", protected(dashboard.InvestmentsSummaryHandler(d.Dashboard)))
-	mux.Handle("GET /dashboard/ticker", protected(dashboard.TickerHandler(d.Dashboard)))
 
 	// Views agregadas da tela de Contas.
 	mux.Handle("GET /contas/banks", protected(contas.BanksHandler(d.Contas)))
@@ -86,12 +85,16 @@ func New(d Deps) http.Handler {
 	mux.Handle("GET /investimentos/positions", protected(investimentos.PositionsHandler(d.Investimentos)))
 	mux.Handle("GET /investimentos/allocation", protected(investimentos.AllocationHandler(d.Investimentos)))
 	mux.Handle("GET /investimentos/crypto", protected(investimentos.CryptoHandler(d.Investimentos)))
+	mux.Handle("GET /investimentos/evolution", protected(investimentos.EvolutionHandler(d.Investimentos)))
+	mux.Handle("GET /investimentos/catalogo", protected(investimentos.CatalogoHandler(d.Investimentos)))
+	mux.Handle("POST /investimentos/backfill", protected(investimentos.BackfillHandler(d.Investimentos)))
 
 	// Recurso "investimentos" (CRUD): ativos + operações (compra/venda). Posição é derivada,
 	// então a escrita reflete nas views sem cache. Carteira isolada (não mexe no saldo das contas).
 	mux.Handle("GET /investimentos/assets", protected(investimentos.AssetsHandler(d.Investimentos)))
 	mux.Handle("POST /investimentos/assets", protected(investimentos.CreateAssetHandler(d.Investimentos)))
 	mux.Handle("GET /investimentos/assets/{id}", protected(investimentos.GetAssetHandler(d.Investimentos)))
+	mux.Handle("GET /investimentos/assets/{id}/history", protected(investimentos.PriceHistoryHandler(d.Investimentos)))
 	mux.Handle("PATCH /investimentos/assets/{id}", protected(investimentos.UpdateAssetHandler(d.Investimentos)))
 	mux.Handle("DELETE /investimentos/assets/{id}", protected(investimentos.ArchiveAssetHandler(d.Investimentos)))
 	mux.Handle("POST /investimentos/assets/{id}/trades", protected(investimentos.TradeHandler(d.Investimentos)))

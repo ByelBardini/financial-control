@@ -44,18 +44,9 @@ type Investment struct {
 	Icon           string  `json:"icon"`
 }
 
-// InvestmentsSummary é o resumo da carteira de investimentos. Deferido (zerado).
+// InvestmentsSummary é o resumo da carteira de investimentos (agregado das posições).
 type InvestmentsSummary struct {
 	TotalCents  int64   `json:"totalCents"`
 	ChangeCents int64   `json:"changeCents"`
 	ChangePct   float64 `json:"changePct"`
-}
-
-// Ticker é a cotação destacada (cripto). Deferido: só rótulo estático, valores zerados.
-type Ticker struct {
-	Name          string  `json:"name"`
-	Symbol        string  `json:"symbol"`
-	ChangePct24h  float64 `json:"changePct24h"`
-	PriceCents    int64   `json:"priceCents"`
-	PositionCents int64   `json:"positionCents"`
 }

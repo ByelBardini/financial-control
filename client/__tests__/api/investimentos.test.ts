@@ -5,9 +5,12 @@ import {
   deleteTrade,
   getAllocation,
   getAsset,
+  getAssetCatalog,
   getCryptoBlock,
+  getPortfolioEvolution,
   getPortfolioSummary,
   getPositions,
+  getPriceHistory,
   getRiskAssessment,
   updateAsset,
 } from '../../src/api/investimentos';
@@ -49,6 +52,24 @@ describe('api/investimentos (views)', () => {
     jest.mocked(client.apiGet).mockResolvedValue({} as never);
     await getCryptoBlock();
     expect(client.apiGet).toHaveBeenCalledWith('/investimentos/crypto');
+  });
+
+  it('getPortfolioEvolution faz GET /investimentos/evolution com o range', async () => {
+    jest.mocked(client.apiGet).mockResolvedValue([] as never);
+    await getPortfolioEvolution('6mo');
+    expect(client.apiGet).toHaveBeenCalledWith('/investimentos/evolution?range=6mo');
+  });
+
+  it('getPriceHistory faz GET /investimentos/assets/{id}/history com o range', async () => {
+    jest.mocked(client.apiGet).mockResolvedValue([] as never);
+    await getPriceHistory('a1', '1y');
+    expect(client.apiGet).toHaveBeenCalledWith('/investimentos/assets/a1/history?range=1y');
+  });
+
+  it('getAssetCatalog faz GET /investimentos/catalogo com class e q url-encodado', async () => {
+    jest.mocked(client.apiGet).mockResolvedValue([] as never);
+    await getAssetCatalog('acoes', 'PETR 4');
+    expect(client.apiGet).toHaveBeenCalledWith('/investimentos/catalogo?class=acoes&q=PETR%204');
   });
 });
 

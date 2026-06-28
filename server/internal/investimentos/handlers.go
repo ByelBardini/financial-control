@@ -59,6 +59,81 @@ func CryptoHandler(svc *Service) http.Handler {
 	})
 }
 
+// EvolutionHandler responde GET /investimentos/evolution?range=... com a evolução do patrimônio
+// geral (valor de mercado × custo acumulado).
+func EvolutionHandler(svc *Service) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		userID, ok := authedUserID(w, r)
+		if !ok {
+			return
+		}
+		out, err := svc.Evolution(r.Context(), userID, r.URL.Query().Get("range"))
+		if err != nil {
+			log.Printf("GET /investimentos/evolution: %v", err)
+			httpx.WriteError(w, http.StatusInternalServerError, "erro ao montar evolução")
+			return
+		}
+		httpx.WriteJSON(w, http.StatusOK, out)
+	})
+}
+
+// CatalogoHandler responde GET /investimentos/catalogo?class=&q= com sugestões de ativos do catálogo
+// externo (autocomplete do cadastro). Classe inválida → 400; renda_fixa / query curta / sem match → [].
+// Não usa o userID além da exigência de token (o catálogo é o universo externo, não dados do usuário).
+func CatalogoHandler(svc *Service) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if _, ok := authedUserID(w, r); !ok {
+			return
+		}
+		q := r.URL.Query()
+		out, err := svc.Catalogo(r.Context(), q.Get("class"), q.Get("q"))
+		if err != nil {
+			if errors.Is(err, ErrClasseInvalida) {
+				httpx.WriteError(w, http.StatusBadRequest, "classe de ativo inválida: use acoes|fiis|cripto")
+				return
+			}
+			log.Printf("GET /investimentos/catalogo: %v", err)
+			httpx.WriteError(w, http.StatusInternalServerError, "erro ao buscar catálogo de ativos")
+			return
+		}
+		httpx.WriteJSON(w, http.StatusOK, out)
+	})
+}
+
+// BackfillHandler responde POST /investimentos/backfill disparando, em segundo plano, o backfill de
+// histórico dos ativos JÁ cadastrados do usuário (classes cotáveis) → 202 + {assets:N} (quantos
+// entraram na fila). Útil uma vez após configurar o BRAPI_TOKEN, pra os ativos antigos ganharem série.
+func BackfillHandler(svc *Service) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		userID, ok := authedUserID(w, r)
+		if !ok {
+			return
+		}
+		n, err := svc.BackfillExistentes(r.Context(), userID)
+		if err != nil {
+			writeAssetError(w, err, "POST /investimentos/backfill", "erro ao iniciar backfill")
+			return
+		}
+		httpx.WriteJSON(w, http.StatusAccepted, map[string]int{"assets": n})
+	})
+}
+
+// PriceHistoryHandler responde GET /investimentos/assets/{id}/history?range=... com a série de preço.
+func PriceHistoryHandler(svc *Service) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		userID, ok := authedUserID(w, r)
+		if !ok {
+			return
+		}
+		out, err := svc.PriceHistory(r.Context(), userID, r.PathValue("id"), r.URL.Query().Get("range"))
+		if err != nil {
+			writeAssetError(w, err, "GET /investimentos/assets/{id}/history", "erro ao buscar histórico de preço")
+			return
+		}
+		httpx.WriteJSON(w, http.StatusOK, out)
+	})
+}
+
 // --- Recurso CRUD (ativos + operações) ---
 
 // writeInput é o corpo de escrita que se autovalida (criar ativo, editar, operar).

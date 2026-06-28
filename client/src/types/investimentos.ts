@@ -44,8 +44,8 @@ export interface AllocationSlice {
 }
 
 // Posição de cripto (pilar à parte). Mesma ideia de ganho/perda manual da Position.
-// series = pontos de preço/valor (centavos) ao longo do tempo pro gráfico do card (CryptoChart);
-// o tooltip mostra o valor do ponto. Sem cotação ao vivo: vem do mock/backend.
+// series = pontos {date, priceCents} ao longo do tempo pro gráfico do card (PriceSparkline);
+// o tooltip mostra data + valor do ponto. Mesmo shape do histórico de qualquer ativo.
 export interface CryptoHolding {
   id: string;
   symbol: string;
@@ -55,7 +55,7 @@ export interface CryptoHolding {
   currentValueCents: number;
   gainCents: number;
   gainPct: number;
-  series: number[];
+  series: PriceHistoryPoint[];
 }
 
 // Bloco de cripto separado do portfólio geral ("são outra parada"): subtotal próprio.
@@ -67,6 +67,21 @@ export interface CryptoBlock {
   gainCents: number;
   gainPct: number;
   holdings: CryptoHolding[];
+}
+
+// Ponto da evolução do patrimônio GERAL (cripto fora): valor de mercado × custo acumulado por dia.
+// O gap entre as duas linhas = ganho não-realizado (padrão de mercado pra "valorizou ou não?").
+// Centavos inteiros; date AAAA-MM-DD.
+export interface EvolutionPoint {
+  date: string;
+  marketValueCents: number;
+  costBasisCents: number;
+}
+
+// Ponto da série diária de preço de um ativo (gráfico de histórico no detalhe). Centavos inteiros.
+export interface PriceHistoryPoint {
+  date: string;
+  priceCents: number;
 }
 
 // Avaliação de Risco = veredito de DESEMPENHO no estilo do mockup (SEM barra/medidor): status
@@ -114,6 +129,16 @@ export interface Trade {
 // Detalhe do ativo: posição derivada + as operações (mais recentes recomputam a posição).
 export interface AssetDetail extends AssetPosition {
   trades: Trade[];
+}
+
+// Candidato de ativo no autocomplete do cadastro (catálogo externo: brapi p/ ações/FIIs,
+// CoinGecko p/ cripto). priceCents = 0 quando a fonte não traz preço na busca (cripto); logoUrl
+// pode vir ausente. Shape 1:1 com internal/investimentos/catalogo.go (CatalogoItem).
+export interface CatalogoItem {
+  ticker: string;
+  name: string;
+  priceCents: number;
+  logoUrl?: string;
 }
 
 // Corpo de criação de ativo (preço atual em centavos). assetClass é imutável após criar.

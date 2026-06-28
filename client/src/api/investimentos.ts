@@ -2,12 +2,16 @@ import { apiDelete, apiGet, apiPatch, apiPost } from './client';
 import { assessRisk } from '../lib/investmentRisk';
 import type {
   AllocationSlice,
+  AssetClass,
   AssetDetail,
+  CatalogoItem,
   CreateAssetInput,
   CreateTradeInput,
   CryptoBlock,
+  EvolutionPoint,
   PortfolioSummary,
   Position,
+  PriceHistoryPoint,
   RiskAssessment,
   UpdateAssetInput,
 } from '../types/investimentos';
@@ -24,6 +28,21 @@ export const getPositions = () => apiGet<Position[]>('/investimentos/positions')
 export const getAllocation = () => apiGet<AllocationSlice[]>('/investimentos/allocation');
 
 export const getCryptoBlock = () => apiGet<CryptoBlock>('/investimentos/crypto');
+
+// Evolução do patrimônio geral (valor de mercado × custo acumulado por dia). range = janela
+// (1mo/3mo/6mo/1y/max). Cripto fica fora (tem o próprio gráfico no card).
+export const getPortfolioEvolution = (range: string) =>
+  apiGet<EvolutionPoint[]>(`/investimentos/evolution?range=${range}`);
+
+// Série diária de preço de um ativo (gráfico de histórico no detalhe). range = janela.
+export const getPriceHistory = (assetId: string, range: string) =>
+  apiGet<PriceHistoryPoint[]>(`/investimentos/assets/${assetId}/history?range=${range}`);
+
+// Busca ativos reais no catálogo externo (autocomplete do cadastro). class escopa a fonte
+// (acoes/fiis → brapi; cripto → CoinGecko); renda_fixa / termo curto / sem match devolvem [].
+// q vai url-encodado (pode ter espaço/acento).
+export const getAssetCatalog = (assetClass: AssetClass, q: string) =>
+  apiGet<CatalogoItem[]>(`/investimentos/catalogo?class=${assetClass}&q=${encodeURIComponent(q)}`);
 
 // Risco = veredito derivado do lucro/perda GERAL (portfólio geral + cripto combinados). Sem
 // endpoint próprio no server: buscamos summary + cripto e calculamos o % geral (custo = valor −

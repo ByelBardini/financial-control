@@ -1,4 +1,5 @@
 import { Pressable, Text, View } from 'react-native';
+import { AssetHistorySection } from './AssetHistorySection';
 import { ModalSheet } from '../ModalSheet';
 import { SectionError } from '../SectionError';
 import { SectionSkeleton } from '../SectionSkeleton';
@@ -69,6 +70,8 @@ export function AssetDetailModal({ assetId, onClose, onTrade, onEdit }: AssetDet
           </View>
           <MoneyInfoRow label="Resultado realizado" cents={asset.realizedCents} />
         </View>
+
+        <AssetHistorySection assetId={assetId} tone={tone} hidden={false} />
 
         <View className="flex-row gap-stack-md">
           <Pressable
