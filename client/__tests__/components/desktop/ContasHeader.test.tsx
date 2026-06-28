@@ -7,7 +7,7 @@ describe('ContasHeader (desktop)', () => {
 
     expect(screen.getByText('Monitor de Sobrevivência')).toBeOnTheScreen();
     expect(screen.getByRole('header', { name: 'Suas contas' })).toBeOnTheScreen();
-    expect(screen.getByText('NOVA CONTA')).toBeOnTheScreen();
+    expect(screen.getByText('Nova conta')).toBeOnTheScreen();
     expect(screen.queryByText('Patrimônio Líquido')).toBeNull();
   });
 
@@ -20,7 +20,7 @@ describe('ContasHeader (desktop)', () => {
     expect(onToggleHidden).toHaveBeenCalledTimes(1);
   });
 
-  it('dispara onCreateAccount ao tocar em NOVA CONTA', async () => {
+  it('dispara onCreateAccount ao tocar em "Nova conta"', async () => {
     const onCreateAccount = jest.fn();
     await render(
       <ContasHeader hidden={false} onToggleHidden={jest.fn()} onCreateAccount={onCreateAccount} />,

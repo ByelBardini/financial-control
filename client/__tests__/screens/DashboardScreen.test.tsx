@@ -24,7 +24,8 @@ describe('DashboardScreen (responsivo)', () => {
     await renderWithClient(<DashboardScreen />);
 
     expect(screen.getByRole('button', { name: 'Início' })).toBeOnTheScreen();
-    expect(screen.queryByText('Visão Geral')).toBeNull();
+    // O mobile agora também usa o cabeçalho padronizado (eyebrow + título).
+    expect(screen.getByRole('header', { name: 'Bem-vindo de volta' })).toBeOnTheScreen();
   });
 
   it('renderiza o layout desktop em telas largas', async () => {

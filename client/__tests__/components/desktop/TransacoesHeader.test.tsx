@@ -18,10 +18,11 @@ describe('TransacoesHeader (desktop)', () => {
   it('mostra título, busca, toggle de valores e a ação de nova transação', async () => {
     await render(<Harness />);
 
+    expect(screen.getByText('Terminal Financeiro')).toBeOnTheScreen();
     expect(screen.getByRole('header', { name: 'Transações' })).toBeOnTheScreen();
     expect(screen.getByText('Rastreando cada centavo em fuga.')).toBeOnTheScreen();
     expect(screen.getByRole('switch', { name: 'Ocultar valores' })).toBeOnTheScreen();
-    expect(screen.getByText('NOVA TRANSAÇÃO')).toBeOnTheScreen();
+    expect(screen.getByText('Nova transação')).toBeOnTheScreen();
 
     const input = screen.getByLabelText('Buscar transações');
     await userEvent.setup().type(input, 'uber');
