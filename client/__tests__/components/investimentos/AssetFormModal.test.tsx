@@ -7,7 +7,11 @@ import type { AssetDetail } from '../../../src/types/investimentos';
 
 jest.mock('../../../src/api/investimentos');
 
-beforeEach(() => jest.clearAllMocks());
+beforeEach(() => {
+  jest.clearAllMocks();
+  // O Ticker autocompleta (useAssetSearch): sem sugestões por padrão, pra não tocar a rede.
+  jest.mocked(api.getAssetCatalog).mockResolvedValue([]);
+});
 
 const detail: AssetDetail = {
   id: 'a1',

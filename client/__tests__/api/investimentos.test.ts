@@ -5,6 +5,7 @@ import {
   deleteTrade,
   getAllocation,
   getAsset,
+  getAssetCatalog,
   getCryptoBlock,
   getPortfolioEvolution,
   getPortfolioSummary,
@@ -63,6 +64,12 @@ describe('api/investimentos (views)', () => {
     jest.mocked(client.apiGet).mockResolvedValue([] as never);
     await getPriceHistory('a1', '1y');
     expect(client.apiGet).toHaveBeenCalledWith('/investimentos/assets/a1/history?range=1y');
+  });
+
+  it('getAssetCatalog faz GET /investimentos/catalogo com class e q url-encodado', async () => {
+    jest.mocked(client.apiGet).mockResolvedValue([] as never);
+    await getAssetCatalog('acoes', 'PETR 4');
+    expect(client.apiGet).toHaveBeenCalledWith('/investimentos/catalogo?class=acoes&q=PETR%204');
   });
 });
 
