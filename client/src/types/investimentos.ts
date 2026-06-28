@@ -131,6 +131,16 @@ export interface AssetDetail extends AssetPosition {
   trades: Trade[];
 }
 
+// Candidato de ativo no autocomplete do cadastro (catálogo externo: brapi p/ ações/FIIs,
+// CoinGecko p/ cripto). priceCents = 0 quando a fonte não traz preço na busca (cripto); logoUrl
+// pode vir ausente. Shape 1:1 com internal/investimentos/catalogo.go (CatalogoItem).
+export interface CatalogoItem {
+  ticker: string;
+  name: string;
+  priceCents: number;
+  logoUrl?: string;
+}
+
 // Corpo de criação de ativo (preço atual em centavos). assetClass é imutável após criar.
 export interface CreateAssetInput {
   ticker: string;

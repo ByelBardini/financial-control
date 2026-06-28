@@ -2,7 +2,9 @@ import { apiDelete, apiGet, apiPatch, apiPost } from './client';
 import { assessRisk } from '../lib/investmentRisk';
 import type {
   AllocationSlice,
+  AssetClass,
   AssetDetail,
+  CatalogoItem,
   CreateAssetInput,
   CreateTradeInput,
   CryptoBlock,
@@ -35,6 +37,12 @@ export const getPortfolioEvolution = (range: string) =>
 // Série diária de preço de um ativo (gráfico de histórico no detalhe). range = janela.
 export const getPriceHistory = (assetId: string, range: string) =>
   apiGet<PriceHistoryPoint[]>(`/investimentos/assets/${assetId}/history?range=${range}`);
+
+// Busca ativos reais no catálogo externo (autocomplete do cadastro). class escopa a fonte
+// (acoes/fiis → brapi; cripto → CoinGecko); renda_fixa / termo curto / sem match devolvem [].
+// q vai url-encodado (pode ter espaço/acento).
+export const getAssetCatalog = (assetClass: AssetClass, q: string) =>
+  apiGet<CatalogoItem[]>(`/investimentos/catalogo?class=${assetClass}&q=${encodeURIComponent(q)}`);
 
 // Risco = veredito derivado do lucro/perda GERAL (portfólio geral + cripto combinados). Sem
 // endpoint próprio no server: buscamos summary + cripto e calculamos o % geral (custo = valor −

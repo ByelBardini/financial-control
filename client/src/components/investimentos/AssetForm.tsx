@@ -5,6 +5,7 @@ import { FormField } from '../auth/FormField';
 import { SelectField } from '../SelectField';
 import { MoneyField } from '../contas/MoneyField';
 import { ArchiveAssetButton } from './ArchiveAssetButton';
+import { TickerAutocomplete } from './TickerAutocomplete';
 import { Icon } from '../Icon';
 import {
   ASSET_CLASSES,
@@ -15,7 +16,7 @@ import {
   type AssetFormValues,
 } from '../../lib/assetForm';
 import { colors } from '../../theme/colors';
-import type { AssetClass } from '../../types/investimentos';
+import type { AssetClass, CatalogoItem } from '../../types/investimentos';
 
 const classOptions = ASSET_CLASSES.map((c) => ({
   value: c.value,
@@ -56,6 +57,14 @@ export function AssetForm({
     patch({ assetClass, icon: assetClassMeta(assetClass).defaultIcon });
   }
 
+  // Escolher uma sugestão preenche ticker + nome; o preço só quando a fonte traz (ações/FIIs via
+  // brapi) — cripto vem sem preço na busca, então não sobrescreve o que o usuário já tiver digitado.
+  function handlePick(item: CatalogoItem) {
+    const next: Partial<AssetFormValues> = { ticker: item.ticker, name: item.name };
+    if (item.priceCents > 0) next.currentPriceCents = item.priceCents;
+    patch(next);
+  }
+
   function handleSubmit() {
     const nextErrors = validateAssetForm(values);
     setErrors(nextErrors);
@@ -65,14 +74,24 @@ export function AssetForm({
 
   return (
     <View className="gap-gutter">
-      <FormField
-        label="Ticker"
-        value={values.ticker}
-        onChangeText={(ticker) => patch({ ticker })}
-        placeholder="Ex.: WEGE3"
-        autoCapitalize="characters"
-        error={errors.ticker}
-      />
+      {values.assetClass === 'renda_fixa' ? (
+        <FormField
+          label="Ticker"
+          value={values.ticker}
+          onChangeText={(ticker) => patch({ ticker })}
+          placeholder="Ex.: Tesouro IPCA+ 2029"
+          autoCapitalize="characters"
+          error={errors.ticker}
+        />
+      ) : (
+        <TickerAutocomplete
+          value={values.ticker}
+          onChangeText={(ticker) => patch({ ticker })}
+          onPick={handlePick}
+          assetClass={values.assetClass}
+          error={errors.ticker}
+        />
+      )}
 
       <FormField
         label="Nome"
