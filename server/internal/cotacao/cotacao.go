@@ -7,6 +7,7 @@ package cotacao
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"math/big"
@@ -170,7 +171,8 @@ type retryErr struct {
 func (e retryErr) Error() string { return e.err.Error() }
 
 func retryAfter(err error) time.Duration {
-	if re, ok := err.(retryErr); ok {
+	var re retryErr
+	if errors.As(err, &re) {
 		return re.wait
 	}
 	return 250 * time.Millisecond
