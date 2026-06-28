@@ -39,6 +39,16 @@ type fakeInvestimentosStore struct {
 	gotTradeID    string
 	appendCalled  bool
 	appendPrice   int64
+
+	// backfill (UpsertDailyPrices): captura + sinal opcional (fechado quando o backfill grava).
+	gotBackfill      []store.PricePoint
+	gotBackfillUser  string
+	gotBackfillAsset string
+	backfillDone     chan struct{}
+
+	// leitura: histórico de preço + evolução do patrimônio.
+	priceHistory []store.PricePoint
+	evolution    []store.EvolutionRow
 }
 
 func (f *fakeInvestimentosStore) ListPositions(_ context.Context, userID string, includeCrypto, onlyCrypto bool) ([]store.PositionRow, error) {
@@ -105,6 +115,24 @@ func (f *fakeInvestimentosStore) AppendPriceObservation(_ context.Context, _, _ 
 	f.appendCalled = true
 	f.appendPrice = priceCents
 	return 1, nil
+}
+
+func (f *fakeInvestimentosStore) UpsertDailyPrices(_ context.Context, userID, assetID string, pts []store.PricePoint) (int64, error) {
+	f.gotBackfillUser = userID
+	f.gotBackfillAsset = assetID
+	f.gotBackfill = pts
+	if f.backfillDone != nil {
+		close(f.backfillDone)
+	}
+	return int64(len(pts)), nil
+}
+
+func (f *fakeInvestimentosStore) ListPriceHistory(_ context.Context, _, _ string, _, _ time.Time) ([]store.PricePoint, error) {
+	return f.priceHistory, f.err
+}
+
+func (f *fakeInvestimentosStore) PortfolioEvolution(_ context.Context, _ string, _, _ time.Time) ([]store.EvolutionRow, error) {
+	return f.evolution, f.err
 }
 
 func (f *fakeInvestimentosStore) RecordTrade(_ context.Context, _, _, side, ticker string, in store.TradeInput) error {
