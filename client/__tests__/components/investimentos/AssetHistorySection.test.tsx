@@ -8,7 +8,7 @@ jest.mock('../../../src/api/investimentos');
 beforeEach(() => jest.clearAllMocks());
 
 describe('AssetHistorySection', () => {
-  it('mostra o cabeçalho + gráfico e busca o range default 6mo', async () => {
+  it('mostra o cabeçalho + gráfico e busca o range default 1mo (30 dias)', async () => {
     jest.mocked(api.getPriceHistory).mockResolvedValue([
       { date: '2026-06-15', priceCents: 1200 },
       { date: '2026-06-16', priceCents: 1250 },
@@ -18,7 +18,7 @@ describe('AssetHistorySection', () => {
 
     expect(await screen.findByTestId('price-sparkline')).toBeOnTheScreen();
     expect(screen.getByText('Histórico de preço')).toBeOnTheScreen();
-    expect(api.getPriceHistory).toHaveBeenCalledWith('a1', '6mo');
+    expect(api.getPriceHistory).toHaveBeenCalledWith('a1', '1mo');
   });
 
   it('sem pontos mostra o estado vazio em vez do gráfico', async () => {

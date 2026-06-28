@@ -8,12 +8,12 @@ const pontos: EvolutionPoint[] = [
 ];
 
 describe('EvolutionSection', () => {
-  it('mostra o cabeçalho e a legenda mercado/custo', async () => {
+  it('mostra o cabeçalho e a legenda valor atual/investido', async () => {
     await render(<EvolutionSection points={pontos} hidden={false} />);
 
     expect(screen.getByText('Evolução do Patrimônio')).toBeOnTheScreen();
-    expect(screen.getByText('Mercado')).toBeOnTheScreen();
-    expect(screen.getByText('Custo')).toBeOnTheScreen();
+    expect(screen.getByText('Valor atual')).toBeOnTheScreen();
+    expect(screen.getByText('Investido')).toBeOnTheScreen();
     expect(screen.getByTestId('evolution-chart')).toBeOnTheScreen();
   });
 
