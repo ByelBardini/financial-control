@@ -65,6 +65,14 @@ preço por ponto), `/evolution` (EvolutionPoint[] — **valor de mercado × cust
 bater com as posições, em vez de zerar; exclui cripto; `?range=` 1mo/3mo/6mo/1y/max, default 6mo — é o gráfico
 de "valorizou ou não?").
 
+**Catálogo (autocomplete do cadastro):** `GET /catalogo?class=<acoes|fiis|cripto>&q=<texto>` → `CatalogoItem[]`
+(`{ticker, name, priceCents, logoUrl?}`, sempre array). Busca ativos reais no catálogo externo (brapi p/ ações/FIIs,
+CoinGecko p/ cripto) pro campo de Ticker sugerir enquanto o usuário digita. `[]` (200) em renda_fixa / query < 2 chars
+/ sem buscador / sem match; **400** classe inválida; `limit` fixo 10 (cota). `Service.Catalogo` valida e delega ao
+`Buscador` (interface — `*cotacao.Resolver` implementa via `Buscar`; injetado por `ComBusca`, espelhando `ComBackfill`).
+Mapeamento + structs de busca em `cotacao/busca.go` (ver `cotacao.md`); o preço só vem nas ações/FIIs (brapi `close`),
+cripto entra sem preço. DTO/validação em `internal/investimentos/catalogo.go`.
+
 **Recurso (gestão + compra/venda):** `GET/POST /assets`, `GET/PATCH/DELETE /assets/{id}`,
 `GET /assets/{id}/history` (PriceHistoryPoint[] — série diária de preço do ativo; `?range=`)
 (PATCH edita metadados + `current_price`; classe **imutável**; preço novo grava `investment_prices`),

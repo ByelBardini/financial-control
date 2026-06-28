@@ -31,6 +31,21 @@ type FonteDePreco interface {
 - `PontoDePreco{ObservedOn time.Time; PriceCents int64; Source string}` — fechamento de um dia.
 - `Resolver` mapeia `asset_class → fonte`: `acoes`/`fiis` → brapi; `cripto` → CoinGecko.
 
+## Busca de catálogo (autocomplete do cadastro — `busca.go`)
+Capacidade **separada** de `FonteDePreco` (que segue só preço): `(*Brapi).BuscarAtivos(ctx, query, kind, limit)`,
+`(*CoinGecko).BuscarAtivos(ctx, query, limit)` e `(*Resolver).Buscar(ctx, class, query, limit)` →
+`[]AtivoBusca{Ticker, Name, PriceCents, LogoURL}`. O `Resolver.Buscar` resolve a fonte/`kind` pela classe
+(acoes→`stock`, fiis→`fund`, cripto→CoinGecko) com **type-assert** pros tipos concretos — classe sem
+catálogo (renda_fixa/desconhecida) ou fonte sem busca → `(nil,nil)`. Reusa `fetchJSON`/`centsFromDecimal`.
+Quem consome é `internal/investimentos` (`Buscador` + `GET /investimentos/catalogo`).
+- **brapi** = `GET /api/quote/list?search=&type=stock|fund&limit=` → `stocks[]{stock,name,close,logo}`. Atenção:
+  o preço aqui é `close` (não `regularMarketPrice` de `/api/quote/{tickers}`) e pode vir `null`/ausente → vira **0**
+  (`precoOpcional`), nunca erro. O `search` casa **só por substring do TICKER** (não por nome).
+- **CoinGecko** = `GET /api/v3/search?query=` → `coins[]{symbol,name,thumb}`; **sem preço** na busca (PriceCents=0),
+  símbolo vira ticker em maiúsculo. Casa por **nome E símbolo** (daí a assimetria de UX entre as classes no mesmo campo).
+- A busca **não** usa `IDPadrao`: acha qualquer cripto. Mas a *cotação* dessa cripto ainda depende do `IDPadrao`
+  (ver "Decisões travadas" #6 e `gotchas.md`) — escolher uma moeda fora do mapa cadastra, mas não cota automático.
+
 ## Decisões travadas (o ponto técnico)
 1. **Batch-first**: `UltimosPrecos` recebe **lista** de tickers — 1 request por classe no job
    diário, não N. Não reintroduzir versão singular (estoura o free-tier).

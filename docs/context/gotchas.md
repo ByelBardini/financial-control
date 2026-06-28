@@ -140,6 +140,16 @@
 - **Causa:** o botão é **autocontido** (chama `useRegisterRecurrence` → `useQueryClient`), então qualquer pai que o renderize condicionalmente (ex.: `RecurrenceRow` quando `isDue`) passa a depender de um `QueryClient` na árvore — não dá mais pra usar o `render` cru.
 - **Correção:** nesses testes, troque `render` pelo `renderWithClient` (`__tests__/_support/renderWithClient.tsx`, que embrulha no `QueryClientProvider` de teste). Vale pra todo componente que **embute** mutation/hook de React Query, não só o de form. (Alternativa de design: receber `onAction`+`pending` por prop em vez de embutir a mutation — aí o componente volta a ser testável com `render` cru; aqui optou-se por autocontido pra evitar prop-drilling por `RecorrenciasPanel`/`MobileTransacoes`.)
 
+## Autocomplete de ativo: cripto fora do `IDPadrao` cadastra mas não cota
+- **Sintoma:** o usuário escolhe uma cripto no autocomplete do cadastro (ela aparece na busca), cadastra, mas o preço fica 0 e o gráfico/histórico vazio — diferente de BTC/ETH, que cotam sozinhas.
+- **Causa:** a busca (CoinGecko `/api/v3/search`, em `cotacao/busca.go`) acha **qualquer** moeda, mas a *cotação*/backfill resolve `ticker→id` via `IDPadrao` (mapa fixo de ~12 moedas em `coingecko.go`). Moeda fora do mapa → `idDe` devolve `(_,false)` → sem cotação automática. A busca e a cotação usam caminhos diferentes (a busca devolve o símbolo; a cotação re-deriva o id pelo símbolo).
+- **Correção:** decisão v1 — aceita-se (sem regressão: o ativo entra, só fica com preço manual via PATCH). Ampliar `IDPadrao` conforme a carteira cresce; persistir o `provider_id` da CoinGecko ficou como evolução futura (exigiria migração + mudança na resolução de preço). Ver `cotacao.md` (#6) e `investimentos.md`.
+
+## Busca brapi (`/api/quote/list`) casa só por ticker; `close` ≠ `regularMarketPrice`
+- **Sintoma:** digitar "petrobras"/"weg" no autocomplete de Ações/FIIs não acha nada (só "PETR"/"WEGE" acham); e o struct de cotação existente não desserializa a resposta da busca.
+- **Causa:** o `search` do `/api/quote/list` da brapi filtra por **substring do TICKER**, não do nome (o CoinGecko `/search` casa nome+símbolo — por isso o mesmo campo se comporta diferente entre classes). E a lista traz o preço em `close`, enquanto `/api/quote/{tickers}` traz `regularMarketPrice` — shapes diferentes, structs diferentes (`brapiListResp` em `busca.go`).
+- **Correção:** o placeholder/empty-state do `TickerAutocomplete` orienta a digitar o **código** (ex.: PETR4); `close` ausente/`null` vira preço 0 (`precoOpcional`), nunca erro. Não tente "consertar" pra busca por nome — não há endpoint grátis pra isso.
+
 ## Jest: suíte grande estoura o timeout default sob paralelismo
 - **Sintoma:** suítes pesadas (dashboard + React Query) falham com "Exceeded timeout of 5000 ms" no `npm test`, mas **passam rodando isoladas** ou com `--maxWorkers=50%`.
 - **Causa:** com todas as suítes em paralelo, a contenção de CPU faz o wall-clock de testes de ~300ms passar dos 5s default. Não é bug nem vazamento de handle.
