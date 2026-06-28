@@ -98,8 +98,8 @@ type Querier interface {
 	// Cartões de crédito do usuário: saldo (negativo = dívida) + limite + apresentação,
 	// p/ a seção "Cartões" (por cartão) e o Raio-X (somado).
 	ListCreditAccounts(ctx context.Context, userID pgtype.UUID) ([]ListCreditAccountsRow, error)
-	// Histórico de preço (centavos) dos ativos de cripto do usuário, em ordem cronológica.
-	// O service agrupa por asset_id pra montar o `series` de cada CryptoHolding.
+	// Histórico de preço (centavos) + data dos ativos de cripto do usuário, em ordem cronológica.
+	// O service agrupa por asset_id pra montar o `series` (date + priceCents) de cada CryptoHolding.
 	ListCryptoSeries(ctx context.Context, userID pgtype.UUID) ([]ListCryptoSeriesRow, error)
 	// Compras parceladas (kind='installment') do usuário agrupadas por purchase_group_id:
 	// progresso (parcelas vencidas / total), valor da parcela e ícone da categoria. As N parcelas

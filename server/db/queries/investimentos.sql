@@ -72,11 +72,12 @@ WHERE a.user_id = sqlc.arg(user_id)
 ORDER BY a.asset_class, a.ticker;
 
 -- name: ListCryptoSeries :many
--- Histórico de preço (centavos) dos ativos de cripto do usuário, em ordem cronológica.
--- O service agrupa por asset_id pra montar o `series` de cada CryptoHolding.
+-- Histórico de preço (centavos) + data dos ativos de cripto do usuário, em ordem cronológica.
+-- O service agrupa por asset_id pra montar o `series` (date + priceCents) de cada CryptoHolding.
 SELECT
     p.asset_id::text          AS asset_id,
-    (p.price * 100)::bigint    AS price_cents
+    (p.price * 100)::bigint    AS price_cents,
+    p.observed_on             AS observed_on
 FROM investment_prices p
 JOIN investment_assets a ON a.id = p.asset_id AND a.user_id = p.user_id
 WHERE p.user_id = sqlc.arg(user_id)
@@ -260,7 +261,7 @@ replay AS (
     FROM seq s JOIN replay r ON s.asset_id = r.asset_id AND s.rn = r.rn + 1
 ),
 ativos AS (
-    SELECT a.id AS asset_id
+    SELECT a.id AS asset_id, a.current_price
     FROM investment_assets a
     WHERE a.user_id = sqlc.arg(user_id) AND a.is_archived = false AND a.asset_class <> 'cripto'
 )
@@ -271,9 +272,14 @@ SELECT
          WHERE r.asset_id = ativos.asset_id AND r.traded_on <= dias.d
          ORDER BY r.traded_on DESC, r.rn DESC LIMIT 1)
         *
-        (SELECT p.price FROM investment_prices p
-         WHERE p.asset_id = ativos.asset_id AND p.observed_on <= dias.d
-         ORDER BY p.observed_on DESC LIMIT 1)
+        -- preço do dia: último close <= dia (forward-fill); sem ledger, cai no current_price
+        -- (manual) pra a linha de mercado bater com a tabela de posições, não despencar a 0.
+        COALESCE(
+            (SELECT p.price FROM investment_prices p
+             WHERE p.asset_id = ativos.asset_id AND p.observed_on <= dias.d
+             ORDER BY p.observed_on DESC LIMIT 1),
+            ativos.current_price
+        )
     ), 0) * 100))::bigint AS market_value_cents,
     (round(COALESCE(SUM(
         (SELECT r.cost FROM replay r

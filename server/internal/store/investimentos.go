@@ -42,9 +42,10 @@ type PositionRow struct {
 	RealizedCents     int64
 }
 
-// CryptoSeriesRow é um ponto do histórico de preço de uma cripto (centavos), p/ o gráfico.
+// CryptoSeriesRow é um ponto do histórico de preço de uma cripto (data + centavos), p/ o gráfico.
 type CryptoSeriesRow struct {
 	AssetID    string
+	ObservedOn time.Time
 	PriceCents int64
 }
 
@@ -171,7 +172,7 @@ func (s *Store) ListCryptoSeries(ctx context.Context, userID string) ([]CryptoSe
 	}
 	out := make([]CryptoSeriesRow, 0, len(rows))
 	for _, r := range rows {
-		out = append(out, CryptoSeriesRow{AssetID: r.AssetID, PriceCents: r.PriceCents})
+		out = append(out, CryptoSeriesRow{AssetID: r.AssetID, ObservedOn: r.ObservedOn.Time, PriceCents: r.PriceCents})
 	}
 	return out, nil
 }

@@ -52,15 +52,15 @@ type AllocationSlice struct {
 
 // CryptoHolding é uma posição de cripto (pilar à parte) + a série de preços do gráfico.
 type CryptoHolding struct {
-	ID                string  `json:"id"`
-	Symbol            string  `json:"symbol"`
-	Name              string  `json:"name"`
-	Icon              string  `json:"icon"`
-	CostBasisCents    int64   `json:"costBasisCents"`
-	CurrentValueCents int64   `json:"currentValueCents"`
-	GainCents         int64   `json:"gainCents"`
-	GainPct           float64 `json:"gainPct"`
-	Series            []int64 `json:"series"`
+	ID                string              `json:"id"`
+	Symbol            string              `json:"symbol"`
+	Name              string              `json:"name"`
+	Icon              string              `json:"icon"`
+	CostBasisCents    int64               `json:"costBasisCents"`
+	CurrentValueCents int64               `json:"currentValueCents"`
+	GainCents         int64               `json:"gainCents"`
+	GainPct           float64             `json:"gainPct"`
+	Series            []PriceHistoryPoint `json:"series"`
 }
 
 // CryptoBlock é o bloco de cripto separado do portfólio geral (subtotal próprio).
@@ -219,9 +219,12 @@ func (s *Service) Crypto(ctx context.Context, userID string) (CryptoBlock, error
 	if err != nil {
 		return CryptoBlock{}, fmt.Errorf("investimentos: série da cripto: %w", err)
 	}
-	seriesByAsset := make(map[string][]int64)
+	seriesByAsset := make(map[string][]PriceHistoryPoint)
 	for _, sr := range series {
-		seriesByAsset[sr.AssetID] = append(seriesByAsset[sr.AssetID], sr.PriceCents)
+		seriesByAsset[sr.AssetID] = append(seriesByAsset[sr.AssetID], PriceHistoryPoint{
+			Date:       sr.ObservedOn.Format(tradeDateLayout),
+			PriceCents: sr.PriceCents,
+		})
 	}
 	holdings := make([]CryptoHolding, 0, len(rows))
 	var subtotal, cost int64
@@ -232,7 +235,7 @@ func (s *Service) Crypto(ctx context.Context, userID string) (CryptoBlock, error
 		gain := r.CurrentValueCents - r.CostBasisCents
 		points := seriesByAsset[r.ID]
 		if points == nil {
-			points = []int64{}
+			points = []PriceHistoryPoint{}
 		}
 		holdings = append(holdings, CryptoHolding{
 			ID:                r.ID,
