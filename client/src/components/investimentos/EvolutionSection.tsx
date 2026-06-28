@@ -34,10 +34,14 @@ export function EvolutionSection({ points, hidden }: EvolutionSectionProps) {
       <View className="flex-row items-end justify-between gap-stack-md">
         <SectionHeading>Evolução do Patrimônio</SectionHeading>
         <View className="flex-row items-center gap-stack-md">
-          <LegendDot color={toneColor(gainTone)} label="Mercado" />
-          <LegendDot color={toneColor('neutral')} label="Custo" />
+          <LegendDot color={toneColor(gainTone)} label="Valor atual" />
+          <LegendDot color={toneColor('neutral')} label="Investido" />
         </View>
       </View>
+      <Text className="font-geist-medium text-label-sm text-on-surface-variant">
+        Quanto a carteira vale (valor atual) × quanto você pôs (investido) — a diferença é seu
+        ganho/perda.
+      </Text>
       {points.length > 0 ? (
         <PortfolioEvolutionChart points={points} hidden={hidden} />
       ) : (

@@ -47,7 +47,7 @@ export function MobileInvestimentos({
   const insets = useSafeAreaInsets();
   const summary = useInvestmentSummary();
   const allocation = useInvestmentAllocation();
-  const evolution = usePortfolioEvolution('6mo');
+  const evolution = usePortfolioEvolution('1mo');
   const positions = useInvestmentPositions();
   const crypto = useCryptoBlock();
   const risk = useInvestmentRisk();

@@ -44,8 +44,8 @@ export interface AllocationSlice {
 }
 
 // Posição de cripto (pilar à parte). Mesma ideia de ganho/perda manual da Position.
-// series = pontos de preço/valor (centavos) ao longo do tempo pro gráfico do card (PriceSparkline);
-// o tooltip mostra o valor do ponto. Sem cotação ao vivo: vem do mock/backend.
+// series = pontos {date, priceCents} ao longo do tempo pro gráfico do card (PriceSparkline);
+// o tooltip mostra data + valor do ponto. Mesmo shape do histórico de qualquer ativo.
 export interface CryptoHolding {
   id: string;
   symbol: string;
@@ -55,7 +55,7 @@ export interface CryptoHolding {
   currentValueCents: number;
   gainCents: number;
   gainPct: number;
-  series: number[];
+  series: PriceHistoryPoint[];
 }
 
 // Bloco de cripto separado do portfólio geral ("são outra parada"): subtotal próprio.

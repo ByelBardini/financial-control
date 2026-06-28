@@ -22,7 +22,7 @@ const RANGES = [
 // (`usePriceHistory`) + toggle de período (1M/6M/1A, default 6M). Mesmo gráfico da cripto
 // (`PriceSparkline`). Gating manual igual ao resto do AssetDetailModal (skeleton/erro/vazio).
 export function AssetHistorySection({ assetId, tone, hidden = false }: AssetHistorySectionProps) {
-  const [range, setRange] = useState<string>('6mo');
+  const [range, setRange] = useState<string>('1mo');
   const history = usePriceHistory(assetId, range);
 
   return (
@@ -67,7 +67,12 @@ export function AssetHistorySection({ assetId, tone, hidden = false }: AssetHist
         </Text>
       );
     return (
-      <PriceSparkline series={history.data.map((p) => p.priceCents)} tone={tone} hidden={hidden} />
+      <PriceSparkline
+        series={history.data.map((p) => p.priceCents)}
+        labels={history.data.map((p) => p.date)}
+        tone={tone}
+        hidden={hidden}
+      />
     );
   }
 }

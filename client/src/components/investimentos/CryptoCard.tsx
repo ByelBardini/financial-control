@@ -55,7 +55,12 @@ export function CryptoCard({ holding, hidden, onPress }: CryptoCardProps) {
           className="font-geist-medium text-label-sm"
         />
       </View>
-      <PriceSparkline series={holding.series} tone={tone} hidden={hidden} />
+      <PriceSparkline
+        series={holding.series.map((p) => p.priceCents)}
+        labels={holding.series.map((p) => p.date)}
+        tone={tone}
+        hidden={hidden}
+      />
     </EditableCard>
   );
 }
