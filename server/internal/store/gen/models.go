@@ -59,6 +59,8 @@ type InvestmentPrice struct {
 	Price      pgtype.Numeric
 	ObservedOn pgtype.Date
 	CreatedAt  pgtype.Timestamptz
+	Source     string
+	AsOf       pgtype.Timestamptz
 }
 
 type InvestmentTrade struct {

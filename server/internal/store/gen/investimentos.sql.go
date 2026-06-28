@@ -12,16 +12,22 @@ import (
 )
 
 const appendPriceObservation = `-- name: AppendPriceObservation :execrows
-INSERT INTO investment_prices (user_id, asset_id, price, observed_on)
+INSERT INTO investment_prices (user_id, asset_id, price, observed_on, source, as_of)
 SELECT
     $1,
     $2,
     ($3::bigint)::numeric / 100,
-    $4
+    $4,
+    'manual',
+    now()
 WHERE EXISTS (
     SELECT 1 FROM investment_assets
     WHERE id = $2 AND user_id = $1 AND is_archived = false
 )
+ON CONFLICT (asset_id, observed_on) DO UPDATE SET
+    price  = EXCLUDED.price,
+    source = EXCLUDED.source,
+    as_of  = EXCLUDED.as_of
 `
 
 type AppendPriceObservationParams struct {
@@ -31,7 +37,8 @@ type AppendPriceObservationParams struct {
 	ObservedOn pgtype.Date
 }
 
-// Grava um ponto de histórico de preço (centavos → NUMERIC). Só se o ativo é do usuário.
+// Grava o fechamento manual do dia (PATCH de preço). UPSERT: editar o preço 2x no mesmo dia
+// atualiza a linha em vez de duplicar (ledger diário). Só se o ativo é do usuário.
 func (q *Queries) AppendPriceObservation(ctx context.Context, arg AppendPriceObservationParams) (int64, error) {
 	result, err := q.db.Exec(ctx, appendPriceObservation,
 		arg.UserID,
@@ -448,6 +455,106 @@ func (q *Queries) ListPositions(ctx context.Context, arg ListPositionsParams) ([
 	return items, nil
 }
 
+const listPriceHistory = `-- name: ListPriceHistory :many
+SELECT
+    p.observed_on              AS observed_on,
+    (p.price * 100)::bigint    AS price_cents
+FROM investment_prices p
+JOIN investment_assets a ON a.id = p.asset_id AND a.user_id = p.user_id
+WHERE p.user_id = $1
+  AND p.asset_id = $2
+  AND a.is_archived = false
+  AND p.observed_on >= $3
+  AND p.observed_on <= $4
+ORDER BY p.observed_on, p.created_at
+`
+
+type ListPriceHistoryParams struct {
+	UserID  pgtype.UUID
+	AssetID pgtype.UUID
+	De      pgtype.Date
+	Ate     pgtype.Date
+}
+
+type ListPriceHistoryRow struct {
+	ObservedOn pgtype.Date
+	PriceCents int64
+}
+
+// Série diária de preço (centavos) de um ativo no intervalo [de, ate], cronológica. Alimenta o
+// gráfico de histórico (qualquer classe) e a derivação da evolução do patrimônio.
+func (q *Queries) ListPriceHistory(ctx context.Context, arg ListPriceHistoryParams) ([]ListPriceHistoryRow, error) {
+	rows, err := q.db.Query(ctx, listPriceHistory,
+		arg.UserID,
+		arg.AssetID,
+		arg.De,
+		arg.Ate,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListPriceHistoryRow{}
+	for rows.Next() {
+		var i ListPriceHistoryRow
+		if err := rows.Scan(&i.ObservedOn, &i.PriceCents); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listQuotableAssets = `-- name: ListQuotableAssets :many
+SELECT
+    a.id::text       AS id,
+    a.user_id::text  AS user_id,
+    a.ticker         AS ticker,
+    a.asset_class    AS asset_class
+FROM investment_assets a
+WHERE a.is_archived = false
+  AND a.asset_class <> 'renda_fixa'
+ORDER BY a.asset_class, a.ticker
+`
+
+type ListQuotableAssetsRow struct {
+	ID         string
+	UserID     string
+	Ticker     string
+	AssetClass string
+}
+
+// Ativos elegíveis à cotação automática (ativos, classe != renda_fixa), de TODOS os usuários —
+// é um job de sistema, não um request de usuário (por isso sem escopo de user_id). O worker
+// agrupa por classe e busca em lote. user_id volta pra gravar o preço no dono certo.
+func (q *Queries) ListQuotableAssets(ctx context.Context) ([]ListQuotableAssetsRow, error) {
+	rows, err := q.db.Query(ctx, listQuotableAssets)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListQuotableAssetsRow{}
+	for rows.Next() {
+		var i ListQuotableAssetsRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.UserID,
+			&i.Ticker,
+			&i.AssetClass,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listTradesByAsset = `-- name: ListTradesByAsset :many
 SELECT
     t.id::text                                                  AS id,
@@ -495,6 +602,103 @@ func (q *Queries) ListTradesByAsset(ctx context.Context, arg ListTradesByAssetPa
 			&i.TradedOn,
 			&i.AccountID,
 		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const portfolioEvolution = `-- name: PortfolioEvolution :many
+WITH RECURSIVE
+dias AS (
+    SELECT generate_series($1::date, $2::date, interval '1 day')::date AS d
+),
+seq AS (
+    SELECT
+        t.asset_id,
+        t.traded_on,
+        t.side,
+        t.quantity,
+        t.unit_price,
+        row_number() OVER (PARTITION BY t.asset_id ORDER BY t.traded_on, t.created_at, t.id) AS rn
+    FROM investment_trades t
+    JOIN investment_assets a ON a.id = t.asset_id AND a.user_id = t.user_id
+    WHERE t.user_id = $3
+      AND a.is_archived = false
+      AND a.asset_class <> 'cripto'
+),
+replay AS (
+    SELECT
+        s.asset_id, s.rn, s.traded_on,
+        CASE WHEN s.side = 'buy' THEN s.quantity ELSE -s.quantity END             AS qty,
+        CASE WHEN s.side = 'buy' THEN s.quantity * s.unit_price ELSE 0 END         AS cost
+    FROM seq s WHERE s.rn = 1
+    UNION ALL
+    SELECT
+        s.asset_id, s.rn, s.traded_on,
+        CASE WHEN s.side = 'buy' THEN r.qty + s.quantity ELSE r.qty - s.quantity END,
+        CASE WHEN s.side = 'buy'
+             THEN r.cost + s.quantity * s.unit_price
+             ELSE r.cost - (r.cost / NULLIF(r.qty, 0)) * s.quantity END
+    FROM seq s JOIN replay r ON s.asset_id = r.asset_id AND s.rn = r.rn + 1
+),
+ativos AS (
+    SELECT a.id AS asset_id
+    FROM investment_assets a
+    WHERE a.user_id = $3 AND a.is_archived = false AND a.asset_class <> 'cripto'
+)
+SELECT
+    dias.d AS on_date,
+    (round(COALESCE(SUM(
+        (SELECT r.qty FROM replay r
+         WHERE r.asset_id = ativos.asset_id AND r.traded_on <= dias.d
+         ORDER BY r.traded_on DESC, r.rn DESC LIMIT 1)
+        *
+        (SELECT p.price FROM investment_prices p
+         WHERE p.asset_id = ativos.asset_id AND p.observed_on <= dias.d
+         ORDER BY p.observed_on DESC LIMIT 1)
+    ), 0) * 100))::bigint AS market_value_cents,
+    (round(COALESCE(SUM(
+        (SELECT r.cost FROM replay r
+         WHERE r.asset_id = ativos.asset_id AND r.traded_on <= dias.d
+         ORDER BY r.traded_on DESC, r.rn DESC LIMIT 1)
+    ), 0) * 100))::bigint AS cost_basis_cents
+FROM dias CROSS JOIN ativos
+GROUP BY dias.d
+ORDER BY dias.d
+`
+
+type PortfolioEvolutionParams struct {
+	De     pgtype.Date
+	Ate    pgtype.Date
+	UserID pgtype.UUID
+}
+
+type PortfolioEvolutionRow struct {
+	OnDate           pgtype.Date
+	MarketValueCents int64
+	CostBasisCents   int64
+}
+
+// Evolução do patrimônio GERAL (exclui cripto) por dia em [de, ate]: duas linhas — valor de
+// MERCADO (qty no dia × último preço <= dia, FORWARD-FILL em fim de semana/feriado) e CUSTO
+// acumulado (preço médio móvel no dia). O gap entre elas = ganho não-realizado. Dinheiro em centavos.
+// snaps = replay das operações guardando (qty, custo) APÓS cada trade + a data; para cada dia pega o
+// último snapshot <= dia (custo/qty path-dependent, igual ListPositions) e o último preço <= dia.
+func (q *Queries) PortfolioEvolution(ctx context.Context, arg PortfolioEvolutionParams) ([]PortfolioEvolutionRow, error) {
+	rows, err := q.db.Query(ctx, portfolioEvolution, arg.De, arg.Ate, arg.UserID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []PortfolioEvolutionRow{}
+	for rows.Next() {
+		var i PortfolioEvolutionRow
+		if err := rows.Scan(&i.OnDate, &i.MarketValueCents, &i.CostBasisCents); err != nil {
 			return nil, err
 		}
 		items = append(items, i)
@@ -588,4 +792,72 @@ func (q *Queries) UpdateAsset(ctx context.Context, arg UpdateAssetParams) (strin
 	var id string
 	err := row.Scan(&id)
 	return id, err
+}
+
+const updateAssetCurrentPrice = `-- name: UpdateAssetCurrentPrice :execrows
+UPDATE investment_assets
+SET current_price = ($1::bigint)::numeric / 100
+WHERE id = $2 AND user_id = $3 AND is_archived = false
+`
+
+type UpdateAssetCurrentPriceParams struct {
+	PriceCents int64
+	AssetID    pgtype.UUID
+	UserID     pgtype.UUID
+}
+
+// Atualiza o "último fechamento" denormalizado do ativo (cache lido pela CTE de posição).
+// Escopado por id + user; ativo arquivado não muda. 0 linhas = não é do usuário/arquivado.
+func (q *Queries) UpdateAssetCurrentPrice(ctx context.Context, arg UpdateAssetCurrentPriceParams) (int64, error) {
+	result, err := q.db.Exec(ctx, updateAssetCurrentPrice, arg.PriceCents, arg.AssetID, arg.UserID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const upsertDailyPrice = `-- name: UpsertDailyPrice :execrows
+INSERT INTO investment_prices (user_id, asset_id, price, observed_on, source, as_of)
+SELECT
+    $1,
+    $2,
+    ($3::bigint)::numeric / 100,
+    $4,
+    $5,
+    $6
+WHERE EXISTS (
+    SELECT 1 FROM investment_assets
+    WHERE id = $2 AND user_id = $1 AND is_archived = false
+)
+ON CONFLICT (asset_id, observed_on) DO UPDATE SET
+    price  = EXCLUDED.price,
+    source = EXCLUDED.source,
+    as_of  = EXCLUDED.as_of
+`
+
+type UpsertDailyPriceParams struct {
+	UserID     pgtype.UUID
+	AssetID    pgtype.UUID
+	PriceCents int64
+	ObservedOn pgtype.Date
+	Source     string
+	AsOf       pgtype.Timestamptz
+}
+
+// Grava/atualiza o fechamento de um dia (backfill e job diário). Idempotente por
+// (asset_id, observed_on). source = 'brapi'|'coingecko'|'manual'; as_of = instante do provedor
+// (NULL no backfill histórico). Só se o ativo é do usuário e está ativo.
+func (q *Queries) UpsertDailyPrice(ctx context.Context, arg UpsertDailyPriceParams) (int64, error) {
+	result, err := q.db.Exec(ctx, upsertDailyPrice,
+		arg.UserID,
+		arg.AssetID,
+		arg.PriceCents,
+		arg.ObservedOn,
+		arg.Source,
+		arg.AsOf,
+	)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
 }

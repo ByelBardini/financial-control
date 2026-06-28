@@ -87,6 +87,29 @@ type TradeInput struct {
 	AccountID      string
 }
 
+// PricePoint é um fechamento diário (centavos) com a data (em BRT) e a origem (source).
+type PricePoint struct {
+	ObservedOn time.Time
+	PriceCents int64
+	Source     string
+}
+
+// QuotableAsset é um ativo elegível à cotação automática (classe != renda_fixa), com o dono.
+type QuotableAsset struct {
+	ID         string
+	UserID     string
+	Ticker     string
+	AssetClass string
+}
+
+// EvolutionRow é um ponto da evolução do patrimônio geral num dia: valor de mercado × custo
+// acumulado (ambos em centavos). O gap entre eles = ganho não-realizado.
+type EvolutionRow struct {
+	OnDate           time.Time
+	MarketValueCents int64
+	CostBasisCents   int64
+}
+
 // ListPositions devolve a posição derivada de cada ativo do usuário (preço médio móvel).
 // includeCrypto/onlyCrypto separam o portfólio geral da cripto à parte.
 func (s *Store) ListPositions(ctx context.Context, userID string, includeCrypto, onlyCrypto bool) ([]PositionRow, error) {
@@ -409,6 +432,161 @@ func (s *Store) DeleteTrade(ctx context.Context, userID, assetID, tradeID string
 		return fmt.Errorf("store: excluir operação: %w", err)
 	}
 	return nil
+}
+
+// UpsertDailyPrices grava em lote (numa tx) os fechamentos históricos de um ativo — backfill no
+// cadastro. Idempotente por dia (re-rodar atualiza). as_of fica NULL (histórico, sem instante do
+// provedor). Devolve quantas linhas foram gravadas/atualizadas.
+func (s *Store) UpsertDailyPrices(ctx context.Context, userID, assetID string, pts []PricePoint) (int64, error) {
+	uid, err := uuidArg(userID)
+	if err != nil {
+		return 0, err
+	}
+	aid, err := uuidArg(assetID)
+	if err != nil {
+		return 0, ErrAssetNotFound
+	}
+	if len(pts) == 0 {
+		return 0, nil
+	}
+	tx, err := s.pool.Begin(ctx)
+	if err != nil {
+		return 0, fmt.Errorf("store: abrir transação: %w", err)
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+	q := s.q.WithTx(tx)
+
+	var n int64
+	for _, p := range pts {
+		rows, err := q.UpsertDailyPrice(ctx, gen.UpsertDailyPriceParams{
+			UserID:     uid,
+			AssetID:    aid,
+			PriceCents: p.PriceCents,
+			ObservedOn: dateArg(p.ObservedOn),
+			Source:     p.Source,
+			AsOf:       pgtype.Timestamptz{}, // histórico: sem instante do provedor
+		})
+		if err != nil {
+			return 0, fmt.Errorf("store: gravar preço histórico (%s): %w", p.ObservedOn.Format("2006-01-02"), err)
+		}
+		n += rows
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return 0, fmt.Errorf("store: confirmar preços históricos: %w", err)
+	}
+	return n, nil
+}
+
+// RecordDailyClose grava o fechamento do dia E atualiza o current_price do ativo, ATOMICAMENTE (o
+// cache lido pela CTE de posição segue o último close). Usado pelo job diário. source =
+// 'brapi'|'coingecko'; asOf = instante da cotação do provedor (zero → NULL).
+func (s *Store) RecordDailyClose(ctx context.Context, userID, assetID string, priceCents int64, observedOn time.Time, source string, asOf time.Time) error {
+	uid, err := uuidArg(userID)
+	if err != nil {
+		return err
+	}
+	aid, err := uuidArg(assetID)
+	if err != nil {
+		return ErrAssetNotFound
+	}
+	tx, err := s.pool.Begin(ctx)
+	if err != nil {
+		return fmt.Errorf("store: abrir transação: %w", err)
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+	q := s.q.WithTx(tx)
+
+	if _, err := q.UpsertDailyPrice(ctx, gen.UpsertDailyPriceParams{
+		UserID:     uid,
+		AssetID:    aid,
+		PriceCents: priceCents,
+		ObservedOn: dateArg(observedOn),
+		Source:     source,
+		AsOf:       tstzArg(asOf),
+	}); err != nil {
+		return fmt.Errorf("store: gravar fechamento do dia: %w", err)
+	}
+	if _, err := q.UpdateAssetCurrentPrice(ctx, gen.UpdateAssetCurrentPriceParams{
+		PriceCents: priceCents,
+		AssetID:    aid,
+		UserID:     uid,
+	}); err != nil {
+		return fmt.Errorf("store: atualizar preço atual: %w", err)
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return fmt.Errorf("store: confirmar fechamento do dia: %w", err)
+	}
+	return nil
+}
+
+// ListPriceHistory devolve a série diária de preço (centavos) de um ativo em [de, ate], cronológica.
+func (s *Store) ListPriceHistory(ctx context.Context, userID, assetID string, de, ate time.Time) ([]PricePoint, error) {
+	uid, err := uuidArg(userID)
+	if err != nil {
+		return nil, err
+	}
+	aid, err := uuidArg(assetID)
+	if err != nil {
+		return nil, ErrAssetNotFound
+	}
+	rows, err := s.q.ListPriceHistory(ctx, gen.ListPriceHistoryParams{
+		UserID:  uid,
+		AssetID: aid,
+		De:      dateArg(de),
+		Ate:     dateArg(ate),
+	})
+	if err != nil {
+		return nil, fmt.Errorf("store: listar histórico de preço: %w", err)
+	}
+	out := make([]PricePoint, 0, len(rows))
+	for _, r := range rows {
+		out = append(out, PricePoint{ObservedOn: r.ObservedOn.Time, PriceCents: r.PriceCents})
+	}
+	return out, nil
+}
+
+// ListQuotableAssets devolve os ativos elegíveis à cotação automática de TODOS os usuários (job de
+// sistema, sem escopo de user). O worker agrupa por classe e busca em lote.
+func (s *Store) ListQuotableAssets(ctx context.Context) ([]QuotableAsset, error) {
+	rows, err := s.q.ListQuotableAssets(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("store: listar ativos cotáveis: %w", err)
+	}
+	out := make([]QuotableAsset, 0, len(rows))
+	for _, r := range rows {
+		out = append(out, QuotableAsset{ID: r.ID, UserID: r.UserID, Ticker: r.Ticker, AssetClass: r.AssetClass})
+	}
+	return out, nil
+}
+
+// PortfolioEvolution devolve a evolução diária do patrimônio geral (exclui cripto) em [de, ate]:
+// valor de mercado (forward-fill de preço) × custo acumulado, por dia.
+func (s *Store) PortfolioEvolution(ctx context.Context, userID string, de, ate time.Time) ([]EvolutionRow, error) {
+	uid, err := uuidArg(userID)
+	if err != nil {
+		return nil, err
+	}
+	rows, err := s.q.PortfolioEvolution(ctx, gen.PortfolioEvolutionParams{
+		De:     dateArg(de),
+		Ate:    dateArg(ate),
+		UserID: uid,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("store: evolução do patrimônio: %w", err)
+	}
+	out := make([]EvolutionRow, 0, len(rows))
+	for _, r := range rows {
+		out = append(out, EvolutionRow{OnDate: r.OnDate.Time, MarketValueCents: r.MarketValueCents, CostBasisCents: r.CostBasisCents})
+	}
+	return out, nil
+}
+
+// tstzArg converte um time.Time no pgtype.Timestamptz; zero → NULL.
+func tstzArg(t time.Time) pgtype.Timestamptz {
+	if t.IsZero() {
+		return pgtype.Timestamptz{}
+	}
+	return pgtype.Timestamptz{Time: t, Valid: true}
 }
 
 // positionRow mapeia a linha gerada pra PositionRow (campos 1:1).
