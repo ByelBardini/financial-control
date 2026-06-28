@@ -24,7 +24,6 @@ export function mockDashboardApi(snapshot: DashboardSnapshot = dashboardSnapshot
   jest.mocked(api.getDiagnosis).mockResolvedValue(snapshot.diagnosis);
   jest.mocked(api.getInvestments).mockResolvedValue(snapshot.investments);
   jest.mocked(api.getInvestmentsSummary).mockResolvedValue(snapshot.investmentsSummary);
-  jest.mocked(api.getTicker).mockResolvedValue(snapshot.ticker);
 }
 
 // Idem para src/api/contas (cada view resolve a fatia correspondente do snapshot).

@@ -7,7 +7,6 @@ import {
   getInvestments,
   getInvestmentsSummary,
   getMonthBalance,
-  getTicker,
 } from '../../src/api/dashboard';
 
 // Mocka o único fetch (apiGet) e verifica só o PATH montado por função — é o que
@@ -45,10 +44,8 @@ describe('camada api/dashboard', () => {
     void getAccounts();
     void getInvestments();
     void getInvestmentsSummary();
-    void getTicker();
     expect(apiGet).toHaveBeenCalledWith('/accounts');
     expect(apiGet).toHaveBeenCalledWith('/investments');
     expect(apiGet).toHaveBeenCalledWith('/dashboard/investments-summary');
-    expect(apiGet).toHaveBeenCalledWith('/dashboard/ticker');
   });
 });
