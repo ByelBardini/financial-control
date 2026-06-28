@@ -8,6 +8,10 @@ export const colors = {
   error: '#ffb4ab',
   onSurface: '#e2e2e8',
   onSurfaceVariant: '#cbc3d7',
+  onPrimaryContainer: '#340080',
+  background: '#111317',
+  outline: '#958ea0',
+  outlineVariant: '#494454',
 } as const;
 
 const toneToColor: Record<Tone, string> = {
