@@ -19,10 +19,14 @@ func fixtureServer(t *testing.T) *httptest.Server {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		switch {
+		case r.URL.Path == "/api/quote/list":
+			writeFixture(t, w, "brapi_search.json")
 		case strings.HasPrefix(r.URL.Path, "/api/quote/") && r.URL.Query().Get("range") != "":
 			writeFixture(t, w, "brapi_history.json")
 		case strings.HasPrefix(r.URL.Path, "/api/quote/"):
 			writeFixture(t, w, "brapi_quote.json")
+		case r.URL.Path == "/api/v3/search":
+			writeFixture(t, w, "coingecko_search.json")
 		case r.URL.Path == "/api/v3/simple/price":
 			writeFixture(t, w, "coingecko_price.json")
 		case strings.HasSuffix(r.URL.Path, "/market_chart"):

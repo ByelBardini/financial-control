@@ -1,0 +1,22 @@
+{
+  "coins": [
+    {
+      "id": "bitcoin",
+      "name": "Bitcoin",
+      "api_symbol": "bitcoin",
+      "symbol": "BTC",
+      "market_cap_rank": 1,
+      "thumb": "https://coin-images.coingecko.com/coins/images/1/thumb/bitcoin.png",
+      "large": "https://coin-images.coingecko.com/coins/images/1/large/bitcoin.png"
+    },
+    {
+      "id": "ethereum",
+      "name": "Ethereum",
+      "api_symbol": "ethereum",
+      "symbol": "eth",
+      "market_cap_rank": 2,
+      "thumb": "https://coin-images.coingecko.com/coins/images/279/thumb/ethereum.png",
+      "large": "https://coin-images.coingecko.com/coins/images/279/large/ethereum.png"
+    }
+  ]
+}

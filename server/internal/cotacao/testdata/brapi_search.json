@@ -1,0 +1,33 @@
+{
+  "indexes": [],
+  "stocks": [
+    {
+      "stock": "PETR4",
+      "name": "PETROLEO BRASILEIRO S.A. PETROBRAS",
+      "close": 38.06,
+      "change": -1.01,
+      "volume": 23383000,
+      "market_cap": 522373615918,
+      "logo": "https://icons.brapi.dev/icons/PETR4.svg",
+      "sector": "Energy Minerals",
+      "type": "stock"
+    },
+    {
+      "stock": "PETR3",
+      "name": "PETROLEO BRASILEIRO S.A. PETROBRAS",
+      "close": null,
+      "change": null,
+      "volume": 0,
+      "market_cap": 0,
+      "logo": "https://icons.brapi.dev/icons/PETR3.svg",
+      "sector": "Energy Minerals",
+      "type": "stock"
+    }
+  ],
+  "availableStockTypes": ["stock", "fund", "bdr"],
+  "currentPage": 1,
+  "totalPages": 1,
+  "itemsPerPage": 2,
+  "totalCount": 2,
+  "hasNextPage": false
+}
