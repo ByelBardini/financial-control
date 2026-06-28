@@ -77,6 +77,29 @@ func EvolutionHandler(svc *Service) http.Handler {
 	})
 }
 
+// CatalogoHandler responde GET /investimentos/catalogo?class=&q= com sugestões de ativos do catálogo
+// externo (autocomplete do cadastro). Classe inválida → 400; renda_fixa / query curta / sem match → [].
+// Não usa o userID além da exigência de token (o catálogo é o universo externo, não dados do usuário).
+func CatalogoHandler(svc *Service) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if _, ok := authedUserID(w, r); !ok {
+			return
+		}
+		q := r.URL.Query()
+		out, err := svc.Catalogo(r.Context(), q.Get("class"), q.Get("q"))
+		if err != nil {
+			if errors.Is(err, ErrClasseInvalida) {
+				httpx.WriteError(w, http.StatusBadRequest, "classe de ativo inválida: use acoes|fiis|cripto")
+				return
+			}
+			log.Printf("GET /investimentos/catalogo: %v", err)
+			httpx.WriteError(w, http.StatusInternalServerError, "erro ao buscar catálogo de ativos")
+			return
+		}
+		httpx.WriteJSON(w, http.StatusOK, out)
+	})
+}
+
 // BackfillHandler responde POST /investimentos/backfill disparando, em segundo plano, o backfill de
 // histórico dos ativos JÁ cadastrados do usuário (classes cotáveis) → 202 + {assets:N} (quantos
 // entraram na fila). Útil uma vez após configurar o BRAPI_TOKEN, pra os ativos antigos ganharem série.

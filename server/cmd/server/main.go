@@ -50,7 +50,7 @@ func main() {
 		Dashboard:     dashboard.NewService(st),
 		Contas:        contas.NewService(st),
 		Transacoes:    transacoes.NewService(st),
-		Investimentos: investimentos.NewService(st, investimentos.ComBackfill(cotador)),
+		Investimentos: investimentos.NewService(st, investimentos.ComBackfill(cotador), investimentos.ComBusca(cotador)),
 	}
 
 	// Job diário de cotação (EOD): atualiza o fechamento de cada ativo cotável no horário (BRT).

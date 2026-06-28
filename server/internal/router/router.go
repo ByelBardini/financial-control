@@ -86,6 +86,7 @@ func New(d Deps) http.Handler {
 	mux.Handle("GET /investimentos/allocation", protected(investimentos.AllocationHandler(d.Investimentos)))
 	mux.Handle("GET /investimentos/crypto", protected(investimentos.CryptoHandler(d.Investimentos)))
 	mux.Handle("GET /investimentos/evolution", protected(investimentos.EvolutionHandler(d.Investimentos)))
+	mux.Handle("GET /investimentos/catalogo", protected(investimentos.CatalogoHandler(d.Investimentos)))
 	mux.Handle("POST /investimentos/backfill", protected(investimentos.BackfillHandler(d.Investimentos)))
 
 	// Recurso "investimentos" (CRUD): ativos + operações (compra/venda). Posição é derivada,

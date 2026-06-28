@@ -114,10 +114,12 @@ type Cotador interface {
 }
 
 // Service agrega as views da carteira e orquestra o recurso de ativos/operações. Sem estado além
-// do store e do cotador opcional (backfill de preço no cadastro).
+// do store, do cotador (backfill de preço no cadastro) e do buscador (catálogo do autocomplete) —
+// ambos opcionais.
 type Service struct {
-	store   InvestimentosStore
-	cotador Cotador // nil = sem cotação automática (backfill desligado)
+	store    InvestimentosStore
+	cotador  Cotador  // nil = sem cotação automática (backfill desligado)
+	buscador Buscador // nil = sem autocomplete de catálogo (Catalogo devolve [])
 }
 
 // Option configura o Service na construção.
@@ -127,6 +129,12 @@ type Option func(*Service)
 // provedor em segundo plano (best-effort) e gravado no ledger. Sem ela, o cadastro não busca preço.
 func ComBackfill(c Cotador) Option {
 	return func(s *Service) { s.cotador = c }
+}
+
+// ComBusca liga o autocomplete do cadastro: o campo de ticker busca ativos reais no catálogo
+// externo (brapi/CoinGecko). Sem ela, Catalogo devolve [] (busca desligada).
+func ComBusca(b Buscador) Option {
+	return func(s *Service) { s.buscador = b }
 }
 
 // NewService injeta a dependência de dados; Options ligam recursos opcionais (ex.: ComBackfill).
