@@ -1,6 +1,7 @@
 import { Text, View } from 'react-native';
 import { MoneyText } from '../MoneyText';
 import { toneColor } from '../../theme/colors';
+import { ASSETS_TOTAL } from '../../lib/moneyLabels';
 import { formatPercent, changeTone } from '../../lib/percent';
 import type { PortfolioSummary } from '../../types/investimentos';
 
@@ -17,7 +18,7 @@ export function PortfolioHero({ summary, hidden }: PortfolioHeroProps) {
   return (
     <View className="gap-stack-md border-b border-outline-variant px-container-margin pb-stack-lg">
       <Text className="font-geist-medium text-label-md uppercase text-on-surface-variant">
-        Patrimônio em Ativos
+        {ASSETS_TOTAL}
       </Text>
       <Text
         accessibilityRole="header"

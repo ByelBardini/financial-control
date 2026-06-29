@@ -1,12 +1,14 @@
 import { useState } from 'react';
 import { Modal, Pressable, ScrollView, Text, View } from 'react-native';
+import { FieldShell } from './FieldShell';
 import { Icon, type IconName } from './Icon';
+import { colors } from '../theme/colors';
 
 // icon/dotColor são opcionais: a Conta passa os dois (o glifo tingido pela cor da marca),
 // a Categoria passa só o icon (tom neutro). Sem icon, o gatilho/opção fica só com o texto.
 export type SelectOption = { value: string; label: string; icon?: IconName; dotColor?: string };
 
-const ICON_NEUTRAL = '#cbc3d7';
+const ICON_NEUTRAL = colors.onSurfaceVariant;
 
 type SelectFieldProps = {
   label: string;
@@ -42,10 +44,7 @@ export function SelectField({
   const borderClass = error ? 'border-error' : 'border-outline-variant';
 
   return (
-    <View className="gap-stack-sm">
-      <Text className="font-geist-semibold text-label-sm uppercase text-on-surface-variant">
-        {label}
-      </Text>
+    <FieldShell label={label} error={error}>
       <Pressable
         onPress={() => {
           if (!disabled) setOpen(true);
@@ -75,11 +74,6 @@ export function SelectField({
         </View>
         {!disabled ? <Icon name="expand_more" size={18} color={ICON_NEUTRAL} /> : null}
       </Pressable>
-      {error ? (
-        <Text accessibilityRole="alert" className="text-label-sm text-error">
-          {error}
-        </Text>
-      ) : null}
 
       <Modal visible={open} transparent animationType="fade" onRequestClose={() => setOpen(false)}>
         <Pressable
@@ -111,7 +105,7 @@ export function SelectField({
           </Pressable>
         </Pressable>
       </Modal>
-    </View>
+    </FieldShell>
   );
 }
 
@@ -141,7 +135,7 @@ function SelectOptionRow({ option, active, onPress }: SelectOptionRowProps) {
           {option.label}
         </Text>
       </View>
-      {active ? <Icon name="check" size={18} color="#d0bcff" /> : null}
+      {active ? <Icon name="check" size={18} color={colors.primary} /> : null}
     </Pressable>
   );
 }

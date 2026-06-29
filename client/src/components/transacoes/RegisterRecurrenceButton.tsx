@@ -1,5 +1,6 @@
 import { Pressable, Text } from 'react-native';
 import { Icon } from '../Icon';
+import { colors } from '../../theme/colors';
 import { useRegisterRecurrence } from '../../hooks/useTransactionMutations';
 import type { TransactionDirection } from '../../types/transacoes';
 
@@ -27,7 +28,7 @@ export function RegisterRecurrenceButton({
       accessibilityState={{ disabled: register.isPending }}
       className="mt-stack-md min-h-11 flex-row items-center justify-center gap-stack-sm rounded-xl border border-outline-variant"
     >
-      <Icon name="check" size={16} color="#d0bcff" />
+      <Icon name="check" size={16} color={colors.primary} />
       <Text className="font-geist-semibold text-label-md text-primary">
         {register.isPending ? 'Registrando…' : label}
       </Text>

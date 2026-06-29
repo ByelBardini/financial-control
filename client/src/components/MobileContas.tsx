@@ -1,4 +1,4 @@
-import { Pressable, ScrollView, View } from 'react-native';
+import { ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BankAccountCard } from './BankAccountCard';
 import { BottomNav } from './BottomNav';
@@ -6,7 +6,8 @@ import { CarteiraCard } from './CarteiraCard';
 import { ContasHero } from './ContasHero';
 import { CreditCardCard } from './CreditCardCard';
 import { DiagnosisCard } from './DiagnosisCard';
-import { Icon } from './Icon';
+import { Fab } from './Fab';
+import { LiquidBalanceHeader } from './LiquidBalanceHeader';
 import { PanicMeter } from './PanicMeter';
 import { QuerySection } from './QuerySection';
 import { SectionHeading } from './SectionHeading';
@@ -20,6 +21,7 @@ import {
   usePovertyXray,
   useVouchers,
 } from '../hooks/useContasQueries';
+import { usePatrimonioOverview } from '../hooks/usePatrimonioQueries';
 import type { AppRoute } from '../navigation/routes';
 
 type MobileContasProps = {
@@ -45,6 +47,7 @@ export function MobileContas({
   onEditAccount,
 }: MobileContasProps) {
   const insets = useSafeAreaInsets();
+  const overview = usePatrimonioOverview();
   const banks = useBankAccounts();
   const cards = useCreditCards();
   const vouchers = useVouchers();
@@ -60,6 +63,14 @@ export function MobileContas({
         contentContainerStyle={{ gap: 24, paddingBottom: insets.bottom + 96 }}
       >
         <ContasHero />
+
+        <QuerySection query={overview} label="o saldo líquido">
+          {(data) => (
+            <View className="px-container-margin">
+              <LiquidBalanceHeader overview={data} hidden={hidden} />
+            </View>
+          )}
+        </QuerySection>
 
         <QuerySection query={xray} label="o medidor de pânico">
           {(data) => (
@@ -134,15 +145,12 @@ export function MobileContas({
         </QuerySection>
       </ScrollView>
 
-      <Pressable
-        onPress={onCreateAccount}
-        accessibilityRole="button"
+      <Fab
+        iconName="add"
         accessibilityLabel="Nova conta"
-        className="absolute right-6 h-14 w-14 items-center justify-center rounded-full bg-primary"
-        style={{ bottom: insets.bottom + 88 }}
-      >
-        <Icon name="add" size={28} color="#3c0091" />
-      </Pressable>
+        onPress={() => onCreateAccount?.()}
+        bottom={insets.bottom + 88}
+      />
 
       <View className="absolute bottom-0 left-0 right-0" style={{ paddingBottom: insets.bottom }}>
         <BottomNav currentRoute={route} onNavigate={onNavigate} />

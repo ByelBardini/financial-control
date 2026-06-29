@@ -5,6 +5,7 @@ import { CashflowSummary } from './CashflowSummary';
 import { CategoryFilter } from './CategoryFilter';
 import { FilterChips } from './FilterChips';
 import { FutureDebtRow } from './FutureDebtRow';
+import { MobilePageHeader } from './MobilePageHeader';
 import { PanicMeter } from './PanicMeter';
 import { PeriodFilter } from './PeriodFilter';
 import { QuerySection } from './QuerySection';
@@ -68,6 +69,7 @@ export function MobileTransacoes({
         className="flex-1"
         contentContainerStyle={{ gap: 24, paddingBottom: insets.bottom + 96 }}
       >
+        <MobilePageHeader eyebrow="Terminal Financeiro" title="Transações" />
         <QuerySection query={summary} label="o fluxo de caixa">
           {(data) => (
             <View className="gap-stack-lg px-container-margin">
@@ -81,7 +83,7 @@ export function MobileTransacoes({
         </QuerySection>
 
         <View className="gap-stack-md px-container-margin">
-          <SectionHeading>Transações</SectionHeading>
+          <SectionHeading>Lançamentos</SectionHeading>
           <TransactionSearch value={controls.searchText} onChange={controls.setSearchText} />
           <View className="flex-row flex-wrap items-center gap-stack-sm">
             <PeriodFilter

@@ -1,5 +1,5 @@
 import { Text, View } from 'react-native';
-import { EditableCard } from '../EditableCard';
+import { Card } from '../Card';
 import { Icon } from '../Icon';
 import { MoneyText } from '../MoneyText';
 import { toneColor } from '../../theme/colors';
@@ -10,8 +10,6 @@ type BankAccountRowProps = {
   hidden: boolean;
   onPress?: () => void;
 };
-
-const rowClass = 'flex-row items-center justify-between border-b border-grid-line py-stack-md';
 
 // Linha de conta na lista "Bancos" do desktop: tile da marca + nome/subtítulo à
 // esquerda; saldo + nota (colorida pelo tom) à direita. Com onPress, vira um alvo
@@ -51,8 +49,13 @@ export function BankAccountRow({ account, hidden, onPress }: BankAccountRowProps
   );
 
   return (
-    <EditableCard className={rowClass} editLabel={`Editar ${account.name}`} onPress={onPress}>
+    <Card
+      variant="row"
+      className="flex-row items-center justify-between"
+      editLabel={`Editar ${account.name}`}
+      onPress={onPress}
+    >
       {body}
-    </EditableCard>
+    </Card>
   );
 }

@@ -6,7 +6,8 @@ import { BottomNav } from './BottomNav';
 import { CategorySpendSection } from './CategorySpendSection';
 import { DiagnosisCard } from './DiagnosisCard';
 import { InvestmentsSection } from './InvestmentsSection';
-import { QuerySection } from './QuerySection';
+import { MobilePageHeader } from './MobilePageHeader';
+import { QuerySection, QuerySection2 } from './QuerySection';
 import { TopBar } from './TopBar';
 import { TransactionSpeedDial } from './transacoes/TransactionSpeedDial';
 import {
@@ -16,6 +17,7 @@ import {
   useInvestments,
   useMonthBalance,
 } from '../hooks/useDashboardQueries';
+import { usePatrimonioOverview } from '../hooks/usePatrimonioQueries';
 import type { AppRoute } from '../navigation/routes';
 import type { TransactionDirection } from '../types/transacoes';
 
@@ -41,6 +43,7 @@ export function MobileDashboard({
 }: MobileDashboardProps) {
   const insets = useSafeAreaInsets();
   const balance = useMonthBalance();
+  const overview = usePatrimonioOverview();
   const accounts = useAccounts();
   const investments = useInvestments();
   const categories = useCategories();
@@ -53,9 +56,10 @@ export function MobileDashboard({
         className="flex-1"
         contentContainerStyle={{ gap: 24, paddingBottom: insets.bottom + 96 }}
       >
-        <QuerySection query={balance} label="o saldo">
-          {(data) => <BalanceHero balance={data} hidden={hidden} />}
-        </QuerySection>
+        <MobilePageHeader eyebrow="Visão Geral" title="Bem-vindo de volta" />
+        <QuerySection2 queryA={balance} queryB={overview} label="o saldo">
+          {(b, o) => <BalanceHero balance={b} overview={o} hidden={hidden} />}
+        </QuerySection2>
         <QuerySection query={accounts} label="as contas">
           {(data) => <AccountsSection accounts={data} hidden={hidden} />}
         </QuerySection>

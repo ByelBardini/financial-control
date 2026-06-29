@@ -17,6 +17,7 @@ import {
   useInvestmentsSummary,
   useMonthBalance,
 } from '../../hooks/useDashboardQueries';
+import { usePatrimonioOverview } from '../../hooks/usePatrimonioQueries';
 import type { MenuAnchor } from '../transacoes/NewTransactionMenu';
 import type { AppRoute } from '../../navigation/routes';
 
@@ -41,6 +42,7 @@ export function DesktopDashboard({
   onCreate,
 }: DesktopDashboardProps) {
   const balance = useMonthBalance();
+  const overview = usePatrimonioOverview();
   const accounts = useAccounts();
   const investments = useInvestments();
   const investmentsSummary = useInvestmentsSummary();
@@ -62,9 +64,9 @@ export function DesktopDashboard({
       <ScrollView className="flex-1" contentContainerStyle={{ flexGrow: 1 }}>
         <DesktopHeader hidden={hidden} onToggleHidden={onToggleHidden} onCreate={onCreate} />
         <View className="flex-1 border-t border-grid-line">
-          <QuerySection query={balance} label="o saldo">
-            {(data) => <SaldoHero balance={data} hidden={hidden} />}
-          </QuerySection>
+          <QuerySection2 queryA={balance} queryB={overview} label="o saldo">
+            {(b, o) => <SaldoHero balance={b} overview={o} hidden={hidden} />}
+          </QuerySection2>
 
           <View className="flex-row border-b border-grid-line">
             <View className="flex-1 border-r border-grid-line">

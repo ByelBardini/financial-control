@@ -64,6 +64,11 @@ type Querier interface {
 	GetAssetNetQuantity(ctx context.Context, arg GetAssetNetQuantityParams) (string, error)
 	// "Carteira Física": saldo total das contas em espécie (cash) do usuário.
 	GetCashBalance(ctx context.Context, userID pgtype.UUID) (int64, error)
+	// Quebra do patrimônio em CONTAS do usuário, em centavos. Líquido = bancos + espécie
+	// (o "quanto eu tenho hoje"); cartão (dívida) e vales ficam à parte. O saldo por conta é
+	// derivado (opening_balance + soma do ledger); a soma por tipo usa FILTER numa varredura só.
+	// Escopo por user_id nos dois lados do join (isolamento). Cast p/ centavos (bigint) no SQL.
+	GetLiquidBreakdown(ctx context.Context, userID pgtype.UUID) (GetLiquidBreakdownRow, error)
 	// Receitas e gastos do mês de @reference_date, em centavos (bigint). Mês vazio → 0.
 	// Escopado por usuário.
 	GetMonthSummary(ctx context.Context, arg GetMonthSummaryParams) (GetMonthSummaryRow, error)

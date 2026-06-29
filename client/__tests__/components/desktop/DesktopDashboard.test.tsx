@@ -1,12 +1,18 @@
 import { screen, userEvent } from '@testing-library/react-native';
 import * as api from '../../../src/api/dashboard';
 import { DesktopDashboard } from '../../../src/components/desktop/DesktopDashboard';
-import { mockDashboardApi, renderWithClient } from '../../_support/renderWithClient';
+import {
+  mockDashboardApi,
+  mockPatrimonioApi,
+  renderWithClient,
+} from '../../_support/renderWithClient';
 
 jest.mock('../../../src/api/dashboard');
+jest.mock('../../../src/api/patrimonio');
 
 beforeEach(() => {
   mockDashboardApi();
+  mockPatrimonioApi();
 });
 
 describe('DesktopDashboard', () => {
@@ -15,7 +21,7 @@ describe('DesktopDashboard', () => {
 
     expect(screen.getByText('Visão Geral')).toBeOnTheScreen(); // SideNav é estático
     expect(screen.getByRole('button', { name: 'Investimentos' })).toBeOnTheScreen();
-    expect(await screen.findByText('Disponível para gastar')).toBeOnTheScreen();
+    expect(await screen.findByText('Saldo líquido')).toBeOnTheScreen();
     expect(await screen.findByText('Você gastou 59% da sua receita.')).toBeOnTheScreen();
     expect(await screen.findByText('CDB 110% CDI')).toBeOnTheScreen(); // painel Investimentos (carteira real)
   });
@@ -23,7 +29,7 @@ describe('DesktopDashboard', () => {
   it('dispara onToggleHidden a partir do header', async () => {
     const onToggleHidden = jest.fn();
     await renderWithClient(<DesktopDashboard hidden={false} onToggleHidden={onToggleHidden} />);
-    await screen.findByText('Disponível para gastar'); // espera as queries assentarem
+    await screen.findByText('Saldo líquido'); // espera as queries assentarem
 
     await userEvent.setup().press(screen.getByRole('switch', { name: 'Ocultar valores' }));
     expect(onToggleHidden).toHaveBeenCalledTimes(1);
@@ -34,7 +40,7 @@ describe('DesktopDashboard', () => {
     await renderWithClient(
       <DesktopDashboard hidden={false} onToggleHidden={jest.fn()} onCreate={onCreate} />,
     );
-    await screen.findByText('Disponível para gastar'); // espera as queries assentarem
+    await screen.findByText('Saldo líquido'); // espera as queries assentarem
 
     await userEvent.setup().press(screen.getByRole('button', { name: 'Nova transação' }));
     expect(onCreate).toHaveBeenCalledTimes(1);
@@ -51,7 +57,7 @@ describe('DesktopDashboard', () => {
     expect(screen.getByRole('button', { name: 'Tentar de novo' })).toBeOnTheScreen();
 
     // o resto do grid segue de pé
-    expect(await screen.findByText('Disponível para gastar')).toBeOnTheScreen();
+    expect(await screen.findByText('Saldo líquido')).toBeOnTheScreen();
     expect(await screen.findByText('CDB 110% CDI')).toBeOnTheScreen();
   });
 });

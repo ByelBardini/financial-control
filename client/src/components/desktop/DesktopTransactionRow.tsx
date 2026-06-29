@@ -1,5 +1,5 @@
 import { Text, View } from 'react-native';
-import { EditableCard } from '../EditableCard';
+import { Card } from '../Card';
 import { TransactionAmount } from '../TransactionAmount';
 import { TransactionTag } from '../TransactionTag';
 import type { Transaction } from '../../types/transacoes';
@@ -10,9 +10,6 @@ type DesktopTransactionRowProps = {
   onPress?: () => void;
 };
 
-const rowClass =
-  'flex-row items-center justify-between border-b border-grid-line px-stack-lg py-stack-md';
-
 // Linha de transação do desktop: coluna de data + título + "conta • categoria" com a
 // etiqueta, e o valor assinado à direita. Bordas finas (border-grid-line) no padrão
 // enterprise das outras telas. Com onPress, vira um alvo "Editar transação" acessível.
@@ -22,7 +19,12 @@ export function DesktopTransactionRow({
   onPress,
 }: DesktopTransactionRowProps) {
   return (
-    <EditableCard className={rowClass} editLabel={`Editar ${transaction.title}`} onPress={onPress}>
+    <Card
+      variant="row"
+      className="flex-row items-center justify-between px-stack-lg"
+      editLabel={`Editar ${transaction.title}`}
+      onPress={onPress}
+    >
       <View className="flex-1 flex-row items-center gap-gutter">
         <Text className="w-12 border-r border-grid-line pr-gutter text-center font-geist-medium text-label-md text-on-surface-variant">
           {transaction.dateLabel}
@@ -45,6 +47,6 @@ export function DesktopTransactionRow({
         hidden={hidden}
         className="font-hanken-semibold text-headline-sm"
       />
-    </EditableCard>
+    </Card>
   );
 }

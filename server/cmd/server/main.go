@@ -13,6 +13,7 @@ import (
 	"financial-control/server/internal/cotacao"
 	"financial-control/server/internal/dashboard"
 	"financial-control/server/internal/investimentos"
+	"financial-control/server/internal/patrimonio"
 	"financial-control/server/internal/precojob"
 	"financial-control/server/internal/router"
 	"financial-control/server/internal/store"
@@ -51,6 +52,7 @@ func main() {
 		Contas:        contas.NewService(st),
 		Transacoes:    transacoes.NewService(st),
 		Investimentos: investimentos.NewService(st, investimentos.ComBackfill(cotador), investimentos.ComBusca(cotador)),
+		Patrimonio:    patrimonio.NewService(st),
 	}
 
 	// Job diário de cotação (EOD): atualiza o fechamento de cada ativo cotável no horário (BRT).

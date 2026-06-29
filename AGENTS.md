@@ -40,6 +40,7 @@ Leia o doc da área **antes** de abrir a fonte correspondente. Atualize-o após 
 | API Go | `docs/context/server-api.md` | endpoints, handlers, DTOs, validação no server |
 | Banco de dados | `docs/context/database.md` | schema, migrations, queries, pgx/sqlc |
 | App Expo | `docs/context/client-app.md` | telas, componentes, hooks, chamadas à API no client |
+| Design system | `docs/context/design-system.md` | padrão visual: tokens, primitivos compartilhados (Button/Card/Field/PageHeader), caixa/eyebrow, regra de classe estática do NativeWind |
 | Armadilhas | `docs/context/gotchas.md` | sempre que um bug recorrente/contraintuitivo aparecer |
 
 ## Onde os testes rodam

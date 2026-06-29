@@ -85,6 +85,16 @@ type CreditAccountRow struct {
 	DotColor     string
 }
 
+// LiquidBreakdownRow é a quebra do patrimônio em contas (centavos): líquido = bancos +
+// espécie ("quanto eu tenho hoje"); a dívida de cartão (saldo negativo, em positivo) e os
+// vales ficam à parte (não entram no líquido).
+type LiquidBreakdownRow struct {
+	BankCents     int64
+	CashCents     int64
+	CardDebtCents int64
+	VoucherCents  int64
+}
+
 // TransactionRow é uma transação do log, com conta e categoria já juntadas (centavos).
 // OccurredOn é a data de competência (sem hora); a formatação do rótulo é feita no domínio.
 type TransactionRow struct {
@@ -390,6 +400,26 @@ func (s *Store) GetCashBalance(ctx context.Context, userID string) (int64, error
 		return 0, fmt.Errorf("store: saldo da carteira: %w", err)
 	}
 	return cents, nil
+}
+
+// GetLiquidBreakdown soma o saldo das contas do usuário por tipo (centavos): bancos
+// (checking/savings) + espécie (cash) = líquido; dívida de cartão (saldo negativo, em
+// positivo) e vales saem à parte. Uma varredura só (FILTER por tipo).
+func (s *Store) GetLiquidBreakdown(ctx context.Context, userID string) (LiquidBreakdownRow, error) {
+	uid, err := uuidArg(userID)
+	if err != nil {
+		return LiquidBreakdownRow{}, err
+	}
+	row, err := s.q.GetLiquidBreakdown(ctx, uid)
+	if err != nil {
+		return LiquidBreakdownRow{}, fmt.Errorf("store: quebra do patrimônio em contas: %w", err)
+	}
+	return LiquidBreakdownRow{
+		BankCents:     row.BankCents,
+		CashCents:     row.CashCents,
+		CardDebtCents: row.CardDebtCents,
+		VoucherCents:  row.VoucherCents,
+	}, nil
 }
 
 // ListCreditAccounts devolve os cartões de crédito do usuário (saldo + limite), em centavos.

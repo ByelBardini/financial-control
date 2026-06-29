@@ -1,5 +1,5 @@
 import { Text, View } from 'react-native';
-import { CashflowMetric } from './CashflowMetric';
+import { LabeledMoney } from './LabeledMoney';
 import { MoneyText } from './MoneyText';
 import { ProgressBar } from './ProgressBar';
 import type { CashflowSummary as CashflowSummaryData } from '../types/transacoes';
@@ -15,7 +15,7 @@ export function CashflowSummary({ summary, hidden }: CashflowSummaryProps) {
     <View className="gap-stack-md">
       <View className="flex-row gap-stack-md">
         <View className={cardClass}>
-          <CashflowMetric
+          <LabeledMoney
             label="Esperança (Inflow)"
             cents={summary.inflowCents}
             tone="secondary"
@@ -23,7 +23,7 @@ export function CashflowSummary({ summary, hidden }: CashflowSummaryProps) {
           />
         </View>
         <View className={cardClass}>
-          <CashflowMetric
+          <LabeledMoney
             label="Realidade (Outflow)"
             cents={summary.outflowCents}
             tone="error"

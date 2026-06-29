@@ -1,5 +1,6 @@
 import { Pressable, Text, View } from 'react-native';
 import { Icon, type IconName } from './Icon';
+import { colors } from '../theme/colors';
 
 type PaginationProps = {
   page: number;
@@ -43,7 +44,7 @@ type PagerButtonProps = {
 };
 
 function PagerButton({ label, icon, disabled, onPress, iconLeft = false }: PagerButtonProps) {
-  const color = disabled ? '#494454' : '#cbc3d7';
+  const color = disabled ? colors.outlineVariant : colors.onSurfaceVariant;
   const text = (
     <Text
       className={`font-geist-medium text-label-sm ${disabled ? 'text-outline-variant' : 'text-on-surface-variant'}`}

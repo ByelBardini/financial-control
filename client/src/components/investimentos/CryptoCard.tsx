@@ -1,6 +1,6 @@
 import { Text, View } from 'react-native';
 import { PriceSparkline } from './PriceSparkline';
-import { EditableCard } from '../EditableCard';
+import { Card } from '../Card';
 import { Icon } from '../Icon';
 import { MoneyText } from '../MoneyText';
 import { toneColor } from '../../theme/colors';
@@ -19,8 +19,9 @@ type CryptoCardProps = {
 export function CryptoCard({ holding, hidden, onPress }: CryptoCardProps) {
   const tone = changeTone(holding.gainPct);
   return (
-    <EditableCard
-      className="gap-stack-md rounded-xl border border-outline-variant bg-surface-container p-gutter"
+    <Card
+      variant="outlined"
+      className="gap-stack-md bg-surface-container p-gutter"
       editLabel={`Abrir ${holding.symbol}`}
       onPress={onPress}
     >
@@ -61,6 +62,6 @@ export function CryptoCard({ holding, hidden, onPress }: CryptoCardProps) {
         tone={tone}
         hidden={hidden}
       />
-    </EditableCard>
+    </Card>
   );
 }

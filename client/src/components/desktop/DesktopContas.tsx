@@ -8,6 +8,7 @@ import { SideNav } from './SideNav';
 import { ValesPanel } from './ValesPanel';
 import { CarteiraCard } from '../CarteiraCard';
 import { DiagnosisCard } from '../DiagnosisCard';
+import { LiquidBalanceHeader } from '../LiquidBalanceHeader';
 import { QuerySection } from '../QuerySection';
 import {
   useBankAccounts,
@@ -17,6 +18,7 @@ import {
   usePovertyXray,
   useVouchers,
 } from '../../hooks/useContasQueries';
+import { usePatrimonioOverview } from '../../hooks/usePatrimonioQueries';
 import type { AppRoute } from '../../navigation/routes';
 
 type DesktopContasProps = {
@@ -29,9 +31,10 @@ type DesktopContasProps = {
   onEditAccount?: (id: string) => void;
 };
 
-// Layout enterprise da tela de Contas: rail fixo + header (título + "Nova conta", sem
-// total agregado) + grid 2/3 (Bancos + Cartões + Vales) / 1/3 (Carteira + Raio-X + Dica),
-// dividido por border-grid-line. Cada célula é uma query independente. Brilho verde→roxo no fundo.
+// Layout enterprise da tela de Contas: rail fixo + header (título + "Nova conta") + faixa do
+// "Saldo líquido" (bancos + espécie, do mesmo /patrimonio/overview que a Início → conciliam)
+// + grid 2/3 (Bancos + Cartões + Vales) / 1/3 (Carteira + Raio-X + Dica), dividido por
+// border-grid-line. Cada célula é uma query independente. Brilho verde→roxo no fundo.
 export function DesktopContas({
   hidden,
   onToggleHidden,
@@ -41,6 +44,7 @@ export function DesktopContas({
   onCreateAccount,
   onEditAccount,
 }: DesktopContasProps) {
+  const overview = usePatrimonioOverview();
   const banks = useBankAccounts();
   const cards = useCreditCards();
   const vouchers = useVouchers();
@@ -65,6 +69,12 @@ export function DesktopContas({
           onToggleHidden={onToggleHidden}
           onCreateAccount={onCreateAccount}
         />
+
+        <View className="border-t border-grid-line p-stack-lg">
+          <QuerySection query={overview} label="o saldo líquido">
+            {(data) => <LiquidBalanceHeader overview={data} hidden={hidden} size="desktop" />}
+          </QuerySection>
+        </View>
 
         <View className="flex-1 flex-row border-t border-grid-line">
           <View className="border-r border-grid-line" style={{ flex: 2 }}>

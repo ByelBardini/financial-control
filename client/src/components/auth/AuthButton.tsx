@@ -1,4 +1,4 @@
-import { ActivityIndicator, Pressable, Text } from 'react-native';
+import { Button } from '../Button';
 
 type AuthButtonProps = {
   label: string;
@@ -7,26 +7,19 @@ type AuthButtonProps = {
   disabled?: boolean;
 };
 
-// Botão primário full-width das telas de auth. `loading` mostra o spinner e,
-// junto de `disabled`, bloqueia o toque e marca `busy`/`disabled` pra a11y.
+// Botão primário full-width das telas de auth e dos submits de formulário. Fino
+// wrapper sobre o Button (variante primary, tamanho lg, largura total) — `loading`
+// mostra spinner e, junto de `disabled`, bloqueia o toque e marca `busy`/`disabled`.
 export function AuthButton({ label, onPress, loading = false, disabled = false }: AuthButtonProps) {
-  const blocked = loading || disabled;
-
   return (
-    <Pressable
+    <Button
+      label={label}
       onPress={onPress}
-      disabled={blocked}
-      accessibilityRole="button"
-      accessibilityLabel={label}
-      accessibilityState={{ disabled: blocked, busy: loading }}
-      className={`h-14 w-full flex-row items-center justify-center gap-stack-md rounded-full bg-primary px-gutter ${
-        blocked ? 'opacity-60' : ''
-      }`}
-    >
-      {loading ? <ActivityIndicator color="#340080" /> : null}
-      <Text className="font-geist-semibold text-label-md uppercase text-on-primary-container">
-        {label}
-      </Text>
-    </Pressable>
+      variant="primary"
+      size="lg"
+      block
+      loading={loading}
+      disabled={disabled}
+    />
   );
 }

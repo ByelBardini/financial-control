@@ -1,4 +1,5 @@
 import { Text, View } from 'react-native';
+import { Card } from './Card';
 import { Icon } from './Icon';
 import { MoneyText } from './MoneyText';
 import { ProgressBar } from './ProgressBar';
@@ -14,7 +15,7 @@ type CarteiraCardProps = {
 // Autocontido (traz o próprio título) pra servir mobile e desktop sem duplicar heading.
 export function CarteiraCard({ cash, hidden }: CarteiraCardProps) {
   return (
-    <View className="gap-stack-md rounded-xl border border-outline-variant bg-surface-container-high p-stack-lg">
+    <Card variant="outlined" className="gap-stack-md bg-surface-container-high p-stack-lg">
       <View className="flex-row items-center gap-stack-md">
         <View className="h-10 w-10 items-center justify-center rounded-full bg-surface-container-highest">
           <Icon name="savings" size={20} color={colors.onSurfaceVariant} />
@@ -41,6 +42,6 @@ export function CarteiraCard({ cash, hidden }: CarteiraCardProps) {
         </View>
         <ProgressBar percent={cash.confidencePercent} tone="secondary" />
       </View>
-    </View>
+    </Card>
   );
 }

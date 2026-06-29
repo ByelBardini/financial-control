@@ -1,5 +1,5 @@
 import { Text, View } from 'react-native';
-import { EditableCard } from './EditableCard';
+import { Card } from './Card';
 import { Icon } from './Icon';
 import { MoneyText } from './MoneyText';
 import { ProgressBar } from './ProgressBar';
@@ -12,9 +12,6 @@ type CreditCardCardProps = {
   hidden: boolean;
   onPress?: () => void;
 };
-
-const cardClass =
-  'gap-stack-md rounded-xl border border-outline-variant bg-surface-container-low p-stack-lg';
 
 // Card de cartão de crédito: tile da marca + nome, fatura atual em destaque, barra
 // de uso do limite (tom = severidade) e legenda "disponível de total" + nota ácida.
@@ -65,8 +62,13 @@ export function CreditCardCard({ card, hidden, onPress }: CreditCardCardProps) {
   );
 
   return (
-    <EditableCard className={cardClass} editLabel={`Editar ${card.name}`} onPress={onPress}>
+    <Card
+      variant="outlined"
+      className="gap-stack-md bg-surface-container-low p-stack-lg"
+      editLabel={`Editar ${card.name}`}
+      onPress={onPress}
+    >
       {body}
-    </EditableCard>
+    </Card>
   );
 }

@@ -5,14 +5,17 @@ import * as api from '../../src/api/dashboard';
 import * as contasApi from '../../src/api/contas';
 import * as transacoesApi from '../../src/api/transacoes';
 import * as investimentosApi from '../../src/api/investimentos';
+import * as patrimonioApi from '../../src/api/patrimonio';
 import { dashboardSnapshot } from '../../src/mocks/dashboardSnapshot';
 import { contasSnapshot } from '../../src/mocks/contasSnapshot';
 import { transacoesSnapshot } from '../../src/mocks/transacoesSnapshot';
 import { investimentosSnapshot } from '../../src/mocks/investimentosSnapshot';
+import { patrimonioSnapshot } from '../../src/mocks/patrimonioSnapshot';
 import type { DashboardSnapshot } from '../../src/types/dashboard';
 import type { ContasSnapshot } from '../../src/types/contas';
 import type { TransacoesSnapshot } from '../../src/types/transacoes';
 import type { InvestimentosSnapshot } from '../../src/types/investimentos';
+import type { PatrimonioOverview } from '../../src/types/patrimonio';
 
 // Faz cada função de src/api/dashboard resolver a fatia correspondente do snapshot.
 // Requer `jest.mock('../../src/api/dashboard')` no topo do arquivo de teste.
@@ -62,6 +65,12 @@ export function mockInvestimentosApi(snapshot: InvestimentosSnapshot = investime
   jest.mocked(investimentosApi.getCryptoBlock).mockResolvedValue(snapshot.crypto);
   jest.mocked(investimentosApi.getRiskAssessment).mockResolvedValue(snapshot.risk);
   jest.mocked(investimentosApi.getPortfolioEvolution).mockResolvedValue([]);
+}
+
+// Idem para src/api/patrimonio (o overview "quanto eu tenho hoje").
+// Requer `jest.mock('../../src/api/patrimonio')` no topo do arquivo de teste.
+export function mockPatrimonioApi(overview: PatrimonioOverview = patrimonioSnapshot) {
+  jest.mocked(patrimonioApi.getPatrimonioOverview).mockResolvedValue(overview);
 }
 
 // Renderiza ui dentro de um QueryClient de teste (retry off, gcTime 0 pra não
