@@ -23,8 +23,20 @@ export function SubMetricsRow({ balance, hidden }: SubMetricsRowProps) {
         hidden={hidden}
         fill
       />
-      <LabeledMoney label={MONTH_EXPENSE} cents={balance.gastosCents} tone="error" hidden={hidden} fill />
-      <LabeledMoney label={MONTH_RESULT} cents={balance.netCents} tone={resultTone} hidden={hidden} fill />
+      <LabeledMoney
+        label={MONTH_EXPENSE}
+        cents={balance.gastosCents}
+        tone="error"
+        hidden={hidden}
+        fill
+      />
+      <LabeledMoney
+        label={MONTH_RESULT}
+        cents={balance.netCents}
+        tone={resultTone}
+        hidden={hidden}
+        fill
+      />
     </View>
   );
 }

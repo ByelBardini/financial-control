@@ -1,7 +1,11 @@
 import { screen, userEvent } from '@testing-library/react-native';
 import * as api from '../../src/api/dashboard';
 import { MobileDashboard } from '../../src/components/MobileDashboard';
-import { mockDashboardApi, mockPatrimonioApi, renderWithClient } from '../_support/renderWithClient';
+import {
+  mockDashboardApi,
+  mockPatrimonioApi,
+  renderWithClient,
+} from '../_support/renderWithClient';
 
 jest.mock('../../src/api/dashboard');
 jest.mock('../../src/api/patrimonio');

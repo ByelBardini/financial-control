@@ -42,8 +42,20 @@ export function SaldoHero({ balance, overview, hidden }: SaldoHeroProps) {
           hidden={hidden}
           fill
         />
-        <LabeledMoney label={MONTH_EXPENSE} cents={balance.gastosCents} tone="error" hidden={hidden} fill />
-        <LabeledMoney label={MONTH_RESULT} cents={balance.netCents} tone={resultTone} hidden={hidden} fill />
+        <LabeledMoney
+          label={MONTH_EXPENSE}
+          cents={balance.gastosCents}
+          tone="error"
+          hidden={hidden}
+          fill
+        />
+        <LabeledMoney
+          label={MONTH_RESULT}
+          cents={balance.netCents}
+          tone={resultTone}
+          hidden={hidden}
+          fill
+        />
         <LabeledMoney label={ASSETS_TOTAL} cents={overview.investedCents} hidden={hidden} fill />
         <LabeledMoney label={CRYPTO_SUBTOTAL} cents={overview.cryptoCents} hidden={hidden} fill />
       </View>

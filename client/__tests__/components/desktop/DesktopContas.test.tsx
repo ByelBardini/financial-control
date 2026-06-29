@@ -1,7 +1,11 @@
 import { screen, userEvent } from '@testing-library/react-native';
 import * as api from '../../../src/api/contas';
 import { DesktopContas } from '../../../src/components/desktop/DesktopContas';
-import { mockContasApi, mockPatrimonioApi, renderWithClient } from '../../_support/renderWithClient';
+import {
+  mockContasApi,
+  mockPatrimonioApi,
+  renderWithClient,
+} from '../../_support/renderWithClient';
 
 jest.mock('../../../src/api/contas');
 jest.mock('../../../src/api/patrimonio');
