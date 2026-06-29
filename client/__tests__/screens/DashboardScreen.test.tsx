@@ -3,18 +3,21 @@ import { DashboardScreen } from '../../src/screens/DashboardScreen';
 import { useIsDesktop } from '../../src/hooks/useIsDesktop';
 import {
   mockDashboardApi,
+  mockPatrimonioApi,
   mockTransacoesApi,
   renderWithClient,
 } from '../_support/renderWithClient';
 
 jest.mock('../../src/hooks/useIsDesktop');
 jest.mock('../../src/api/dashboard');
+jest.mock('../../src/api/patrimonio');
 jest.mock('../../src/api/transacoes');
 const mockUseIsDesktop = useIsDesktop as jest.MockedFunction<typeof useIsDesktop>;
 
 beforeEach(() => {
   jest.clearAllMocks();
   mockDashboardApi();
+  mockPatrimonioApi();
   mockTransacoesApi();
 });
 
@@ -62,7 +65,7 @@ describe('DashboardScreen — criar transação a partir da Início', () => {
   it('mobile: FAB → speed dial → Despesa abre o modal "Nova despesa"', async () => {
     mockUseIsDesktop.mockReturnValue(false);
     await renderWithClient(<DashboardScreen />);
-    await screen.findByText('Saldo do Mês');
+    await screen.findByText('Saldo líquido');
     const user = userEvent.setup();
 
     await user.press(screen.getByRole('button', { name: 'Nova transação' }));

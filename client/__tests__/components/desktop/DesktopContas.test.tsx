@@ -1,13 +1,15 @@
 import { screen, userEvent } from '@testing-library/react-native';
 import * as api from '../../../src/api/contas';
 import { DesktopContas } from '../../../src/components/desktop/DesktopContas';
-import { mockContasApi, renderWithClient } from '../../_support/renderWithClient';
+import { mockContasApi, mockPatrimonioApi, renderWithClient } from '../../_support/renderWithClient';
 
 jest.mock('../../../src/api/contas');
+jest.mock('../../../src/api/patrimonio');
 
 beforeEach(() => {
   jest.clearAllMocks();
   mockContasApi();
+  mockPatrimonioApi();
 });
 
 describe('DesktopContas', () => {
@@ -22,6 +24,7 @@ describe('DesktopContas', () => {
     );
 
     expect(await screen.findByText('Monitor de Sobrevivência')).toBeOnTheScreen();
+    expect(await screen.findByText('Saldo líquido')).toBeOnTheScreen(); // total geral (faixa do topo)
     expect(await screen.findByRole('header', { name: 'Bancos' })).toBeOnTheScreen();
     expect(await screen.findByRole('header', { name: 'Vales (Benefícios)' })).toBeOnTheScreen();
     expect(await screen.findByRole('header', { name: 'Raio-X de Pobreza' })).toBeOnTheScreen();

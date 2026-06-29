@@ -2,17 +2,19 @@ import { screen, userEvent } from '@testing-library/react-native';
 import * as accountsApi from '../../src/api/accounts';
 import { ContasScreen } from '../../src/screens/ContasScreen';
 import { useIsDesktop } from '../../src/hooks/useIsDesktop';
-import { mockContasApi, renderWithClient } from '../_support/renderWithClient';
+import { mockContasApi, mockPatrimonioApi, renderWithClient } from '../_support/renderWithClient';
 import type { AccountDetail } from '../../src/types/accounts';
 
 jest.mock('../../src/hooks/useIsDesktop');
 jest.mock('../../src/api/contas');
+jest.mock('../../src/api/patrimonio');
 jest.mock('../../src/api/accounts');
 const mockUseIsDesktop = useIsDesktop as jest.MockedFunction<typeof useIsDesktop>;
 
 beforeEach(() => {
   jest.clearAllMocks();
   mockContasApi();
+  mockPatrimonioApi();
 });
 
 describe('ContasScreen (responsivo)', () => {

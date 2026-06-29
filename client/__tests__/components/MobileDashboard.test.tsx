@@ -1,12 +1,14 @@
 import { screen, userEvent } from '@testing-library/react-native';
 import * as api from '../../src/api/dashboard';
 import { MobileDashboard } from '../../src/components/MobileDashboard';
-import { mockDashboardApi, renderWithClient } from '../_support/renderWithClient';
+import { mockDashboardApi, mockPatrimonioApi, renderWithClient } from '../_support/renderWithClient';
 
 jest.mock('../../src/api/dashboard');
+jest.mock('../../src/api/patrimonio');
 
 beforeEach(() => {
   mockDashboardApi();
+  mockPatrimonioApi();
 });
 
 describe('MobileDashboard', () => {
@@ -14,7 +16,7 @@ describe('MobileDashboard', () => {
     await renderWithClient(<MobileDashboard hidden={false} onToggleHidden={jest.fn()} />);
 
     expect(screen.getByText('Pobrify')).toBeOnTheScreen(); // TopBar é estático (sem query)
-    expect(await screen.findByText('Saldo do Mês')).toBeOnTheScreen();
+    expect(await screen.findByText('Saldo líquido')).toBeOnTheScreen();
     expect(await screen.findByRole('header', { name: 'Contas' })).toBeOnTheScreen();
     expect(await screen.findByRole('header', { name: 'Investimentos (Risos)' })).toBeOnTheScreen();
     expect(await screen.findByRole('header', { name: 'Gastos por Categoria' })).toBeOnTheScreen();
@@ -25,7 +27,7 @@ describe('MobileDashboard', () => {
   it('dispara onToggleHidden ao tocar no switch', async () => {
     const onToggleHidden = jest.fn();
     await renderWithClient(<MobileDashboard hidden={false} onToggleHidden={onToggleHidden} />);
-    await screen.findByText('Saldo do Mês'); // espera as queries assentarem
+    await screen.findByText('Saldo líquido'); // espera as queries assentarem
 
     await userEvent.setup().press(screen.getByRole('switch', { name: 'Ocultar valores' }));
     expect(onToggleHidden).toHaveBeenCalledTimes(1);
@@ -50,7 +52,7 @@ describe('MobileDashboard', () => {
 
   it('mascara os valores quando hidden', async () => {
     await renderWithClient(<MobileDashboard hidden onToggleHidden={jest.fn()} />);
-    await screen.findByText('Saldo do Mês'); // espera o BalanceHero carregar
+    await screen.findByText('Saldo líquido'); // espera o BalanceHero carregar
 
     expect(screen.queryByText('R$ 1.284,50')).toBeNull();
     expect(screen.getAllByLabelText('valor oculto').length).toBeGreaterThan(0);
@@ -66,7 +68,7 @@ describe('MobileDashboard', () => {
     expect(screen.queryByRole('header', { name: 'Gastos por Categoria' })).toBeNull();
 
     // as outras seções seguem renderizando normalmente
-    expect(await screen.findByText('Saldo do Mês')).toBeOnTheScreen();
+    expect(await screen.findByText('Saldo líquido')).toBeOnTheScreen();
     expect(await screen.findByText('Diagnóstico Pobrify')).toBeOnTheScreen();
   });
 });

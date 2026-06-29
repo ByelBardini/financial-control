@@ -1,13 +1,15 @@
 import { screen, userEvent } from '@testing-library/react-native';
 import * as api from '../../src/api/contas';
 import { MobileContas } from '../../src/components/MobileContas';
-import { mockContasApi, renderWithClient } from '../_support/renderWithClient';
+import { mockContasApi, mockPatrimonioApi, renderWithClient } from '../_support/renderWithClient';
 
 jest.mock('../../src/api/contas');
+jest.mock('../../src/api/patrimonio');
 
 beforeEach(() => {
   jest.clearAllMocks();
   mockContasApi();
+  mockPatrimonioApi();
 });
 
 describe('MobileContas', () => {
@@ -23,6 +25,8 @@ describe('MobileContas', () => {
 
     expect(screen.getByText('Pobrify')).toBeOnTheScreen(); // TopBar é estático (sem query)
     expect(screen.getByText('Monitor de Sobrevivência')).toBeOnTheScreen(); // título estático
+    expect(await screen.findByText('Saldo líquido')).toBeOnTheScreen(); // total geral (mesma fonte da Início)
+    expect(screen.getByText('Em bancos')).toBeOnTheScreen();
     expect(await screen.findByText('Tempo Estimado de Vida (Bancária)')).toBeOnTheScreen();
     expect(await screen.findByRole('header', { name: 'Bancos' })).toBeOnTheScreen();
     expect(await screen.findByRole('header', { name: 'Cartões' })).toBeOnTheScreen();
