@@ -7,6 +7,7 @@ import { ContasHero } from './ContasHero';
 import { CreditCardCard } from './CreditCardCard';
 import { DiagnosisCard } from './DiagnosisCard';
 import { Fab } from './Fab';
+import { LiquidBalanceHeader } from './LiquidBalanceHeader';
 import { PanicMeter } from './PanicMeter';
 import { QuerySection } from './QuerySection';
 import { SectionHeading } from './SectionHeading';
@@ -20,6 +21,7 @@ import {
   usePovertyXray,
   useVouchers,
 } from '../hooks/useContasQueries';
+import { usePatrimonioOverview } from '../hooks/usePatrimonioQueries';
 import type { AppRoute } from '../navigation/routes';
 
 type MobileContasProps = {
@@ -45,6 +47,7 @@ export function MobileContas({
   onEditAccount,
 }: MobileContasProps) {
   const insets = useSafeAreaInsets();
+  const overview = usePatrimonioOverview();
   const banks = useBankAccounts();
   const cards = useCreditCards();
   const vouchers = useVouchers();
@@ -60,6 +63,14 @@ export function MobileContas({
         contentContainerStyle={{ gap: 24, paddingBottom: insets.bottom + 96 }}
       >
         <ContasHero />
+
+        <QuerySection query={overview} label="o saldo líquido">
+          {(data) => (
+            <View className="px-container-margin">
+              <LiquidBalanceHeader overview={data} hidden={hidden} />
+            </View>
+          )}
+        </QuerySection>
 
         <QuerySection query={xray} label="o medidor de pânico">
           {(data) => (

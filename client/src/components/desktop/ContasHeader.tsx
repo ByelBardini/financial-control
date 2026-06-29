@@ -9,8 +9,8 @@ type ContasHeaderProps = {
 };
 
 // Cabeçalho da página de Contas: compõe o DesktopPageHeader (eyebrow + título) com
-// ocultar valores + "Nova conta" à direita. Sem balanço agregado ("Patrimônio
-// Líquido") — a tela foca no saldo de cada conta + o cartão (Raio-X), não num total.
+// ocultar valores + "Nova conta" à direita. O total geral ("Saldo líquido") voltou —
+// renderizado pelo DesktopContas numa faixa logo abaixo deste header, não aqui.
 export function ContasHeader({ hidden, onToggleHidden, onCreateAccount }: ContasHeaderProps) {
   return (
     <DesktopPageHeader eyebrow="Monitor de Sobrevivência" title="Suas contas">

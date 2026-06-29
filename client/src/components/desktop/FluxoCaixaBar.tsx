@@ -1,5 +1,5 @@
 import { Text, View } from 'react-native';
-import { CashflowMetric } from '../CashflowMetric';
+import { LabeledMoney } from '../LabeledMoney';
 import { PanicMeter } from '../PanicMeter';
 import type { CashflowSummary } from '../../types/transacoes';
 
@@ -15,19 +15,19 @@ export function FluxoCaixaBar({ summary, hidden }: FluxoCaixaBarProps) {
       </Text>
       <View className="flex-row flex-wrap items-end justify-between gap-stack-lg">
         <View className="flex-row gap-x-12 gap-y-stack-md">
-          <CashflowMetric
+          <LabeledMoney
             label="Inflow (Esperança)"
             cents={summary.inflowCents}
             tone="secondary"
             hidden={hidden}
           />
-          <CashflowMetric
+          <LabeledMoney
             label="Outflow (Realidade)"
             cents={summary.outflowCents}
             tone="error"
             hidden={hidden}
           />
-          <CashflowMetric
+          <LabeledMoney
             label="Net Burn Rate"
             cents={summary.netBurnCents}
             tone="neutral"

@@ -2,6 +2,7 @@ import { Text, View } from 'react-native';
 import { CryptoCard } from './CryptoCard';
 import { MoneyText } from '../MoneyText';
 import { SectionHeading } from '../SectionHeading';
+import { CRYPTO_SUBTOTAL } from '../../lib/moneyLabels';
 import type { CryptoBlock } from '../../types/investimentos';
 
 type CryptoSectionProps = {
@@ -23,7 +24,7 @@ export function CryptoSection({ crypto, hidden, onOpenHolding }: CryptoSectionPr
         </Text>
         <View className="flex-row items-center gap-stack-sm">
           <Text className="font-geist-medium text-label-sm uppercase text-on-surface-variant">
-            Subtotal em cripto
+            {CRYPTO_SUBTOTAL}
           </Text>
           <MoneyText
             cents={crypto.subtotalCents}

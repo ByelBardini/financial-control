@@ -7,22 +7,16 @@ type ContasPanelProps = {
   hidden: boolean;
 };
 
-// Coluna Contas: total somado + lista com bolinhas de marca.
+// Coluna Contas: lista cada conta com seu saldo (o detalhe "quanto em cada uma"). O total
+// geral mora no herói (SaldoHero: Saldo líquido + Em bancos / Em espécie, do mesmo
+// /patrimonio/overview que a tela de Contas). Esta coluna NÃO soma mais no client — a soma
+// crua de GET /accounts incluía cartão (negativo) e exchange, divergindo do líquido.
 export function ContasPanel({ accounts, hidden }: ContasPanelProps) {
-  const totalCents = accounts.reduce((sum, account) => sum + account.balanceCents, 0);
   return (
     <View className="gap-stack-md p-stack-lg">
-      <View className="flex-row items-center justify-between">
-        <Text className="font-geist-medium text-label-sm uppercase text-on-surface-variant">
-          Contas
-        </Text>
-        <MoneyText
-          cents={totalCents}
-          hidden={hidden}
-          tone="neutral"
-          className="font-geist-semibold text-label-md"
-        />
-      </View>
+      <Text className="font-geist-medium text-label-sm uppercase text-on-surface-variant">
+        Contas
+      </Text>
       <View>
         {accounts.map((account) => (
           <View
