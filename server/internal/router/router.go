@@ -12,6 +12,7 @@ import (
 	"financial-control/server/internal/health"
 	"financial-control/server/internal/httpx"
 	"financial-control/server/internal/investimentos"
+	"financial-control/server/internal/patrimonio"
 	"financial-control/server/internal/ratelimit"
 	"financial-control/server/internal/transacoes"
 )
@@ -31,6 +32,7 @@ type Deps struct {
 	Contas        *contas.Service
 	Transacoes    *transacoes.Service
 	Investimentos *investimentos.Service
+	Patrimonio    *patrimonio.Service
 }
 
 // New devolve o roteador com todas as rotas registradas. Só `GET /health` e
@@ -64,6 +66,10 @@ func New(d Deps) http.Handler {
 	mux.Handle("GET /dashboard/diagnosis", protected(dashboard.DiagnosisHandler(d.Dashboard)))
 	mux.Handle("GET /investments", protected(dashboard.InvestmentsHandler(d.Dashboard)))
 	mux.Handle("GET /dashboard/investments-summary", protected(dashboard.InvestmentsSummaryHandler(d.Dashboard)))
+
+	// Patrimônio: o saldo líquido (bancos + espécie) + blocos à parte — fonte única do
+	// "quanto eu tenho hoje", consumida pela Início e pela tela de Contas (conciliam).
+	mux.Handle("GET /patrimonio/overview", protected(patrimonio.OverviewHandler(d.Patrimonio)))
 
 	// Views agregadas da tela de Contas.
 	mux.Handle("GET /contas/banks", protected(contas.BanksHandler(d.Contas)))
