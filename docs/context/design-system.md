@@ -42,6 +42,8 @@ Estrutura única: **eyebrow tonal + título grande + subtítulo opcional** à es
 | `MobilePageHeader` | `src/components/MobilePageHeader.tsx` | ✅ pronto (4 telas mobile migradas) | cabeçalho mobile |
 | `Card` | `src/components/Card.tsx` | ✅ pronto (todos os cards migrados; `EditableCard` removido) | base dos cards (variantes outlined/accent/row/plain; Pressable+a11y quando `onPress`) |
 | `FieldShell` | `src/components/FieldShell.tsx` | ✅ pronto | casca de campo: label CAIXA ALTA + erro (alert); composta por `FormField` (e via ele `MoneyField`/`QuantityField`/`PasswordField`) e `SelectField` |
+| `LabeledMoney` | `src/components/LabeledMoney.tsx` | ✅ pronto | rótulo + valor (`MoneyText`) colorido pelo tom; `fill` estica em colunas iguais. Átomo único das métricas de hero/fluxo — **unificou e aposentou** `SubMetric`/`CashflowMetric` |
+| `LiquidBalanceHeader` | `src/components/LiquidBalanceHeader.tsx` | ✅ pronto | "quanto eu tenho hoje": Saldo líquido em destaque + subtotais Em bancos/Em espécie; prop-driven (recebe `PatrimonioOverview`), compartilhado por Início e Contas (mesma fonte → conciliam) |
 
 > Conforme cada onda do refactor (ver `docs/context/client-app.md` e o plano) entrega um primitivo, atualize a coluna "Estado" e mova as telas para compô-lo.
 
