@@ -10,6 +10,7 @@ import (
 	"financial-control/server/internal/contas"
 	"financial-control/server/internal/dashboard"
 	"financial-control/server/internal/investimentos"
+	"financial-control/server/internal/patrimonio"
 	"financial-control/server/internal/router"
 	"financial-control/server/internal/transacoes"
 )
@@ -25,6 +26,7 @@ func newTestRouter() http.Handler {
 		Contas:        contas.NewService(nil),
 		Transacoes:    transacoes.NewService(nil),
 		Investimentos: investimentos.NewService(nil),
+		Patrimonio:    patrimonio.NewService(nil),
 	})
 }
 
@@ -40,6 +42,7 @@ func TestRotasDeDadosExigemToken(t *testing.T) {
 		"/dashboard/diagnosis",
 		"/investments",
 		"/dashboard/investments-summary",
+		"/patrimonio/overview",
 		"/auth/me",
 		"/accounts/a1",
 		"/contas/banks",
