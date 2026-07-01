@@ -109,6 +109,57 @@ func TestCreateTransferStore(t *testing.T) {
 			t.Errorf("err = %v, quero ErrTransferInvalid", err)
 		}
 	})
+
+	t.Run("vale → conta comum → inválida (classes diferentes)", func(t *testing.T) {
+		const valeAcc = "a0000000-0000-0000-0000-0000000000ff"
+		insertVoucherAccountRaw(t, ctx, dsn, valeAcc, "Alelo")
+		_, err := st.CreateTransfer(ctx, userAID, store.TransferInput{
+			OriginAccountID:      valeAcc,
+			DestinationAccountID: userANubankAcc,
+			AmountCents:          5000,
+			Description:          "x",
+			OccurredOn:           today,
+		})
+		if !errors.Is(err, store.ErrTransferInvalid) {
+			t.Errorf("err = %v, quero ErrTransferInvalid (vale não vai pra conta comum)", err)
+		}
+	})
+
+	t.Run("vale → vale → ok (mesma classe)", func(t *testing.T) {
+		const valeA = "a0000000-0000-0000-0000-0000000000fe"
+		const valeB = "a0000000-0000-0000-0000-0000000000fd"
+		insertVoucherAccountRaw(t, ctx, dsn, valeA, "Sodexo")
+		insertVoucherAccountRaw(t, ctx, dsn, valeB, "Ticket")
+		gid, err := st.CreateTransfer(ctx, userAID, store.TransferInput{
+			OriginAccountID:      valeA,
+			DestinationAccountID: valeB,
+			AmountCents:          3000,
+			Description:          "Passa pro outro vale",
+			OccurredOn:           today,
+		})
+		if err != nil {
+			t.Fatalf("vale → vale deveria ser válido: %v", err)
+		}
+		if gid == "" {
+			t.Fatal("group id vazio no vale → vale")
+		}
+	})
+}
+
+// insertVoucherAccountRaw cria um vale (account_type='voucher') do usuário A via SQL.
+func insertVoucherAccountRaw(t *testing.T, ctx context.Context, dsn, accountID, name string) {
+	t.Helper()
+	conn, err := pgx.Connect(ctx, dsn)
+	if err != nil {
+		t.Fatalf("pgx.Connect: %v", err)
+	}
+	defer conn.Close(ctx)
+	if _, err := conn.Exec(ctx, `INSERT INTO accounts
+		(id, user_id, name, account_type, opening_balance, icon, tone, dot_color)
+		VALUES ($1, $2, $3, 'voucher', 500.00, 'restaurant', 'secondary', '#9ddf2e')`,
+		accountID, userAID, name); err != nil {
+		t.Fatalf("inserir vale: %v", err)
+	}
 }
 
 // assertTransferLegs confere que o grupo tem exatamente 2 linhas kind='transfer': a perna de

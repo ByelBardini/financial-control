@@ -68,7 +68,7 @@ func authed(target, userID string) *http.Request {
 
 func TestListHandlerDevolveContasEmJSONEEscopaPorUsuario(t *testing.T) {
 	fake := &fakeAccountStore{rows: []store.AccountRow{
-		{ID: "a1", Name: "Nubank", BalanceCents: 84220, Icon: "credit_card", Tone: "primary", DotColor: "#d0bcff"},
+		{ID: "a1", Name: "Nubank", AccountType: "checking", BalanceCents: 84220, Icon: "credit_card", Tone: "primary", DotColor: "#d0bcff"},
 	}}
 
 	rec := httptest.NewRecorder()
@@ -80,7 +80,7 @@ func TestListHandlerDevolveContasEmJSONEEscopaPorUsuario(t *testing.T) {
 	if ct := rec.Header().Get("Content-Type"); ct != "application/json" {
 		t.Fatalf("Content-Type = %q, quero application/json", ct)
 	}
-	const want = `[{"id":"a1","name":"Nubank","balanceCents":84220,"icon":"credit_card","tone":"primary","dotColor":"#d0bcff"}]` + "\n"
+	const want = `[{"id":"a1","name":"Nubank","accountType":"checking","balanceCents":84220,"icon":"credit_card","tone":"primary","dotColor":"#d0bcff"}]` + "\n"
 	if got := rec.Body.String(); got != want {
 		t.Fatalf("body = %q, quero %q", got, want)
 	}
