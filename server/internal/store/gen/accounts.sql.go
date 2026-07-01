@@ -139,6 +139,7 @@ const listAccountsWithBalance = `-- name: ListAccountsWithBalance :many
 SELECT
     a.id::text                                                             AS id,
     a.name                                                                 AS name,
+    a.account_type                                                         AS account_type,
     ((a.opening_balance + COALESCE(SUM(t.signed_amount), 0)) * 100)::bigint AS balance_cents,
     a.icon                                                                 AS icon,
     a.tone                                                                 AS tone,
@@ -147,13 +148,14 @@ FROM accounts a
 LEFT JOIN transactions t ON t.account_id = a.id AND t.user_id = a.user_id
 WHERE a.is_archived = false
   AND a.user_id = $1
-GROUP BY a.id, a.name, a.opening_balance, a.icon, a.tone, a.dot_color
+GROUP BY a.id, a.name, a.account_type, a.opening_balance, a.icon, a.tone, a.dot_color
 ORDER BY a.name
 `
 
 type ListAccountsWithBalanceRow struct {
 	ID           string
 	Name         string
+	AccountType  string
 	BalanceCents int64
 	Icon         string
 	Tone         string
@@ -174,6 +176,7 @@ func (q *Queries) ListAccountsWithBalance(ctx context.Context, userID pgtype.UUI
 		if err := rows.Scan(
 			&i.ID,
 			&i.Name,
+			&i.AccountType,
 			&i.BalanceCents,
 			&i.Icon,
 			&i.Tone,

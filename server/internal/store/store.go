@@ -34,6 +34,7 @@ var ErrTransactionNotFound = errors.New("transação não encontrada")
 type AccountRow struct {
 	ID           string
 	Name         string
+	AccountType  string
 	Icon         string
 	Tone         string
 	DotColor     string
@@ -307,6 +308,7 @@ func (s *Store) ListAccountsWithBalance(ctx context.Context, userID string) ([]A
 		out = append(out, AccountRow{
 			ID:           r.ID,
 			Name:         r.Name,
+			AccountType:  r.AccountType,
 			Icon:         r.Icon,
 			Tone:         r.Tone,
 			DotColor:     r.DotColor,

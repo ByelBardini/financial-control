@@ -12,10 +12,12 @@ import (
 	"financial-control/server/internal/store"
 )
 
-// Account é a conta no formato que o client espera (valores em centavos).
+// Account é a conta no formato que o client espera (valores em centavos). accountType permite ao
+// client distinguir tipos (ex.: excluir vales dos seletores de transferência).
 type Account struct {
 	ID           string `json:"id"`
 	Name         string `json:"name"`
+	AccountType  string `json:"accountType"`
 	BalanceCents int64  `json:"balanceCents"`
 	Icon         string `json:"icon"`
 	Tone         string `json:"tone"`
@@ -54,6 +56,7 @@ func (s *Service) List(ctx context.Context, userID string) ([]Account, error) {
 		out = append(out, Account{
 			ID:           r.ID,
 			Name:         r.Name,
+			AccountType:  r.AccountType,
 			BalanceCents: r.BalanceCents,
 			Icon:         r.Icon,
 			Tone:         r.Tone,

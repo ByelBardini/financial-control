@@ -38,6 +38,12 @@ WHERE $5::uuid <> $6::uuid
     SELECT 1 FROM accounts
     WHERE id = $6 AND user_id = $1 AND is_archived = false
   )
+  -- Vale só transfere para vale (não é sacável p/ conta): as duas pontas precisam ser da MESMA
+  -- classe — ambas 'voucher' ou ambas não-'voucher'. Compara o is_voucher das duas contas.
+  AND (
+    (SELECT account_type = 'voucher' FROM accounts WHERE id = $5 AND user_id = $1)
+    = (SELECT account_type = 'voucher' FROM accounts WHERE id = $6 AND user_id = $1)
+  )
 RETURNING transfer_group_id::text AS group_id
 `
 

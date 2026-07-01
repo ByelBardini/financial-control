@@ -31,4 +31,10 @@ WHERE sqlc.arg(origin_account_id)::uuid <> sqlc.arg(destination_account_id)::uui
     SELECT 1 FROM accounts
     WHERE id = sqlc.arg(destination_account_id) AND user_id = sqlc.arg(user_id) AND is_archived = false
   )
+  -- Vale só transfere para vale (não é sacável p/ conta): as duas pontas precisam ser da MESMA
+  -- classe — ambas 'voucher' ou ambas não-'voucher'. Compara o is_voucher das duas contas.
+  AND (
+    (SELECT account_type = 'voucher' FROM accounts WHERE id = sqlc.arg(origin_account_id) AND user_id = sqlc.arg(user_id))
+    = (SELECT account_type = 'voucher' FROM accounts WHERE id = sqlc.arg(destination_account_id) AND user_id = sqlc.arg(user_id))
+  )
 RETURNING transfer_group_id::text AS group_id;
