@@ -20,11 +20,18 @@ describe('BankAccountCard', () => {
     expect(screen.getByLabelText('valor oculto')).toBeOnTheScreen();
   });
 
-  it('vira botão "Editar conta" quando onPress é fornecido', async () => {
+  it('o corpo vira "Transferir de {conta}" e a engrenagem "Editar {conta}"', async () => {
     const onPress = jest.fn();
-    await render(<BankAccountCard account={nubank} hidden={false} onPress={onPress} />);
+    const onEdit = jest.fn();
+    await render(
+      <BankAccountCard account={nubank} hidden={false} onPress={onPress} onEdit={onEdit} />,
+    );
+    const user = userEvent.setup();
 
-    await userEvent.setup().press(screen.getByRole('button', { name: 'Editar Nubank' }));
+    await user.press(screen.getByRole('button', { name: 'Transferir de Nubank' }));
     expect(onPress).toHaveBeenCalledTimes(1);
+
+    await user.press(screen.getByRole('button', { name: 'Editar Nubank' }));
+    expect(onEdit).toHaveBeenCalledTimes(1);
   });
 });

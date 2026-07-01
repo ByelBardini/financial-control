@@ -12,13 +12,13 @@ describe('CartoesPanel (desktop)', () => {
     expect(screen.getByText('Itaú Click')).toBeOnTheScreen();
   });
 
-  it('encaminha o id do cartão tocado para onEditAccount', async () => {
-    const onEditAccount = jest.fn();
+  it('encaminha o id do cartão tocado para onOpenCard (abre o detalhe)', async () => {
+    const onOpenCard = jest.fn();
     await render(
-      <CartoesPanel cards={contasSnapshot.cards} hidden={false} onEditAccount={onEditAccount} />,
+      <CartoesPanel cards={contasSnapshot.cards} hidden={false} onOpenCard={onOpenCard} />,
     );
 
-    await userEvent.setup().press(screen.getByRole('button', { name: 'Editar Nubank Roxinho' }));
-    expect(onEditAccount).toHaveBeenCalledWith('nubank-cartao');
+    await userEvent.setup().press(screen.getByRole('button', { name: 'Abrir Nubank Roxinho' }));
+    expect(onOpenCard).toHaveBeenCalledWith('nubank-cartao');
   });
 });
