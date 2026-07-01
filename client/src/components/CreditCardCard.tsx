@@ -15,7 +15,7 @@ type CreditCardCardProps = {
 
 // Card de cartão de crédito: tile da marca + nome, fatura atual em destaque, barra
 // de uso do limite (tom = severidade) e legenda "disponível de total" + nota ácida.
-// Com onPress, vira um alvo "Editar conta" acessível.
+// Com onPress, vira um alvo "Abrir cartão" acessível (abre o detalhe do cartão).
 export function CreditCardCard({ card, hidden, onPress }: CreditCardCardProps) {
   const limitLabel = hidden ? MONEY_MASK : formatBRL(card.limitCents);
   const availableLabel = hidden ? MONEY_MASK : formatBRL(card.availableCents);
@@ -65,7 +65,7 @@ export function CreditCardCard({ card, hidden, onPress }: CreditCardCardProps) {
     <Card
       variant="outlined"
       className="gap-stack-md bg-surface-container-low p-stack-lg"
-      editLabel={`Editar ${card.name}`}
+      editLabel={`Abrir ${card.name}`}
       onPress={onPress}
     >
       {body}

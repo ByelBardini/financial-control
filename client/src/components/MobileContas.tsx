@@ -4,9 +4,9 @@ import { BankAccountCard } from './BankAccountCard';
 import { BottomNav } from './BottomNav';
 import { CarteiraCard } from './CarteiraCard';
 import { ContasHero } from './ContasHero';
+import { ContasSpeedDial } from './ContasSpeedDial';
 import { CreditCardCard } from './CreditCardCard';
 import { DiagnosisCard } from './DiagnosisCard';
-import { Fab } from './Fab';
 import { LiquidBalanceHeader } from './LiquidBalanceHeader';
 import { PanicMeter } from './PanicMeter';
 import { QuerySection } from './QuerySection';
@@ -32,6 +32,9 @@ type MobileContasProps = {
   onLogout?: () => void;
   onCreateAccount?: () => void;
   onEditAccount?: (id: string) => void;
+  onOpenCard?: (id: string) => void;
+  onTransfer?: () => void;
+  onTransferFrom?: (id: string) => void;
 };
 
 // Pilha vertical do mobile (Contas). Cada seção é uma query independente
@@ -45,6 +48,9 @@ export function MobileContas({
   onLogout,
   onCreateAccount,
   onEditAccount,
+  onOpenCard,
+  onTransfer,
+  onTransferFrom,
 }: MobileContasProps) {
   const insets = useSafeAreaInsets();
   const overview = usePatrimonioOverview();
@@ -89,7 +95,8 @@ export function MobileContas({
                   key={account.id}
                   account={account}
                   hidden={hidden}
-                  onPress={onEditAccount ? () => onEditAccount(account.id) : undefined}
+                  onPress={onTransferFrom ? () => onTransferFrom(account.id) : undefined}
+                  onEdit={onEditAccount ? () => onEditAccount(account.id) : undefined}
                 />
               ))}
             </View>
@@ -105,7 +112,7 @@ export function MobileContas({
                   key={card.id}
                   card={card}
                   hidden={hidden}
-                  onPress={onEditAccount ? () => onEditAccount(card.id) : undefined}
+                  onPress={onOpenCard ? () => onOpenCard(card.id) : undefined}
                 />
               ))}
             </View>
@@ -121,7 +128,8 @@ export function MobileContas({
                   key={voucher.id}
                   voucher={voucher}
                   hidden={hidden}
-                  onPress={onEditAccount ? () => onEditAccount(voucher.id) : undefined}
+                  onPress={onTransferFrom ? () => onTransferFrom(voucher.id) : undefined}
+                  onEdit={onEditAccount ? () => onEditAccount(voucher.id) : undefined}
                 />
               ))}
             </View>
@@ -145,12 +153,7 @@ export function MobileContas({
         </QuerySection>
       </ScrollView>
 
-      <Fab
-        iconName="add"
-        accessibilityLabel="Nova conta"
-        onPress={() => onCreateAccount?.()}
-        bottom={insets.bottom + 88}
-      />
+      <ContasSpeedDial onCreate={() => onCreateAccount?.()} onTransfer={() => onTransfer?.()} />
 
       <View className="absolute bottom-0 left-0 right-0" style={{ paddingBottom: insets.bottom }}>
         <BottomNav currentRoute={route} onNavigate={onNavigate} />

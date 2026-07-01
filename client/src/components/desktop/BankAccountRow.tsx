@@ -1,5 +1,6 @@
-import { Text, View } from 'react-native';
+import { Pressable, Text, View } from 'react-native';
 import { Card } from '../Card';
+import { AccountGear } from '../contas/AccountGear';
 import { Icon } from '../Icon';
 import { MoneyText } from '../MoneyText';
 import { toneColor } from '../../theme/colors';
@@ -8,13 +9,13 @@ import type { BankAccount } from '../../types/contas';
 type BankAccountRowProps = {
   account: BankAccount;
   hidden: boolean;
-  onPress?: () => void;
+  onPress?: () => void; // tocar na linha abre Transferir com esta conta como origem
+  onEdit?: () => void; // engrenagem → editar/arquivar
 };
 
-// Linha de conta na lista "Bancos" do desktop: tile da marca + nome/subtítulo à
-// esquerda; saldo + nota (colorida pelo tom) à direita. Com onPress, vira um alvo
-// "Editar conta" acessível.
-export function BankAccountRow({ account, hidden, onPress }: BankAccountRowProps) {
+// Linha de conta na lista "Bancos" do desktop: tile da marca + nome/subtítulo à esquerda; saldo +
+// nota à direita. O corpo é um alvo "Transferir de {conta}"; a engrenagem (irmã) abre a edição.
+export function BankAccountRow({ account, hidden, onPress, onEdit }: BankAccountRowProps) {
   const body = (
     <>
       <View className="flex-1 flex-row items-center gap-stack-md">
@@ -49,13 +50,17 @@ export function BankAccountRow({ account, hidden, onPress }: BankAccountRowProps
   );
 
   return (
-    <Card
-      variant="row"
-      className="flex-row items-center justify-between"
-      editLabel={`Editar ${account.name}`}
-      onPress={onPress}
-    >
-      {body}
+    <Card variant="row" className="flex-row items-center gap-stack-md">
+      <Pressable
+        onPress={onPress}
+        disabled={!onPress}
+        accessibilityRole="button"
+        accessibilityLabel={`Transferir de ${account.name}`}
+        className="flex-1 flex-row items-center justify-between gap-stack-md"
+      >
+        {body}
+      </Pressable>
+      {onEdit ? <AccountGear name={account.name} onEdit={onEdit} /> : null}
     </Card>
   );
 }
