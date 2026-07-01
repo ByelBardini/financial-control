@@ -123,6 +123,30 @@ WHERE t.user_id = sqlc.arg(user_id)
 GROUP BY t.purchase_group_id
 ORDER BY MIN(t.occurred_on) DESC;
 
+-- name: ListCardInvoiceDebts :many
+-- Faturas mensais ABERTAS dos cartões do usuário (viram linhas de Dívidas Futuras): por cartão ×
+-- mês de competência, gastos avulsos (kind='standard') menos pagamentos (income — ex.: a perna de
+-- entrada de uma transferência p/ o cartão), só quando ainda sobra saldo devedor (net > 0). Exclui
+-- parcelas (kind='installment') p/ NÃO duplicar com a linha de parcelamento. Em centavos. Mais
+-- recente primeiro.
+SELECT
+    a.id::text                                                                                             AS card_id,
+    a.name                                                                                                 AS card_name,
+    to_char(date_trunc('month', t.occurred_on), 'YYYY-MM')                                                 AS month,
+    (COALESCE(SUM(t.amount) FILTER (WHERE t.direction = 'expense' AND t.kind = 'standard'), 0) * 100)::bigint AS charges_cents,
+    (COALESCE(SUM(t.amount) FILTER (WHERE t.direction = 'income'), 0) * 100)::bigint                        AS payments_cents
+FROM transactions t
+JOIN accounts a ON a.id = t.account_id AND a.user_id = t.user_id
+WHERE t.user_id = sqlc.arg(user_id)
+  AND a.account_type = 'credit_card'
+  AND a.is_archived = false
+GROUP BY a.id, a.name, date_trunc('month', t.occurred_on)
+HAVING (
+    COALESCE(SUM(t.amount) FILTER (WHERE t.direction = 'expense' AND t.kind = 'standard'), 0)
+  - COALESCE(SUM(t.amount) FILTER (WHERE t.direction = 'income'), 0)
+) > 0
+ORDER BY date_trunc('month', t.occurred_on) DESC;
+
 -- name: CreateTransaction :one
 -- Cria uma transação 'standard' do usuário. Só insere se a conta (e a categoria, se
 -- informada) pertencem ao usuário — impede anexar transação à conta de outro dono.

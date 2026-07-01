@@ -21,6 +21,8 @@ type ContasStore interface {
 	ListVoucherAccounts(ctx context.Context, userID string) ([]store.VoucherRow, error)
 	GetCashBalance(ctx context.Context, userID string) (int64, error)
 	ListCreditAccounts(ctx context.Context, userID string) ([]store.CreditAccountRow, error)
+	GetCardSummary(ctx context.Context, userID, cardID string) (store.CardSummaryRow, error)
+	ListCardEntries(ctx context.Context, userID, cardID string) ([]store.CardEntryRow, error)
 }
 
 // Service agrega as views da tela de Contas: junta o dado real do store com a
@@ -98,15 +100,7 @@ func (s *Service) Cards(ctx context.Context, userID string) ([]CreditCard, error
 // creditCardView deriva a visão de um cartão: fatura (saldo negativo), disponível
 // (limite − fatura, ≥ 0), % usado (0..100) e a ironia do uso. Pura (sem store).
 func creditCardView(r store.CreditAccountRow) CreditCard {
-	var invoice int64
-	if r.BalanceCents < 0 {
-		invoice = -r.BalanceCents
-	}
-	available := r.LimitCents - invoice
-	if available < 0 {
-		available = 0
-	}
-	used := pct.Clamp(invoice, r.LimitCents)
+	invoice, available, used := cardInvoice(r.BalanceCents, r.LimitCents)
 	note, tone := cardNote(used)
 	return CreditCard{
 		ID:             r.ID,

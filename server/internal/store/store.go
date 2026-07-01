@@ -140,6 +140,16 @@ type InstallmentDebtRow struct {
 	CategoryIcon     string
 }
 
+// CardInvoiceDebtRow é a fatura mensal ABERTA de um cartão (dívida futura): gastos e pagamentos
+// (centavos) do cartão naquele mês de competência. O devido (net) = charges − payments (só > 0).
+type CardInvoiceDebtRow struct {
+	CardID        string
+	CardName      string
+	Month         string // "YYYY-MM"
+	ChargesCents  int64
+	PaymentsCents int64
+}
+
 // TransactionFilter são os filtros + paginação do log de transações. Since/Until nil = sem
 // recorte de tempo daquele lado; CategoryIDs vazio = todas as categorias (filtro OR entre
 // as informadas); Query "" = sem busca.
@@ -553,6 +563,30 @@ func (s *Store) ListInstallmentDebts(ctx context.Context, userID string) ([]Inst
 			InstallmentsPaid: int(r.InstallmentsPaid),
 			InstallmentCents: r.InstallmentCents,
 			CategoryIcon:     r.CategoryIcon,
+		})
+	}
+	return out, nil
+}
+
+// ListCardInvoiceDebts devolve as faturas mensais abertas (net devedor > 0) dos cartões do usuário,
+// em centavos — viram linhas de Dívidas Futuras "Fatura {mês} - {cartão}".
+func (s *Store) ListCardInvoiceDebts(ctx context.Context, userID string) ([]CardInvoiceDebtRow, error) {
+	uid, err := uuidArg(userID)
+	if err != nil {
+		return nil, err
+	}
+	rows, err := s.q.ListCardInvoiceDebts(ctx, uid)
+	if err != nil {
+		return nil, fmt.Errorf("store: listar faturas do cartão: %w", err)
+	}
+	out := make([]CardInvoiceDebtRow, 0, len(rows))
+	for _, r := range rows {
+		out = append(out, CardInvoiceDebtRow{
+			CardID:        r.CardID,
+			CardName:      r.CardName,
+			Month:         r.Month,
+			ChargesCents:  r.ChargesCents,
+			PaymentsCents: r.PaymentsCents,
 		})
 	}
 	return out, nil

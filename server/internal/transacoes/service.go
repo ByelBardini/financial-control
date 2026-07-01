@@ -25,6 +25,7 @@ type TransacoesStore interface {
 	ListTransactionsFiltered(ctx context.Context, userID string, f store.TransactionFilter) ([]store.TransactionRow, int, error)
 	ListRecurringRules(ctx context.Context, userID string) ([]store.RecurringRuleRow, error)
 	ListInstallmentDebts(ctx context.Context, userID string) ([]store.InstallmentDebtRow, error)
+	ListCardInvoiceDebts(ctx context.Context, userID string) ([]store.CardInvoiceDebtRow, error)
 	ListCategories(ctx context.Context, userID string) ([]store.CategoryRow, error)
 	CreateTransaction(ctx context.Context, userID string, in store.TransactionInput) (string, error)
 	CreateInstallmentPurchase(ctx context.Context, userID string, in store.InstallmentInput) (int64, error)
@@ -226,13 +227,19 @@ func (s *Service) Recurrences(ctx context.Context, userID string) ([]Recurrence,
 	return out, nil
 }
 
-// FutureDebts devolve as compras parceladas com progresso (parcelas lançadas/total) + ironia.
+// FutureDebts devolve as dívidas futuras: as compras parceladas (progresso lançadas/total) e as
+// faturas mensais abertas dos cartões ("Fatura {mês} - {cartão}", devido = gastos − pagamentos).
+// As faturas vêm primeiro (mais recentes no topo), depois os parcelamentos.
 func (s *Service) FutureDebts(ctx context.Context, userID string) ([]FutureDebt, error) {
+	invoices, err := s.cardInvoiceDebts(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
 	rows, err := s.store.ListInstallmentDebts(ctx, userID)
 	if err != nil {
 		return nil, fmt.Errorf("transacoes: listar dívidas: %w", err)
 	}
-	out := make([]FutureDebt, 0, len(rows))
+	out := invoices
 	for _, r := range rows {
 		percent := pct.Clamp(int64(r.InstallmentsPaid), int64(r.InstallmentTotal))
 		out = append(out, FutureDebt{
@@ -243,6 +250,30 @@ func (s *Service) FutureDebts(ctx context.Context, userID string) ([]FutureDebt,
 			Percent:          percent,
 			Tone:             debtTone(percent),
 			Icon:             r.CategoryIcon,
+			Note:             debtNote(percent),
+		})
+	}
+	return out, nil
+}
+
+// cardInvoiceDebts monta as faturas mensais abertas dos cartões como dívidas (devido = gastos −
+// pagamentos; % pago = pagamentos/gastos). Rótulo "Fatura {Mês/Ano} - {cartão}".
+func (s *Service) cardInvoiceDebts(ctx context.Context, userID string) ([]FutureDebt, error) {
+	rows, err := s.store.ListCardInvoiceDebts(ctx, userID)
+	if err != nil {
+		return nil, fmt.Errorf("transacoes: listar faturas: %w", err)
+	}
+	out := make([]FutureDebt, 0, len(rows))
+	for _, r := range rows {
+		percent := pct.Clamp(r.PaymentsCents, r.ChargesCents)
+		out = append(out, FutureDebt{
+			ID:               "card:" + r.CardID + ":" + r.Month,
+			Label:            faturaLabel(r.CardName, r.Month),
+			InstallmentLabel: "Fatura do cartão",
+			AmountCents:      r.ChargesCents - r.PaymentsCents,
+			Percent:          percent,
+			Tone:             debtTone(percent),
+			Icon:             "credit_card",
 			Note:             debtNote(percent),
 		})
 	}

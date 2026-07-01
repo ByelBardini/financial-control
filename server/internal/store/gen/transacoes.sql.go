@@ -406,6 +406,65 @@ func (q *Queries) ListActiveRecurringRules(ctx context.Context, userID pgtype.UU
 	return items, nil
 }
 
+const listCardInvoiceDebts = `-- name: ListCardInvoiceDebts :many
+SELECT
+    a.id::text                                                                                             AS card_id,
+    a.name                                                                                                 AS card_name,
+    to_char(date_trunc('month', t.occurred_on), 'YYYY-MM')                                                 AS month,
+    (COALESCE(SUM(t.amount) FILTER (WHERE t.direction = 'expense' AND t.kind = 'standard'), 0) * 100)::bigint AS charges_cents,
+    (COALESCE(SUM(t.amount) FILTER (WHERE t.direction = 'income'), 0) * 100)::bigint                        AS payments_cents
+FROM transactions t
+JOIN accounts a ON a.id = t.account_id AND a.user_id = t.user_id
+WHERE t.user_id = $1
+  AND a.account_type = 'credit_card'
+  AND a.is_archived = false
+GROUP BY a.id, a.name, date_trunc('month', t.occurred_on)
+HAVING (
+    COALESCE(SUM(t.amount) FILTER (WHERE t.direction = 'expense' AND t.kind = 'standard'), 0)
+  - COALESCE(SUM(t.amount) FILTER (WHERE t.direction = 'income'), 0)
+) > 0
+ORDER BY date_trunc('month', t.occurred_on) DESC
+`
+
+type ListCardInvoiceDebtsRow struct {
+	CardID        string
+	CardName      string
+	Month         string
+	ChargesCents  int64
+	PaymentsCents int64
+}
+
+// Faturas mensais ABERTAS dos cartões do usuário (viram linhas de Dívidas Futuras): por cartão ×
+// mês de competência, gastos avulsos (kind='standard') menos pagamentos (income — ex.: a perna de
+// entrada de uma transferência p/ o cartão), só quando ainda sobra saldo devedor (net > 0). Exclui
+// parcelas (kind='installment') p/ NÃO duplicar com a linha de parcelamento. Em centavos. Mais
+// recente primeiro.
+func (q *Queries) ListCardInvoiceDebts(ctx context.Context, userID pgtype.UUID) ([]ListCardInvoiceDebtsRow, error) {
+	rows, err := q.db.Query(ctx, listCardInvoiceDebts, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListCardInvoiceDebtsRow{}
+	for rows.Next() {
+		var i ListCardInvoiceDebtsRow
+		if err := rows.Scan(
+			&i.CardID,
+			&i.CardName,
+			&i.Month,
+			&i.ChargesCents,
+			&i.PaymentsCents,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listCategories = `-- name: ListCategories :many
 SELECT
     c.id::text AS id,
