@@ -15,6 +15,7 @@ import (
 	"financial-control/server/internal/patrimonio"
 	"financial-control/server/internal/ratelimit"
 	"financial-control/server/internal/transacoes"
+	"financial-control/server/internal/transfers"
 )
 
 // loginRateBurst e loginRateWindow definem o freio anti-força-bruta do login:
@@ -33,6 +34,7 @@ type Deps struct {
 	Transacoes    *transacoes.Service
 	Investimentos *investimentos.Service
 	Patrimonio    *patrimonio.Service
+	Transfers     *transfers.Service
 }
 
 // New devolve o roteador com todas as rotas registradas. Só `GET /health` e
@@ -74,6 +76,7 @@ func New(d Deps) http.Handler {
 	// Views agregadas da tela de Contas.
 	mux.Handle("GET /contas/banks", protected(contas.BanksHandler(d.Contas)))
 	mux.Handle("GET /contas/cards", protected(contas.CardsHandler(d.Contas)))
+	mux.Handle("GET /contas/cards/{id}", protected(contas.CardDetailHandler(d.Contas)))
 	mux.Handle("GET /contas/vouchers", protected(contas.VouchersHandler(d.Contas)))
 	mux.Handle("GET /contas/cash", protected(contas.CashHandler(d.Contas)))
 	mux.Handle("GET /contas/xray", protected(contas.XrayHandler(d.Contas)))
@@ -114,6 +117,10 @@ func New(d Deps) http.Handler {
 	mux.Handle("GET /transactions/{id}", protected(transacoes.GetTransactionHandler(d.Transacoes)))
 	mux.Handle("PATCH /transactions/{id}", protected(transacoes.UpdateHandler(d.Transacoes)))
 	mux.Handle("DELETE /transactions/{id}", protected(transacoes.DeleteHandler(d.Transacoes)))
+
+	// Transferência entre contas (dupla entrada). "Pagar fatura" de cartão usa esta mesma rota
+	// com o destino sendo a conta credit_card.
+	mux.Handle("POST /transfers", protected(transfers.CreateHandler(d.Transfers)))
 
 	return httpx.CORS(mux)
 }
