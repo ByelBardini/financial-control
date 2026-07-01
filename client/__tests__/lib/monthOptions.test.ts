@@ -3,20 +3,25 @@ import { defaultMonth, monthOptions, monthToOccurredOn } from '../../src/lib/mon
 describe('monthOptions', () => {
   const now = new Date(2026, 5, 15); // Junho/2026 (mês 5, 0-based)
 
-  it('gera de +fwd a -back, do futuro pro passado, com rótulo PT-BR', () => {
-    const opts = monthOptions(now, 2, 1); // 1 futuro + atual + 2 passados
-    expect(opts.map((o) => o.value)).toEqual(['2026-07', '2026-06', '2026-05', '2026-04']);
+  it('gera de -back a +fwd, do mais antigo pro mais futuro, com rótulo PT-BR', () => {
+    const opts = monthOptions(now, 2, 1); // 2 passados + atual + 1 futuro
+    expect(opts.map((o) => o.value)).toEqual(['2026-04', '2026-05', '2026-06', '2026-07']);
     expect(opts.map((o) => o.label)).toEqual([
-      'Julho/2026',
-      'Junho/2026',
-      'Maio/2026',
       'Abril/2026',
+      'Maio/2026',
+      'Junho/2026',
+      'Julho/2026',
     ]);
+  });
+
+  it('back=0 (lançar fatura): mês corrente primeiro, sem passado', () => {
+    const opts = monthOptions(now, 0, 2);
+    expect(opts.map((o) => o.value)).toEqual(['2026-06', '2026-07', '2026-08']);
   });
 
   it('vira o ano ao cruzar dezembro/janeiro', () => {
     const dez = new Date(2026, 11, 10); // Dezembro/2026
-    expect(monthOptions(dez, 0, 1).map((o) => o.value)).toEqual(['2027-01', '2026-12']);
+    expect(monthOptions(dez, 0, 1).map((o) => o.value)).toEqual(['2026-12', '2027-01']);
   });
 });
 

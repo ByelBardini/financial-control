@@ -102,6 +102,7 @@ describe('InvestimentosScreen (responsivo)', () => {
       {
         id: 'acc-1',
         name: 'Nubank',
+        accountType: 'checking',
         balanceCents: 1000,
         icon: 'account_balance',
         tone: 'neutral',

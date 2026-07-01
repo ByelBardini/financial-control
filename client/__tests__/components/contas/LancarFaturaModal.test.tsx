@@ -30,21 +30,21 @@ describe('LancarFaturaModal', () => {
     await waitFor(() => expect(onClose).toHaveBeenCalledTimes(1));
   });
 
-  it('permite escolher outro mês (competência muda)', async () => {
+  it('permite escolher um mês futuro (competência muda)', async () => {
     jest.mocked(txApi.createTransaction).mockResolvedValue({} as never);
     await renderWithClient(<LancarFaturaModal cardId="card1" onClose={jest.fn()} />);
     const user = userEvent.setup();
-    const opts = monthOptions(new Date());
-    const current = opts[6]; // índice 6 = mês atual (fwd=6)
-    const past = opts[7]; // mês anterior
+    const opts = monthOptions(new Date(), 0, 12);
+    const current = opts[0]; // índice 0 = mês atual
+    const future = opts[1]; // próximo mês
 
     await user.type(await screen.findByLabelText('Valor'), '10000');
     await user.press(screen.getByRole('button', { name: `Mês da fatura: ${current.label}` }));
-    await user.press(screen.getByRole('menuitem', { name: past.label }));
+    await user.press(screen.getByRole('menuitem', { name: future.label }));
     await user.press(screen.getByRole('button', { name: 'Lançar' }));
 
     expect(txApi.createTransaction).toHaveBeenCalledWith(
-      expect.objectContaining({ occurredOn: `${past.value}-01` }),
+      expect.objectContaining({ occurredOn: `${future.value}-01` }),
     );
   });
 

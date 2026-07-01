@@ -14,6 +14,7 @@ const accounts: Account[] = [
   {
     id: 'a1',
     name: 'Nubank',
+    accountType: 'checking',
     balanceCents: 100000,
     icon: 'account_balance',
     tone: 'neutral',

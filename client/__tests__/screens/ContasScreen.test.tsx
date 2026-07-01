@@ -23,6 +23,7 @@ beforeEach(() => {
     {
       id: 'nubank-cartao',
       name: 'Nubank Roxinho',
+      accountType: 'credit_card',
       balanceCents: -32000,
       icon: 'credit_card',
       tone: 'primary',

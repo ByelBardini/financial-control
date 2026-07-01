@@ -23,6 +23,7 @@ describe('useAccounts (React Query)', () => {
       {
         id: 'nubank',
         name: 'Nubank',
+        accountType: 'checking',
         balanceCents: 84220,
         icon: 'credit_card',
         tone: 'primary',
