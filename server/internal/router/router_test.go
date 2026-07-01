@@ -13,6 +13,7 @@ import (
 	"financial-control/server/internal/patrimonio"
 	"financial-control/server/internal/router"
 	"financial-control/server/internal/transacoes"
+	"financial-control/server/internal/transfers"
 )
 
 // newTestRouter monta o router com serviços "vazios". Sem token o RequireAuth
@@ -27,6 +28,7 @@ func newTestRouter() http.Handler {
 		Transacoes:    transacoes.NewService(nil),
 		Investimentos: investimentos.NewService(nil),
 		Patrimonio:    patrimonio.NewService(nil),
+		Transfers:     transfers.NewService(nil),
 	})
 }
 
@@ -47,6 +49,7 @@ func TestRotasDeDadosExigemToken(t *testing.T) {
 		"/accounts/a1",
 		"/contas/banks",
 		"/contas/cards",
+		"/contas/cards/c1",
 		"/contas/vouchers",
 		"/contas/cash",
 		"/contas/xray",
@@ -89,6 +92,7 @@ func TestRotasDeEscritaExigemToken(t *testing.T) {
 		{http.MethodDelete, "/investimentos/assets/a1"},
 		{http.MethodPost, "/investimentos/assets/a1/trades"},
 		{http.MethodDelete, "/investimentos/assets/a1/trades/t1"},
+		{http.MethodPost, "/transfers"},
 	}
 	for _, c := range cases {
 		rec := httptest.NewRecorder()
