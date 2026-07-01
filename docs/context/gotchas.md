@@ -88,6 +88,11 @@
 - **Causa:** Expo Web (`:8081`) → API (`:8080`) é cross-origin; sem `Access-Control-Allow-Origin` o browser bloqueia a leitura.
 - **Correção:** middleware `httpx.CORS` embrulhando o mux em `router.New` (origem via `CORS_ALLOW_ORIGIN`). RN nativo não tem CORS — só afeta a web.
 
+## Expo Web `output: single` (SPA): refresh em rota profunda dá 404 no host estático
+- **Sintoma:** com URL por tela (`/contas`, `/transacoes`…) via History API (`useUrlRoute.web`), navegar clicando funciona, mas **F5 / abrir direto** uma rota profunda **404 num host estático** (`expo export -p web`). No dev (`expo start --web`) funciona.
+- **Causa:** o web do projeto é **SPA** (`app.json` → `web.output: "single"`, default do SDK 56): o export gera **um só `index.html`** + assets, sem HTML por rota. O `useUrlRoute` (web) lê `window.location.pathname` no boot pra cair na tela certa — mas isso exige que o host **devolva o `index.html` pra qualquer caminho**. O dev server já faz esse fallback SPA; um host estático cru não.
+- **Correção:** configurar **rewrite SPA** no host de produção (todo path desconhecido → `/index.html`, status 200): Netlify/`client/public/_redirects` → `/*    /index.html   200`; Vercel → `{ "rewrites": [{ "source": "/:path*", "destination": "/" }] }`; Nginx → `try_files $uri /index.html;`; Apache → `FallbackResource /index.html`. (`public/` é copiado no export — criar o `_redirects` só quando for hospedar.) Escape hatch p/ host sem rewrite: hash routing (`/#/contas`). Em dev não precisa de nada. Ver `navigation/useUrlRoute.web.ts` + `routePath.ts`.
+
 ## `go run` deixa órfão segurando a porta
 - **Sintoma:** ao reiniciar o server, `listen tcp :8080: bind: ... only one usage of each socket address`.
 - **Causa:** matar o `go run` nem sempre mata o binário-filho compilado, que continua escutando a porta.

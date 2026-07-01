@@ -34,8 +34,16 @@ CHECK `('standard','installment','transfer','investment')`:
   extrato (tag `Investimento`), mas é **excluído do resumo do mês** (`GetMonthSummary`/`ListCategorySpend`
   filtram `kind <> 'investment'`). Excluir o trade **cascata** esta linha. Sem categoria; criada só pelo
   domínio de investimentos (não há POST direto). Ver [investimentos.md](investimentos.md).
-- **`transfer`** — **reservado** (transferência entre contas = dupla entrada com `transfer_group_id`). Não
-  implementado ainda (fora de escopo).
+- **`transfer`** — **transferência entre contas** = dupla entrada: duas linhas com o mesmo `transfer_group_id`
+  (uma `expense` na origem, uma `income` no destino). CHECK `tx_transfer_coherent` (migration `00008`) casa
+  `transfer_group_id` com `kind='transfer'` tudo-ou-nada. **Mexe no saldo** das duas contas, mas é **excluída
+  do resumo do mês** (`GetMonthSummary`/`ListCategorySpend` filtram `kind <> 'transfer'`, como `investment`).
+  Endpoint `POST /transfers` (pacote `internal/transfers`, reusa `store.CreateTransfer`). "Pagar fatura" de
+  cartão é uma transferência cujo destino é a conta `credit_card`.
+- **Fatura como dívida futura**: `GET /transacoes/debts` (`FutureDebts`) inclui as **faturas mensais abertas**
+  de cada cartão (`ListCardInvoiceDebts`): agrupa transações do cartão por mês de `occurred_on`, devido =
+  gastos `kind='standard'` − pagamentos (`income`), só `net > 0`, rótulo "Fatura {Mês/Ano} - {cartão}".
+  Parcelas (`kind='installment'`) ficam **fora** dessa soma (já aparecem como parcelamento) p/ não duplicar.
 
 > `kind` é a natureza da **linha**; não confunda com os "tipos de lançamento" da UI (abaixo), que são a
 > intenção do usuário ao criar. Uma recorrência **não** é um `kind` — é um `standard` ligado a uma regra.
@@ -87,5 +95,5 @@ tem data de competência, sem hora).
 - Editar/excluir **parcelamento ou recorrência** em lote = **V2** (hoje edita-se linha a linha).
 
 ## Fora de escopo (hoje)
-Transferências (`kind='transfer'`); edição em lote de parcelamento/recorrência; materialização automática de
+Edição em lote de parcelamento/recorrência; materialização automática de
 ocorrências futuras (agendador); override manual de tag; `interval_count` > 1; backfill de períodos pulados.
