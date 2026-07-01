@@ -18,7 +18,8 @@ type LancarFaturaModalProps = {
 // como "Fatura {Mês/Ano} - {cartão}" (agregada por mês no server). Reusa useCreateTransaction.
 export function LancarFaturaModal({ cardId, onClose }: LancarFaturaModalProps) {
   const createMut = useCreateTransaction();
-  const [options] = useState(() => monthOptions(new Date()));
+  // Mês corrente + até 12 meses no futuro; nenhum mês no passado (back=0). Corrente vem primeiro.
+  const [options] = useState(() => monthOptions(new Date(), 0, 12));
   const [month, setMonth] = useState(() => defaultMonth(new Date()));
   const [amountCents, setAmountCents] = useState(0);
   const [description, setDescription] = useState('');

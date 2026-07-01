@@ -28,10 +28,11 @@ function monthLabel(year: number, month0: number): string {
   return `${MONTHS[month0]}/${year}`;
 }
 
-// monthOptions gera os meses de -back a +fwd em torno de `now`, do mais futuro pro mais antigo.
+// monthOptions gera os meses de -back a +fwd em torno de `now`, do mais antigo pro mais futuro.
+// Para "lançar fatura" o caller usa back=0 (nenhum mês no passado) → o mês corrente vem primeiro.
 export function monthOptions(now: Date, back = 6, fwd = 6): MonthOption[] {
   const out: MonthOption[] = [];
-  for (let i = fwd; i >= -back; i--) {
+  for (let i = -back; i <= fwd; i++) {
     const d = new Date(now.getFullYear(), now.getMonth() + i, 1);
     out.push({
       value: ym(d.getFullYear(), d.getMonth()),

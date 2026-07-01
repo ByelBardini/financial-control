@@ -128,8 +128,7 @@ export function MobileContas({
                   key={voucher.id}
                   voucher={voucher}
                   hidden={hidden}
-                  onPress={onTransferFrom ? () => onTransferFrom(voucher.id) : undefined}
-                  onEdit={onEditAccount ? () => onEditAccount(voucher.id) : undefined}
+                  onPress={onEditAccount ? () => onEditAccount(voucher.id) : undefined}
                 />
               ))}
             </View>

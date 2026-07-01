@@ -17,6 +17,7 @@ import type { IconName } from '../Icon';
 type AccountOption = {
   id: string;
   name: string;
+  accountType: string;
   icon: IconName;
   dotColor: string;
   balanceCents: number;
@@ -64,12 +65,16 @@ export function TransferForm({
     onSubmit(values);
   }
 
-  const accountOptions = accounts.map((a) => ({
-    value: a.id,
-    label: a.name,
-    icon: a.icon,
-    dotColor: a.dotColor,
-  }));
+  // Vale só transfere para vale (mesma classe). Cada seletor mostra só contas da MESMA classe da
+  // outra ponta já escolhida (vale↔vale ou conta↔conta); sem a outra ponta escolhida, mostra todas.
+  const isVoucherId = (id: string) => accounts.find((a) => a.id === id)?.accountType === 'voucher';
+  const optionsForClassOf = (otherId: string) =>
+    (otherId === ''
+      ? accounts
+      : accounts.filter((a) => (a.accountType === 'voucher') === isVoucherId(otherId))
+    ).map((a) => ({ value: a.id, label: a.name, icon: a.icon, dotColor: a.dotColor }));
+  const originOptions = optionsForClassOf(values.destinationAccountId);
+  const destinationOptions = optionsForClassOf(values.originAccountId);
   const balanceOf = (id: string) => accounts.find((a) => a.id === id)?.balanceCents;
 
   return (
@@ -86,7 +91,7 @@ export function TransferForm({
           label="De"
           value={values.originAccountId}
           balanceCents={balanceOf(values.originAccountId)}
-          options={accountOptions}
+          options={originOptions}
           onChange={(originAccountId) => patch({ originAccountId })}
           placeholder="Conta de origem"
           error={errors.origin}
@@ -108,7 +113,7 @@ export function TransferForm({
           label="Para"
           value={values.destinationAccountId}
           balanceCents={balanceOf(values.destinationAccountId)}
-          options={accountOptions}
+          options={destinationOptions}
           onChange={(destinationAccountId) => patch({ destinationAccountId })}
           placeholder="Conta de destino"
           disabled={lockDestination}

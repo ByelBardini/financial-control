@@ -12,7 +12,7 @@ import type { Tone } from '../types/dashboard';
 type VoucherCardProps = {
   voucher: Voucher;
   hidden: boolean;
-  onPress?: () => void; // tocar no card abre Transferir com este vale como origem
+  onPress?: () => void; // tocar no card abre Transferir com este vale como origem (vale → vale)
   onEdit?: () => void; // engrenagem → editar/arquivar
 };
 
@@ -24,7 +24,7 @@ const statusTone: Record<VoucherStatus, Tone> = {
 };
 
 // Cartão de vale (benefício): ícone + status, valor, barra de consumo e nota ácida. O corpo é um
-// alvo "Transferir de {vale}"; a engrenagem (irmã, absoluta no canto) abre a edição.
+// alvo "Transferir de {vale}" (vale só transfere para outro vale); a engrenagem (irmã) abre a edição.
 export function VoucherCard({ voucher, hidden, onPress, onEdit }: VoucherCardProps) {
   const body = (
     <>
