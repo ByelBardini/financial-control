@@ -104,7 +104,7 @@ sempre em **centavos** (inteiro). **Toda rota abaixo exige `Authorization: Beare
 | POST | `/transactions/installment-purchases` | **compra parcelada**: cria N linhas `kind='installment'` (mesmo `purchase_group_id`, datadas mês a mês), valor **por parcela** → **201** `{created:N}`; **400** inválido ou conta não-própria | implementado |
 | POST | `/recurring-rules` | **transação fixa (modelo)**: registra só a regra em `recurring_rules` — **não lança transação** (cada ocorrência é registrada pelo botão) → **201** `{created:true}`; **400** inválido ou conta não-própria | implementado |
 | POST | `/recurring-rules/{id}/register` | **registra a ocorrência do período corrente**: lança a transação `standard` (copia conta/categoria/valor/sentido da regra, `recurring_rule_id` setado, `occurred_on=hoje`) → **201** + `TransactionDetail`; **409** já registrada neste período / fora da janela; **404** regra não-própria | implementado |
-| POST | `/transfers` | **transferência entre contas** (dupla entrada): cria 2 linhas `kind='transfer'` (débito na origem, crédito no destino, mesmo `transfer_group_id`) num INSERT atômico → **201** `TransferResult`; **400** corpo inválido, origem==destino, valor ≤ 0, ou conta não-própria/arquivada. **Pagar fatura** de cartão = transfer com `destinationAccountId` = a conta `credit_card`. Move saldo, mas é excluída do resumo do mês | implementado |
+| POST | `/transfers` | **transferência entre contas** (dupla entrada): cria 2 linhas `kind='transfer'` (débito na origem, crédito no destino, mesmo `transfer_group_id`) num INSERT atômico → **201** `TransferResult`; **400** corpo inválido, origem==destino, valor ≤ 0, conta não-própria/arquivada, **ou classes diferentes**. **Regra de classe**: vale só transfere para vale — as duas pontas precisam ser da mesma classe (ambas `voucher` ou ambas não-`voucher`); a query rejeita mistura. **Pagar fatura** de cartão = transfer com `destinationAccountId` = a conta `credit_card`. Move saldo, mas é excluída do resumo do mês | implementado |
 | GET | `/investimentos/summary` | resumo do portfólio GERAL (cripto fora): patrimônio/ganho/% + título/quip | implementado |
 | GET | `/investimentos/positions` | posições abertas do portfólio geral (preço médio derivado) | implementado |
 | GET | `/investimentos/allocation` | alocação por classe (Ações/FIIs/Renda Fixa; percent = share) | implementado |
@@ -149,7 +149,7 @@ Valores `*Cents`/monetários são **int64 em centavos**.
 
 | DTO | Endpoint | Campos |
 |---|---|---|
-| `Account[]` | `/accounts` | `id`, `name`, `balanceCents`, `icon`, `tone`, `dotColor` |
+| `Account[]` | `/accounts` | `id`, `name`, `accountType` (checking/savings/cash/exchange/credit_card/voucher — o client usa p/ filtrar vales da transferência), `balanceCents`, `icon`, `tone`, `dotColor` |
 | `CreateAccountInput` (req) | `POST /accounts` | `name`, `accountType`, `openingBalanceCents` (**0 obrigatório p/ `credit_card`** — `!= 0` → 400 citando "saldo inicial"), `icon`, `tone`, `dotColor`, `subtitle?`, `creditLimitCents?` |
 | `UpdateAccountInput` (req) | `PATCH /accounts/{id}` | igual ao Create **menos `openingBalanceCents`** (saldo nunca editável) |
 | `AccountDetail` | `GET/POST/PATCH /accounts` | `id`, `name`, `accountType`, `subtitle`, `balanceCents`, `icon`, `tone`, `dotColor`, `creditLimitCents` |
