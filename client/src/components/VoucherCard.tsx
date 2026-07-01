@@ -1,5 +1,6 @@
-import { Text, View } from 'react-native';
+import { Pressable, Text, View } from 'react-native';
 import { Card } from './Card';
+import { AccountGear } from './contas/AccountGear';
 import { Icon } from './Icon';
 import { MoneyText } from './MoneyText';
 import { ProgressBar } from './ProgressBar';
@@ -11,7 +12,8 @@ import type { Tone } from '../types/dashboard';
 type VoucherCardProps = {
   voucher: Voucher;
   hidden: boolean;
-  onPress?: () => void;
+  onPress?: () => void; // tocar no card abre Transferir com este vale como origem (vale → vale)
+  onEdit?: () => void; // engrenagem → editar/arquivar
 };
 
 // Tom da barra de consumo por status do vale.
@@ -21,12 +23,12 @@ const statusTone: Record<VoucherStatus, Tone> = {
   critico: 'error',
 };
 
-// Cartão de vale (benefício): ícone + status, valor, barra de consumo e nota ácida.
-// Com onPress, vira um alvo "Editar conta" acessível.
-export function VoucherCard({ voucher, hidden, onPress }: VoucherCardProps) {
+// Cartão de vale (benefício): ícone + status, valor, barra de consumo e nota ácida. O corpo é um
+// alvo "Transferir de {vale}" (vale só transfere para outro vale); a engrenagem (irmã) abre a edição.
+export function VoucherCard({ voucher, hidden, onPress, onEdit }: VoucherCardProps) {
   const body = (
     <>
-      <View className="flex-row items-start justify-between">
+      <View className="flex-row items-start justify-between pr-9">
         <View className="h-10 w-10 items-center justify-center rounded-full bg-surface-container-high">
           <Icon name={voucher.icon} size={20} color={colors.onSurfaceVariant} />
         </View>
@@ -50,13 +52,21 @@ export function VoucherCard({ voucher, hidden, onPress }: VoucherCardProps) {
   );
 
   return (
-    <Card
-      variant="outlined"
-      className="gap-stack-md bg-surface-container-low p-stack-lg"
-      editLabel={`Editar ${voucher.name}`}
-      onPress={onPress}
-    >
-      {body}
+    <Card variant="outlined" className="bg-surface-container-low p-stack-lg">
+      <Pressable
+        onPress={onPress}
+        disabled={!onPress}
+        accessibilityRole="button"
+        accessibilityLabel={`Transferir de ${voucher.name}`}
+        className="gap-stack-md"
+      >
+        {body}
+      </Pressable>
+      {onEdit ? (
+        <View className="absolute right-3 top-3">
+          <AccountGear name={voucher.name} onEdit={onEdit} />
+        </View>
+      ) : null}
     </Card>
   );
 }

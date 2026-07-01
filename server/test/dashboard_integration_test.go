@@ -28,6 +28,7 @@ import (
 	"financial-control/server/internal/router"
 	"financial-control/server/internal/store"
 	"financial-control/server/internal/transacoes"
+	"financial-control/server/internal/transfers"
 )
 
 // itestSecret assina os tokens nos testes de integração (bypassa o config.Load).
@@ -43,6 +44,7 @@ func newServer(t *testing.T, st *store.Store) *httptest.Server {
 		Contas:        contas.NewService(st),
 		Transacoes:    transacoes.NewService(st),
 		Investimentos: investimentos.NewService(st),
+		Transfers:     transfers.NewService(st),
 	}))
 	t.Cleanup(srv.Close)
 	return srv

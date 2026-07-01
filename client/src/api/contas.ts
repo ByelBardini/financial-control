@@ -1,6 +1,7 @@
 import { apiGet } from './client';
 import type {
   BankAccount,
+  CardDetail,
   CashWallet,
   CreditCard,
   ManagementTip,
@@ -15,6 +16,10 @@ import type {
 export const getBankAccounts = () => apiGet<BankAccount[]>('/contas/banks');
 
 export const getCreditCards = () => apiGet<CreditCard[]>('/contas/cards');
+
+// Detalhe de um cartão (cabeçalho + faturas por mês), pro overlay de detalhe.
+export const getCardDetail = (id: string) =>
+  apiGet<CardDetail>(`/contas/cards/${encodeURIComponent(id)}`);
 
 export const getVouchers = () => apiGet<Voucher[]>('/contas/vouchers');
 

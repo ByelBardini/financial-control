@@ -29,6 +29,9 @@ type DesktopContasProps = {
   onLogout?: () => void;
   onCreateAccount?: () => void;
   onEditAccount?: (id: string) => void;
+  onOpenCard?: (id: string) => void;
+  onTransfer?: () => void;
+  onTransferFrom?: (id: string) => void;
 };
 
 // Layout enterprise da tela de Contas: rail fixo + header (título + "Nova conta") + faixa do
@@ -43,6 +46,9 @@ export function DesktopContas({
   onLogout,
   onCreateAccount,
   onEditAccount,
+  onOpenCard,
+  onTransfer,
+  onTransferFrom,
 }: DesktopContasProps) {
   const overview = usePatrimonioOverview();
   const banks = useBankAccounts();
@@ -68,6 +74,7 @@ export function DesktopContas({
           hidden={hidden}
           onToggleHidden={onToggleHidden}
           onCreateAccount={onCreateAccount}
+          onTransfer={onTransfer}
         />
 
         <View className="border-t border-grid-line p-stack-lg">
@@ -80,20 +87,28 @@ export function DesktopContas({
           <View className="border-r border-grid-line" style={{ flex: 2 }}>
             <QuerySection query={banks} label="os bancos">
               {(data) => (
-                <BancosPanel accounts={data} hidden={hidden} onEditAccount={onEditAccount} />
+                <BancosPanel
+                  accounts={data}
+                  hidden={hidden}
+                  onTransferFrom={onTransferFrom}
+                  onEditAccount={onEditAccount}
+                />
               )}
             </QuerySection>
             <View className="border-t border-grid-line">
               <QuerySection query={cards} label="os cartões">
-                {(data) => (
-                  <CartoesPanel cards={data} hidden={hidden} onEditAccount={onEditAccount} />
-                )}
+                {(data) => <CartoesPanel cards={data} hidden={hidden} onOpenCard={onOpenCard} />}
               </QuerySection>
             </View>
             <View className="border-t border-grid-line">
               <QuerySection query={vouchers} label="os vales">
                 {(data) => (
-                  <ValesPanel vouchers={data} hidden={hidden} onEditAccount={onEditAccount} />
+                  <ValesPanel
+                    vouchers={data}
+                    hidden={hidden}
+                    onTransferFrom={onTransferFrom}
+                    onEditAccount={onEditAccount}
+                  />
                 )}
               </QuerySection>
             </View>

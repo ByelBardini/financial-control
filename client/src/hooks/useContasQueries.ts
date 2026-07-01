@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import {
   getBankAccounts,
+  getCardDetail,
   getCashWallet,
   getCreditCards,
   getManagementTip,
@@ -17,6 +18,14 @@ export const useBankAccounts = () =>
 
 export const useCreditCards = () =>
   useQuery({ queryKey: ['contas', 'cards'], queryFn: () => getCreditCards() });
+
+// Detalhe de um cartão (cabeçalho + faturas por mês), só quando há id (overlay aberto).
+export const useCardDetail = (id: string | undefined) =>
+  useQuery({
+    queryKey: ['contas', 'card', id],
+    queryFn: () => getCardDetail(id as string),
+    enabled: id !== undefined,
+  });
 
 export const useVouchers = () =>
   useQuery({ queryKey: ['contas', 'vouchers'], queryFn: () => getVouchers() });

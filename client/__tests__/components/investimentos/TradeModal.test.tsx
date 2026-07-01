@@ -15,6 +15,7 @@ const accounts: Account[] = [
   {
     id: 'acc-1',
     name: 'Nubank',
+    accountType: 'checking',
     balanceCents: 100000,
     icon: 'account_balance',
     tone: 'neutral',
@@ -23,6 +24,7 @@ const accounts: Account[] = [
   {
     id: 'acc-2',
     name: 'Binance',
+    accountType: 'exchange',
     balanceCents: 145000,
     icon: 'currency_bitcoin',
     tone: 'neutral',

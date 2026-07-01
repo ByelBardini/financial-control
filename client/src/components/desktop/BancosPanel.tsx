@@ -7,11 +7,12 @@ import type { BankAccount } from '../../types/contas';
 type BancosPanelProps = {
   accounts: BankAccount[];
   hidden: boolean;
+  onTransferFrom?: (id: string) => void;
   onEditAccount?: (id: string) => void;
 };
 
 // Painel "Bancos" do desktop: título com ícone + contagem de contas + lista de linhas.
-export function BancosPanel({ accounts, hidden, onEditAccount }: BancosPanelProps) {
+export function BancosPanel({ accounts, hidden, onTransferFrom, onEditAccount }: BancosPanelProps) {
   return (
     <View className="gap-stack-md p-stack-lg">
       <PanelHeading
@@ -26,7 +27,8 @@ export function BancosPanel({ accounts, hidden, onEditAccount }: BancosPanelProp
             key={account.id}
             account={account}
             hidden={hidden}
-            onPress={onEditAccount ? () => onEditAccount(account.id) : undefined}
+            onPress={onTransferFrom ? () => onTransferFrom(account.id) : undefined}
+            onEdit={onEditAccount ? () => onEditAccount(account.id) : undefined}
           />
         ))}
       </View>

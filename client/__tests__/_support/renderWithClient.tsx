@@ -38,6 +38,20 @@ export function mockContasApi(snapshot: ContasSnapshot = contasSnapshot) {
   jest.mocked(contasApi.getCashWallet).mockResolvedValue(snapshot.cash);
   jest.mocked(contasApi.getPovertyXray).mockResolvedValue(snapshot.xray);
   jest.mocked(contasApi.getManagementTip).mockResolvedValue(snapshot.tip);
+  const [firstCard] = snapshot.cards;
+  if (firstCard) {
+    jest.mocked(contasApi.getCardDetail).mockResolvedValue({
+      id: firstCard.id,
+      name: firstCard.name,
+      icon: firstCard.icon,
+      brandColor: firstCard.brandColor,
+      limitCents: firstCard.limitCents,
+      invoiceCents: firstCard.invoiceCents,
+      availableCents: firstCard.availableCents,
+      usedPercent: firstCard.usedPercent,
+      months: [],
+    });
+  }
 }
 
 // Idem para src/api/transacoes (cada view resolve a fatia correspondente do snapshot).

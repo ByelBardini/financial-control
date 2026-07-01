@@ -133,6 +133,20 @@ func installmentLabel(paid, total int) string {
 	return fmt.Sprintf("Parcela %d/%d", paid, total)
 }
 
+// ptMonthNames são os meses por extenso em PT-BR (índice 1..12) para o rótulo da fatura.
+var ptMonthNames = [...]string{"", "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
+	"Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"}
+
+// faturaLabel monta o rótulo da fatura na Dívidas Futuras: "Fatura Março/2026 - Nubank".
+// month vem como "YYYY-MM"; formato inesperado cai no cru ("Fatura {month} - {card}").
+func faturaLabel(cardName, month string) string {
+	t, err := time.Parse("2006-01", month)
+	if err != nil {
+		return fmt.Sprintf("Fatura %s - %s", month, cardName)
+	}
+	return fmt.Sprintf("Fatura %s/%d - %s", ptMonthNames[t.Month()], t.Year(), cardName)
+}
+
 // debtTone tinge a barra da dívida pelo progresso. PLACEHOLDER.
 func debtTone(percent int) string {
 	if percent >= 80 {

@@ -1,5 +1,6 @@
 import {
   getBankAccounts,
+  getCardDetail,
   getCashWallet,
   getCreditCards,
   getManagementTip,
@@ -25,6 +26,12 @@ describe('api/contas', () => {
     jest.mocked(client.apiGet).mockResolvedValue([] as never);
     await getCreditCards();
     expect(client.apiGet).toHaveBeenCalledWith('/contas/cards');
+  });
+
+  it('getCardDetail faz GET /contas/cards/{id} (id encodado)', async () => {
+    jest.mocked(client.apiGet).mockResolvedValue({} as never);
+    await getCardDetail('c 1');
+    expect(client.apiGet).toHaveBeenCalledWith('/contas/cards/c%201');
   });
 
   it('getVouchers faz GET /contas/vouchers', async () => {

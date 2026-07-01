@@ -13,15 +13,16 @@ import (
 // fakeStore é o fake nomeado da dependência de dados (sem banco). Captura o userID
 // recebido pra provar o escopo por usuário em cada query.
 type fakeStore struct {
-	summary   store.MonthSummaryRow
-	txns      []store.TransactionRow
-	total     int
-	gotFilter store.TransactionFilter
-	cats      []store.CategoryRow
-	rules     []store.RecurringRuleRow
-	debts     []store.InstallmentDebtRow
-	err       error
-	gotUserID string
+	summary      store.MonthSummaryRow
+	txns         []store.TransactionRow
+	total        int
+	gotFilter    store.TransactionFilter
+	cats         []store.CategoryRow
+	rules        []store.RecurringRuleRow
+	debts        []store.InstallmentDebtRow
+	cardInvoices []store.CardInvoiceDebtRow
+	err          error
+	gotUserID    string
 
 	// escrita (CRUD)
 	createID  string
@@ -76,6 +77,11 @@ func (f *fakeStore) ListRecurringRules(_ context.Context, userID string) ([]stor
 func (f *fakeStore) ListInstallmentDebts(_ context.Context, userID string) ([]store.InstallmentDebtRow, error) {
 	f.gotUserID = userID
 	return f.debts, f.err
+}
+
+func (f *fakeStore) ListCardInvoiceDebts(_ context.Context, userID string) ([]store.CardInvoiceDebtRow, error) {
+	f.gotUserID = userID
+	return f.cardInvoices, f.err
 }
 
 func (f *fakeStore) CreateTransaction(_ context.Context, userID string, in store.TransactionInput) (string, error) {
@@ -327,6 +333,35 @@ func TestFutureDebtsDerivaProgressoELabel(t *testing.T) {
 	}
 	if got[0] != want {
 		t.Errorf("got[0] = %+v\nquero    %+v", got[0], want)
+	}
+}
+
+func TestFutureDebtsIncluiFaturaDoCartao(t *testing.T) {
+	fake := &fakeStore{
+		cardInvoices: []store.CardInvoiceDebtRow{
+			{CardID: "c1", CardName: "Nubank", Month: "2026-03", ChargesCents: 62000, PaymentsCents: 20000},
+		},
+		debts: []store.InstallmentDebtRow{
+			{GroupID: "g1", Description: "Fone (1/3)", InstallmentTotal: 3, InstallmentsPaid: 2, InstallmentCents: 10000, CategoryIcon: "headphones"},
+		},
+	}
+	got, err := transacoes.NewService(fake).FutureDebts(context.Background(), "u-1")
+	if err != nil {
+		t.Fatalf("erro inesperado: %v", err)
+	}
+	if len(got) != 2 {
+		t.Fatalf("len = %d, quero 2 (fatura + parcela)", len(got))
+	}
+	// A fatura vem primeiro; devido = gastos − pagamentos; % = pago/gastos.
+	fatura := transacoes.FutureDebt{
+		ID: "card:c1:2026-03", Label: "Fatura Março/2026 - Nubank", InstallmentLabel: "Fatura do cartão",
+		AmountCents: 42000, Percent: 32, Tone: "primary", Icon: "credit_card", Note: "Decisão financeira questionável.",
+	}
+	if got[0] != fatura {
+		t.Errorf("got[0] = %+v\nquero    %+v", got[0], fatura)
+	}
+	if got[1].ID != "g1" {
+		t.Errorf("got[1].ID = %q, quero g1 (o parcelamento vem depois da fatura)", got[1].ID)
 	}
 }
 

@@ -7,6 +7,7 @@ export type Tone = 'primary' | 'secondary' | 'error' | 'neutral';
 export interface Account {
   id: string;
   name: string;
+  accountType: string; // checking/savings/cash/exchange/credit_card/voucher — filtra vales da transferência
   balanceCents: number;
   icon: IconName; // usado no layout mobile
   tone: Tone; // cor do valor no mobile

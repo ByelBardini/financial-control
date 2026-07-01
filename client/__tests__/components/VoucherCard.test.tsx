@@ -22,11 +22,16 @@ describe('VoucherCard', () => {
     expect(screen.getByLabelText('valor oculto')).toBeOnTheScreen();
   });
 
-  it('vira botão "Editar conta" quando onPress é fornecido', async () => {
+  it('o corpo vira "Transferir de {vale}" e a engrenagem "Editar {vale}"', async () => {
     const onPress = jest.fn();
-    await render(<VoucherCard voucher={alelo} hidden={false} onPress={onPress} />);
+    const onEdit = jest.fn();
+    await render(<VoucherCard voucher={alelo} hidden={false} onPress={onPress} onEdit={onEdit} />);
+    const user = userEvent.setup();
 
-    await userEvent.setup().press(screen.getByRole('button', { name: 'Editar Alelo Refeição' }));
+    await user.press(screen.getByRole('button', { name: 'Transferir de Alelo Refeição' }));
     expect(onPress).toHaveBeenCalledTimes(1);
+
+    await user.press(screen.getByRole('button', { name: 'Editar Alelo Refeição' }));
+    expect(onEdit).toHaveBeenCalledTimes(1);
   });
 });

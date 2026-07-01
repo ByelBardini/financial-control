@@ -7,12 +7,12 @@ import type { CreditCard } from '../../types/contas';
 type CartoesPanelProps = {
   cards: CreditCard[];
   hidden: boolean;
-  onEditAccount?: (id: string) => void;
+  onOpenCard?: (id: string) => void;
 };
 
 // Painel "Cartões" do desktop: título com ícone + contagem + cartões lado a lado
-// (CreditCardCard é flex-1, então dividem a linha, como o ValesPanel).
-export function CartoesPanel({ cards, hidden, onEditAccount }: CartoesPanelProps) {
+// (CreditCardCard é flex-1, então dividem a linha, como o ValesPanel). Tocar abre o detalhe.
+export function CartoesPanel({ cards, hidden, onOpenCard }: CartoesPanelProps) {
   return (
     <View className="gap-stack-md p-stack-lg">
       <PanelHeading
@@ -27,7 +27,7 @@ export function CartoesPanel({ cards, hidden, onEditAccount }: CartoesPanelProps
             <CreditCardCard
               card={card}
               hidden={hidden}
-              onPress={onEditAccount ? () => onEditAccount(card.id) : undefined}
+              onPress={onOpenCard ? () => onOpenCard(card.id) : undefined}
             />
           </View>
         ))}

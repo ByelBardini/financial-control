@@ -5,6 +5,7 @@ import * as api from '../../src/api/contas';
 import { contasSnapshot } from '../../src/mocks/contasSnapshot';
 import {
   useBankAccounts,
+  useCardDetail,
   useCashWallet,
   useCreditCards,
   useManagementTip,
@@ -78,5 +79,22 @@ describe('demais recursos de Contas', () => {
     const { result } = await renderHook(() => useManagementTip(), { wrapper: makeWrapper() });
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
     expect(result.current.data?.title).toBe('Dica de Gestão');
+  });
+});
+
+describe('useCardDetail (só busca com id)', () => {
+  it('não busca quando o id é undefined (overlay fechado)', async () => {
+    const { result } = await renderHook(() => useCardDetail(undefined), { wrapper: makeWrapper() });
+    expect(api.getCardDetail).not.toHaveBeenCalled();
+    expect(result.current.fetchStatus).toBe('idle');
+  });
+
+  it('busca o detalhe do cartão quando há id', async () => {
+    jest
+      .mocked(api.getCardDetail)
+      .mockResolvedValue({ id: 'c1', name: 'Nubank', months: [] } as never);
+    const { result } = await renderHook(() => useCardDetail('c1'), { wrapper: makeWrapper() });
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(api.getCardDetail).toHaveBeenCalledWith('c1');
   });
 });

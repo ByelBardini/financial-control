@@ -18,6 +18,7 @@ export const dashboardSnapshot: DashboardSnapshot = {
     {
       id: 'nubank',
       name: 'Nubank',
+      accountType: 'checking',
       balanceCents: 84220,
       icon: 'credit_card',
       tone: 'primary',
@@ -26,6 +27,7 @@ export const dashboardSnapshot: DashboardSnapshot = {
     {
       id: 'inter',
       name: 'Inter',
+      accountType: 'checking',
       balanceCents: 32000,
       icon: 'account_balance',
       tone: 'neutral',
@@ -34,6 +36,7 @@ export const dashboardSnapshot: DashboardSnapshot = {
     {
       id: 'carteira',
       name: 'Carteira',
+      accountType: 'cash',
       balanceCents: 12230,
       icon: 'account_balance_wallet',
       tone: 'neutral',
@@ -42,6 +45,7 @@ export const dashboardSnapshot: DashboardSnapshot = {
     {
       id: 'binance',
       name: 'Binance',
+      accountType: 'exchange',
       balanceCents: 145000,
       icon: 'currency_bitcoin',
       tone: 'neutral',

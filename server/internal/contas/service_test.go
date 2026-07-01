@@ -12,12 +12,16 @@ import (
 // fakeContasStore é o fake nomeado da dependência de dados (sem banco). Captura o
 // userID recebido pra provar o escopo por usuário em cada query.
 type fakeContasStore struct {
-	banks     []store.BankAccountRow
-	vouchers  []store.VoucherRow
-	cash      int64
-	credits   []store.CreditAccountRow
-	err       error
-	gotUserID string
+	banks       []store.BankAccountRow
+	vouchers    []store.VoucherRow
+	cash        int64
+	credits     []store.CreditAccountRow
+	cardSummary store.CardSummaryRow
+	cardEntries []store.CardEntryRow
+	cardErr     error
+	err         error
+	gotUserID   string
+	gotCardID   string
 }
 
 func (f *fakeContasStore) ListBankAccounts(_ context.Context, userID string) ([]store.BankAccountRow, error) {
@@ -38,6 +42,18 @@ func (f *fakeContasStore) GetCashBalance(_ context.Context, userID string) (int6
 func (f *fakeContasStore) ListCreditAccounts(_ context.Context, userID string) ([]store.CreditAccountRow, error) {
 	f.gotUserID = userID
 	return f.credits, f.err
+}
+
+func (f *fakeContasStore) GetCardSummary(_ context.Context, userID, cardID string) (store.CardSummaryRow, error) {
+	f.gotUserID = userID
+	f.gotCardID = cardID
+	return f.cardSummary, f.cardErr
+}
+
+func (f *fakeContasStore) ListCardEntries(_ context.Context, userID, cardID string) ([]store.CardEntryRow, error) {
+	f.gotUserID = userID
+	f.gotCardID = cardID
+	return f.cardEntries, f.cardErr
 }
 
 func TestBanksMapeiaBrandColorENotaDerivada(t *testing.T) {

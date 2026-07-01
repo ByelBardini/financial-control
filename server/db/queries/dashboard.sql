@@ -7,6 +7,7 @@ SELECT
 FROM transactions
 WHERE user_id = sqlc.arg(user_id)
   AND kind <> 'investment' -- aporte/resgate move saldo, mas não é gasto/renda do mês
+  AND kind <> 'transfer'   -- transferência move saldo entre contas, mas não é receita/gasto
   AND occurred_on >= date_trunc('month', sqlc.arg(reference_date)::date)
   AND occurred_on <  date_trunc('month', sqlc.arg(reference_date)::date) + interval '1 month';
 
@@ -23,6 +24,7 @@ FROM transactions t
 JOIN categories c ON c.id = t.category_id AND c.user_id = t.user_id
 WHERE t.direction = 'expense'
   AND t.kind <> 'investment' -- aporte não é gasto por categoria
+  AND t.kind <> 'transfer'   -- transferência não é gasto por categoria
   AND t.user_id = sqlc.arg(user_id)
   AND t.occurred_on >= date_trunc('month', sqlc.arg(reference_date)::date)
   AND t.occurred_on <  date_trunc('month', sqlc.arg(reference_date)::date) + interval '1 month'

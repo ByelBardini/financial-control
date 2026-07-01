@@ -47,6 +47,44 @@ export interface CreditCard {
   noteTone: Tone;
 }
 
+// Um lançamento dentro de uma fatura mensal (tela de detalhe do cartão). direction
+// inflow/outflow; kind 'standard'|'installment'|'transfer'|'investment'.
+export interface InvoiceEntry {
+  id: string;
+  occurredOn: string;
+  description: string;
+  category: string;
+  icon: string;
+  direction: 'inflow' | 'outflow';
+  amountCents: number;
+  kind: string;
+}
+
+// Fatura de um mês: compras (charges), pagamentos (payments) e o líquido devido
+// (netCents = charges − payments) + os lançamentos. month "YYYY-MM"; label "Junho/2026".
+export interface InvoiceMonth {
+  month: string;
+  label: string;
+  chargesCents: number;
+  paymentsCents: number;
+  netCents: number;
+  entries: InvoiceEntry[];
+}
+
+// Detalhe de um cartão (GET /contas/cards/{id}): cabeçalho (limite/fatura/disponível/% usado,
+// mesma matemática do CreditCard) + faturas por mês (mais recente primeiro).
+export interface CardDetail {
+  id: string;
+  name: string;
+  icon: IconName;
+  brandColor: string;
+  limitCents: number;
+  invoiceCents: number;
+  availableCents: number;
+  usedPercent: number;
+  months: InvoiceMonth[];
+}
+
 // Carteira física (dinheiro em espécie) + medidor de "Confiança Financeira".
 export interface CashWallet {
   balanceCents: number;

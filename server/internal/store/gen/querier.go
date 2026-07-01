@@ -45,6 +45,13 @@ type Querier interface {
 	// informada) pertencem ao usuário — impede anexar transação à conta de outro dono.
 	// 0 linhas (ErrNoRows no store) → conta/categoria inválida. Centavos → NUMERIC na borda.
 	CreateTransaction(ctx context.Context, arg CreateTransactionParams) (string, error)
+	// Transferência entre contas como dupla entrada num único statement (atômico): uma perna
+	// 'expense' na origem e uma 'income' no destino, ambas kind='transfer' e dividindo um
+	// transfer_group_id gerado uma vez no CTE. Só insere se origem ≠ destino E as DUAS contas são
+	// do usuário e não arquivadas — as guardas não dependem da perna, então é tudo-ou-nada (2 linhas
+	// no sucesso, 0 se qualquer guarda falhar; nunca 1). Centavos → NUMERIC na borda. RETURNING
+	// devolve o group_id (igual nas duas linhas) pro store confirmar o par e ecoar o grupo.
+	CreateTransfer(ctx context.Context, arg CreateTransferParams) ([]string, error)
 	// Exclui uma operação (escopada por id + asset + user). A posição recomputa no próximo read.
 	// ErrNoRows → 404.
 	DeleteTrade(ctx context.Context, arg DeleteTradeParams) (string, error)
@@ -62,6 +69,14 @@ type Querier interface {
 	// Quantidade líquida atual de um ativo (Σbuy − Σsell) como string — backstop de mensagem
 	// no erro de venda insuficiente. Sempre devolve uma linha (0 quando não há operações).
 	GetAssetNetQuantity(ctx context.Context, arg GetAssetNetQuantityParams) (string, error)
+	// Queries do detalhe de um cartão de crédito (tela de detalhe). Saldo derivado (centavos via
+	// cast no SQL), tudo escopado por user_id + o id do cartão. A "fatura por mês" é uma VIEW de
+	// agrupamento sobre as transações do cartão (por mês de occurred_on) — não redefine limite nem
+	// disponível, que continuam vindo do saldo all-time (igual ao creditCardView). Ver server-api.md.
+	// Cabeçalho do cartão (escopado por id+user, só credit_card ativo): nome/ícone/cor + limite e
+	// saldo all-time (opening_balance + soma do ledger). 0 linhas (ErrNoRows) → não é cartão do
+	// usuário → ErrCardNotFound (handler responde 404). O service deriva fatura/disponível disso.
+	GetCardSummary(ctx context.Context, arg GetCardSummaryParams) (GetCardSummaryRow, error)
 	// "Carteira Física": saldo total das contas em espécie (cash) do usuário.
 	GetCashBalance(ctx context.Context, userID pgtype.UUID) (int64, error)
 	// Quebra do patrimônio em CONTAS do usuário, em centavos. Líquido = bancos + espécie
@@ -94,6 +109,16 @@ type Querier interface {
 	// o join de transações filtrado pelo mesmo dono (isolamento nos dois lados).
 	// Contas "Bancos": corrente + poupança, com saldo e campos de apresentação.
 	ListBankAccounts(ctx context.Context, userID pgtype.UUID) ([]ListBankAccountsRow, error)
+	// Lançamentos do cartão (escopado por user+conta), com o mês de competência (YYYY-MM) e a
+	// categoria juntada (mesmo dono nos dois lados). O service agrupa por mês → faturas. Ordenado
+	// do mais recente pro mais antigo, então os meses já saem em ordem decrescente.
+	ListCardEntries(ctx context.Context, arg ListCardEntriesParams) ([]ListCardEntriesRow, error)
+	// Faturas mensais ABERTAS dos cartões do usuário (viram linhas de Dívidas Futuras): por cartão ×
+	// mês de competência, gastos avulsos (kind='standard') menos pagamentos (income — ex.: a perna de
+	// entrada de uma transferência p/ o cartão), só quando ainda sobra saldo devedor (net > 0). Exclui
+	// parcelas (kind='installment') p/ NÃO duplicar com a linha de parcelamento. Em centavos. Mais
+	// recente primeiro.
+	ListCardInvoiceDebts(ctx context.Context, userID pgtype.UUID) ([]ListCardInvoiceDebtsRow, error)
 	// Categorias ativas do usuário — alimenta o filtro de categoria da tela de Transações.
 	ListCategories(ctx context.Context, userID pgtype.UUID) ([]ListCategoriesRow, error)
 	// Gasto por categoria (apenas despesas) no mês de @reference_date, em centavos (bigint).

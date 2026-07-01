@@ -23,11 +23,11 @@ describe('CreditCardCard', () => {
     expect(screen.getByLabelText('valor oculto')).toBeOnTheScreen();
   });
 
-  it('vira botão "Editar conta" quando onPress é fornecido', async () => {
+  it('vira botão "Abrir cartão" quando onPress é fornecido', async () => {
     const onPress = jest.fn();
     await render(<CreditCardCard card={roxinho} hidden={false} onPress={onPress} />);
 
-    await userEvent.setup().press(screen.getByRole('button', { name: 'Editar Nubank Roxinho' }));
+    await userEvent.setup().press(screen.getByRole('button', { name: 'Abrir Nubank Roxinho' }));
     expect(onPress).toHaveBeenCalledTimes(1);
   });
 });

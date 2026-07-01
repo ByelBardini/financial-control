@@ -34,6 +34,7 @@ server/
 │   ├── contas/               # GET /contas/* (dto+personality+service+handlers)
 │   ├── transacoes/           # /transacoes/* views + /transactions CRUD
 │   ├── investimentos/        # /investimentos/* views + CRUD de ativo/operação (CTE recursiva)
+│   ├── transfers/            # POST /transfers (dupla entrada; reusa store.CreateTransfer)
 │   └── router/router.go      # router.New(Deps) → http.Handler
 └── test/                     # integração/e2e (HTTP real; tag `integration` para os que usam DB)
 ```
@@ -85,6 +86,7 @@ sempre em **centavos** (inteiro). **Toda rota abaixo exige `Authorization: Beare
 | GET | `/dashboard/diagnosis` | cartão de diagnóstico (texto derivado do net) | implementado |
 | GET | `/contas/banks` | contas de banco (checking/savings) + nota derivada | implementado |
 | GET | `/contas/cards` | cartões de crédito (por item): fatura/limite/disponível/% usado + nota derivada | implementado |
+| GET | `/contas/cards/{id}` | **detalhe de um cartão**: cabeçalho (limite/fatura/disponível/% usado, derivados do saldo all-time como em `/contas/cards`) + **faturas por mês** (`months[]`: agrupa os lançamentos do cartão por mês de `occurred_on`; cada um traz compras/pagamentos/líquido + os lançamentos) → **200** `CardDetail`; **404** se não é cartão do usuário | implementado |
 | GET | `/contas/vouchers` | vales (voucher) + % restante/status derivados | implementado |
 | GET | `/contas/cash` | carteira física (cash) + confiança/quip derivados | implementado |
 | GET | `/contas/xray` | "Raio-X de Pobreza": dívida/limite (cartões) + Panic Meter | implementado |
@@ -94,7 +96,7 @@ sempre em **centavos** (inteiro). **Toda rota abaixo exige `Authorization: Beare
 | GET | `/transacoes/list` | log **filtrado + paginado**: `?period=30d`(default)`\|3m\|6m\|1y\|custom` (custom usa `?from=&to=` YYYY-MM-DD), `?category=<id>` **repetível** (OR entre as), `?q=<busca ILIKE>`, `?page=N` (1-based), `?pageSize=N` (default **10**, clamp `[1,100]`; ≤0/ausente → default — o desktop manda o nº de linhas que cabem na tela; filtros lenientes) → **envelope** `TransactionPage` | implementado |
 | GET | `/categories` | categorias ativas do usuário (alimenta o filtro de categoria) | implementado |
 | GET | `/transacoes/recurrences` | recorrências ativas (`recurring_rules`) — receitas + assinaturas; cada uma traz **`isDue`** (a ocorrência do período corrente ainda não foi registrada → o client mostra "Registrar") | implementado |
-| GET | `/transacoes/debts` | compras parceladas agregadas por `purchase_group_id` (progresso + ironia) | implementado |
+| GET | `/transacoes/debts` | dívidas futuras: **faturas mensais abertas dos cartões** ("Fatura {Mês/Ano} - {cartão}", devido = gastos `kind='standard'` − pagamentos `income`, só net > 0; via `ListCardInvoiceDebts`) **primeiro**, depois compras parceladas agregadas por `purchase_group_id` (progresso + ironia). Parcelas ficam só como parcelamento (excluídas da fatura p/ não duplicar) | implementado |
 | POST | `/transactions` | cria transação `standard` (body em centavos; `direction` inflow/outflow → income/expense) → **201** + recurso; **400** inválido **ou** conta/categoria não-própria | implementado |
 | GET | `/transactions/{id}` | transação única (escopada por id+user) → **200** `TransactionDetail`; **404** | implementado |
 | PATCH | `/transactions/{id}` | edita (sem trocar de conta) → **200** + recurso; **404** | implementado |
@@ -102,6 +104,7 @@ sempre em **centavos** (inteiro). **Toda rota abaixo exige `Authorization: Beare
 | POST | `/transactions/installment-purchases` | **compra parcelada**: cria N linhas `kind='installment'` (mesmo `purchase_group_id`, datadas mês a mês), valor **por parcela** → **201** `{created:N}`; **400** inválido ou conta não-própria | implementado |
 | POST | `/recurring-rules` | **transação fixa (modelo)**: registra só a regra em `recurring_rules` — **não lança transação** (cada ocorrência é registrada pelo botão) → **201** `{created:true}`; **400** inválido ou conta não-própria | implementado |
 | POST | `/recurring-rules/{id}/register` | **registra a ocorrência do período corrente**: lança a transação `standard` (copia conta/categoria/valor/sentido da regra, `recurring_rule_id` setado, `occurred_on=hoje`) → **201** + `TransactionDetail`; **409** já registrada neste período / fora da janela; **404** regra não-própria | implementado |
+| POST | `/transfers` | **transferência entre contas** (dupla entrada): cria 2 linhas `kind='transfer'` (débito na origem, crédito no destino, mesmo `transfer_group_id`) num INSERT atômico → **201** `TransferResult`; **400** corpo inválido, origem==destino, valor ≤ 0, conta não-própria/arquivada, **ou classes diferentes**. **Regra de classe**: vale só transfere para vale — as duas pontas precisam ser da mesma classe (ambas `voucher` ou ambas não-`voucher`); a query rejeita mistura. **Pagar fatura** de cartão = transfer com `destinationAccountId` = a conta `credit_card`. Move saldo, mas é excluída do resumo do mês | implementado |
 | GET | `/investimentos/summary` | resumo do portfólio GERAL (cripto fora): patrimônio/ganho/% + título/quip | implementado |
 | GET | `/investimentos/positions` | posições abertas do portfólio geral (preço médio derivado) | implementado |
 | GET | `/investimentos/allocation` | alocação por classe (Ações/FIIs/Renda Fixa; percent = share) | implementado |
@@ -146,12 +149,13 @@ Valores `*Cents`/monetários são **int64 em centavos**.
 
 | DTO | Endpoint | Campos |
 |---|---|---|
-| `Account[]` | `/accounts` | `id`, `name`, `balanceCents`, `icon`, `tone`, `dotColor` |
+| `Account[]` | `/accounts` | `id`, `name`, `accountType` (checking/savings/cash/exchange/credit_card/voucher — o client usa p/ filtrar vales da transferência), `balanceCents`, `icon`, `tone`, `dotColor` |
 | `CreateAccountInput` (req) | `POST /accounts` | `name`, `accountType`, `openingBalanceCents` (**0 obrigatório p/ `credit_card`** — `!= 0` → 400 citando "saldo inicial"), `icon`, `tone`, `dotColor`, `subtitle?`, `creditLimitCents?` |
 | `UpdateAccountInput` (req) | `PATCH /accounts/{id}` | igual ao Create **menos `openingBalanceCents`** (saldo nunca editável) |
 | `AccountDetail` | `GET/POST/PATCH /accounts` | `id`, `name`, `accountType`, `subtitle`, `balanceCents`, `icon`, `tone`, `dotColor`, `creditLimitCents` |
 | `BankAccount[]` | `/contas/banks` | `id`, `name`, `subtitle`, `balanceCents`, `icon`, `brandColor` (= dot_color), `note`, `noteTone` |
 | `CreditCard[]` | `/contas/cards` | `id`, `name`, `invoiceCents` (fatura = saldo negativo), `limitCents`, `availableCents` (= limite − fatura, ≥ 0), `usedPercent` (0..100), `icon`, `brandColor` (= dot_color), `note`, `noteTone` |
+| `CardDetail` | `/contas/cards/{id}` | `id`, `name`, `icon`, `brandColor`, `limitCents`, `invoiceCents`, `availableCents`, `usedPercent` (cabeçalho = mesma matemática do `CreditCard`) + `months[]` (`InvoiceMonth`: `month` "YYYY-MM", `label` "Junho/2026", `chargesCents`, `paymentsCents`, `netCents` = charges − payments, `entries[]`); `InvoiceEntry`: `id`, `occurredOn`, `description`, `category`, `icon`, `direction` (inflow/outflow), `amountCents`, `kind` |
 | `Voucher[]` | `/contas/vouchers` | `id`, `name`, `valueCents`, `icon`, `status` (`ativo`/`estavel`/`critico`), `remainingPercent`, `note`, `noteTone` |
 | `CashWallet` | `/contas/cash` | `balanceCents`, `quip`, `confidenceLabel`, `confidencePercent` |
 | `PovertyXray` | `/contas/xray` | `title`, `rows[]` (`label`/`cents`/`tone`), `panic` (`percent`/`levelLabel`/`levelTone`/`lowLabel`/`highLabel`/`note`) |
@@ -164,10 +168,12 @@ Valores `*Cents`/monetários são **int64 em centavos**.
 | `TransactionPage` | `/transacoes/list` | `items` (`Transaction[]`: `id`, `dateLabel` "12 OUT", `timeLabel` "12/10", `title`, `accountLabel`, `category`, `tag`, `tagTone`, `amountCents`, `direction`, `icon`), `page`, `pageSize` (10), `total`, `pageCount` |
 | `Category[]` | `/categories` | `id`, `name`, `icon`, `kind` (income/expense) |
 | `Recurrence[]` | `/transacoes/recurrences` | `id`, `name`, `category`, `amountCents`, `direction`, `icon`, `isDue` (período corrente pendente de registro; calendário: dia / semana-domingo / mês / ano — `interval_count` ignorado na V1; decidido em Go com relógio injetável) |
-| `FutureDebt[]` | `/transacoes/debts` | `id`, `label`, `installmentLabel` ("Parcela X/Y"), `amountCents`, `percent`, `tone`, `icon`, `note` |
+| `FutureDebt[]` | `/transacoes/debts` | `id`, `label`, `installmentLabel` ("Parcela X/Y"), `amountCents`, `percent`, `tone`, `icon`, `note`. **Duas fontes, mesmo shape**: parcelas (`id`=group_id, label="Fone", installmentLabel="Parcela 2/3") e faturas de cartão (`id`="card:{cardId}:{YYYY-MM}", label="Fatura Março/2026 - Nubank", installmentLabel="Fatura do cartão", icon="credit_card", percent=pago/gastos, amountCents=devido) |
 | `CreateTransactionInput` (req) | `POST /transactions` | `accountId`, `categoryId?`, `description`, `direction` (inflow/outflow), `amountCents` (> 0), `occurredOn` (`YYYY-MM-DD`) |
 | `UpdateTransactionInput` (req) | `PATCH /transactions/{id}` | igual ao Create **menos `accountId`** (não troca de conta) |
 | `TransactionDetail` | `GET/POST/PATCH /transactions` | `id`, `accountId`, `categoryId`, `description`, `direction` (inflow/outflow), `amountCents`, `occurredOn`, `accountLabel`, `category`, `icon` |
+| `CreateTransferInput` (req) | `POST /transfers` | `originAccountId`, `destinationAccountId` (≠ origem), `description?` (default "Transferência"), `amountCents` (> 0), `occurredOn` (`YYYY-MM-DD`) |
+| `TransferResult` | `POST /transfers` | `groupId` (transfer_group_id do par), `originAccountId`, `destinationAccountId`, `amountCents`, `occurredOn` |
 | `CreateInstallmentInput` (req) | `POST /transactions/installment-purchases` | `accountId`, `categoryId?`, `description`, `amountCents` (**por parcela**, > 0), `totalInstallments` (2..48), `occurredOn` (1ª parcela) — sempre despesa |
 | `CreateRecurringRuleInput` (req) | `POST /recurring-rules` | `accountId`, `categoryId?`, `description`, `direction` (inflow/outflow), `amountCents` (> 0), `frequency` (daily/weekly/monthly/yearly), `intervalCount` (≥1), `startDate`, `endDate?` **XOR** `maxOccurrences?` (ambos nulos = permanente) |
 | `PortfolioSummary` | `/investimentos/summary` | `totalCents`, `gainCents`, `gainPct`, `title`, `quip` (geral, cripto fora) |
