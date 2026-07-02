@@ -33,9 +33,33 @@ func (q *Queries) ArchiveAccount(ctx context.Context, arg ArchiveAccountParams) 
 	return id, err
 }
 
+const countEligiblePaymentAccount = `-- name: CountEligiblePaymentAccount :one
+SELECT COUNT(*) AS total
+FROM accounts
+WHERE id = $1
+  AND user_id = $2
+  AND account_type IN ('checking','savings')
+  AND is_archived = false
+`
+
+type CountEligiblePaymentAccountParams struct {
+	ID     pgtype.UUID
+	UserID pgtype.UUID
+}
+
+// Conta quantas contas de banco (checking/savings) ativas do usuário batem com o id. Usado pra
+// validar a conta de pagamento vinculada a um cartão: 0 = inválida (inexistente, de outro usuário,
+// arquivada, ou tipo não-banco). Só bancos podem pagar fatura de cartão.
+func (q *Queries) CountEligiblePaymentAccount(ctx context.Context, arg CountEligiblePaymentAccountParams) (int64, error) {
+	row := q.db.QueryRow(ctx, countEligiblePaymentAccount, arg.ID, arg.UserID)
+	var total int64
+	err := row.Scan(&total)
+	return total, err
+}
+
 const createAccount = `-- name: CreateAccount :one
 INSERT INTO accounts (
-    user_id, name, account_type, opening_balance, icon, tone, dot_color, subtitle, credit_limit
+    user_id, name, account_type, opening_balance, icon, tone, dot_color, subtitle, credit_limit, payment_account_id
 ) VALUES (
     $1,
     $2,
@@ -45,7 +69,8 @@ INSERT INTO accounts (
     $6,
     $7,
     $8,
-    ($9::bigint)::numeric / 100
+    ($9::bigint)::numeric / 100,
+    $10
 )
 RETURNING id::text AS id
 `
@@ -60,6 +85,7 @@ type CreateAccountParams struct {
 	DotColor            string
 	Subtitle            pgtype.Text
 	CreditLimitCents    pgtype.Int8
+	PaymentAccountID    pgtype.UUID
 }
 
 // Cria conta do usuário. Dinheiro entra em centavos (bigint) e vira NUMERIC no insert.
@@ -74,6 +100,7 @@ func (q *Queries) CreateAccount(ctx context.Context, arg CreateAccountParams) (s
 		arg.DotColor,
 		arg.Subtitle,
 		arg.CreditLimitCents,
+		arg.PaymentAccountID,
 	)
 	var id string
 	err := row.Scan(&id)
@@ -90,13 +117,14 @@ SELECT
     a.icon                                                                  AS icon,
     a.tone                                                                  AS tone,
     a.dot_color                                                             AS dot_color,
-    (COALESCE(a.credit_limit, 0) * 100)::bigint                             AS credit_limit_cents
+    (COALESCE(a.credit_limit, 0) * 100)::bigint                             AS credit_limit_cents,
+    (COALESCE(a.payment_account_id::text, ''))::text                        AS payment_account_id
 FROM accounts a
 LEFT JOIN transactions t ON t.account_id = a.id AND t.user_id = a.user_id
 WHERE a.id = $1
   AND a.user_id = $2
   AND a.is_archived = false
-GROUP BY a.id, a.name, a.account_type, a.subtitle, a.opening_balance, a.icon, a.tone, a.dot_color, a.credit_limit
+GROUP BY a.id, a.name, a.account_type, a.subtitle, a.opening_balance, a.icon, a.tone, a.dot_color, a.credit_limit, a.payment_account_id
 `
 
 type GetAccountByIDWithBalanceParams struct {
@@ -114,6 +142,7 @@ type GetAccountByIDWithBalanceRow struct {
 	Tone             string
 	DotColor         string
 	CreditLimitCents int64
+	PaymentAccountID string
 }
 
 // Conta única do usuário (escopada por id + user_id) com saldo derivado em centavos.
@@ -131,6 +160,7 @@ func (q *Queries) GetAccountByIDWithBalance(ctx context.Context, arg GetAccountB
 		&i.Tone,
 		&i.DotColor,
 		&i.CreditLimitCents,
+		&i.PaymentAccountID,
 	)
 	return i, err
 }
@@ -200,9 +230,10 @@ UPDATE accounts SET
     tone         = $4,
     dot_color    = $5,
     subtitle     = $6,
-    credit_limit = ($7::bigint)::numeric / 100
-WHERE id = $8
-  AND user_id = $9
+    credit_limit = ($7::bigint)::numeric / 100,
+    payment_account_id = $8
+WHERE id = $9
+  AND user_id = $10
   AND is_archived = false
 RETURNING id::text AS id
 `
@@ -215,6 +246,7 @@ type UpdateAccountParams struct {
 	DotColor         string
 	Subtitle         pgtype.Text
 	CreditLimitCents pgtype.Int8
+	PaymentAccountID pgtype.UUID
 	ID               pgtype.UUID
 	UserID           pgtype.UUID
 }
@@ -231,6 +263,7 @@ func (q *Queries) UpdateAccount(ctx context.Context, arg UpdateAccountParams) (s
 		arg.DotColor,
 		arg.Subtitle,
 		arg.CreditLimitCents,
+		arg.PaymentAccountID,
 		arg.ID,
 		arg.UserID,
 	)

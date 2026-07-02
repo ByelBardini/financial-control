@@ -28,18 +28,19 @@ SELECT
     a.icon                                                                  AS icon,
     a.tone                                                                  AS tone,
     a.dot_color                                                             AS dot_color,
-    (COALESCE(a.credit_limit, 0) * 100)::bigint                             AS credit_limit_cents
+    (COALESCE(a.credit_limit, 0) * 100)::bigint                             AS credit_limit_cents,
+    (COALESCE(a.payment_account_id::text, ''))::text                        AS payment_account_id
 FROM accounts a
 LEFT JOIN transactions t ON t.account_id = a.id AND t.user_id = a.user_id
 WHERE a.id = sqlc.arg(id)
   AND a.user_id = sqlc.arg(user_id)
   AND a.is_archived = false
-GROUP BY a.id, a.name, a.account_type, a.subtitle, a.opening_balance, a.icon, a.tone, a.dot_color, a.credit_limit;
+GROUP BY a.id, a.name, a.account_type, a.subtitle, a.opening_balance, a.icon, a.tone, a.dot_color, a.credit_limit, a.payment_account_id;
 
 -- name: CreateAccount :one
 -- Cria conta do usuário. Dinheiro entra em centavos (bigint) e vira NUMERIC no insert.
 INSERT INTO accounts (
-    user_id, name, account_type, opening_balance, icon, tone, dot_color, subtitle, credit_limit
+    user_id, name, account_type, opening_balance, icon, tone, dot_color, subtitle, credit_limit, payment_account_id
 ) VALUES (
     sqlc.arg(user_id),
     sqlc.arg(name),
@@ -49,7 +50,8 @@ INSERT INTO accounts (
     sqlc.arg(tone),
     sqlc.arg(dot_color),
     sqlc.narg(subtitle),
-    (sqlc.narg(credit_limit_cents)::bigint)::numeric / 100
+    (sqlc.narg(credit_limit_cents)::bigint)::numeric / 100,
+    sqlc.narg(payment_account_id)
 )
 RETURNING id::text AS id;
 
@@ -64,11 +66,23 @@ UPDATE accounts SET
     tone         = sqlc.arg(tone),
     dot_color    = sqlc.arg(dot_color),
     subtitle     = sqlc.narg(subtitle),
-    credit_limit = (sqlc.narg(credit_limit_cents)::bigint)::numeric / 100
+    credit_limit = (sqlc.narg(credit_limit_cents)::bigint)::numeric / 100,
+    payment_account_id = sqlc.narg(payment_account_id)
 WHERE id = sqlc.arg(id)
   AND user_id = sqlc.arg(user_id)
   AND is_archived = false
 RETURNING id::text AS id;
+
+-- name: CountEligiblePaymentAccount :one
+-- Conta quantas contas de banco (checking/savings) ativas do usuário batem com o id. Usado pra
+-- validar a conta de pagamento vinculada a um cartão: 0 = inválida (inexistente, de outro usuário,
+-- arquivada, ou tipo não-banco). Só bancos podem pagar fatura de cartão.
+SELECT COUNT(*) AS total
+FROM accounts
+WHERE id = sqlc.arg(id)
+  AND user_id = sqlc.arg(user_id)
+  AND account_type IN ('checking','savings')
+  AND is_archived = false;
 
 -- name: ArchiveAccount :one
 -- Soft-delete: marca a conta como arquivada (escopado por id + user_id). RETURNING

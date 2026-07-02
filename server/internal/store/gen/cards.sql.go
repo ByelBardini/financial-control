@@ -19,14 +19,15 @@ SELECT
     a.icon                                                                  AS icon,
     a.dot_color                                                             AS dot_color,
     (COALESCE(a.credit_limit, 0) * 100)::bigint                             AS limit_cents,
-    ((a.opening_balance + COALESCE(SUM(t.signed_amount), 0)) * 100)::bigint AS balance_cents
+    ((a.opening_balance + COALESCE(SUM(t.signed_amount), 0)) * 100)::bigint AS balance_cents,
+    (COALESCE(a.payment_account_id::text, ''))::text                        AS payment_account_id
 FROM accounts a
 LEFT JOIN transactions t ON t.account_id = a.id AND t.user_id = a.user_id
 WHERE a.id = $1
   AND a.user_id = $2
   AND a.account_type = 'credit_card'
   AND a.is_archived = false
-GROUP BY a.id, a.name, a.icon, a.dot_color, a.credit_limit, a.opening_balance
+GROUP BY a.id, a.name, a.icon, a.dot_color, a.credit_limit, a.opening_balance, a.payment_account_id
 `
 
 type GetCardSummaryParams struct {
@@ -35,12 +36,13 @@ type GetCardSummaryParams struct {
 }
 
 type GetCardSummaryRow struct {
-	ID           string
-	Name         string
-	Icon         string
-	DotColor     string
-	LimitCents   int64
-	BalanceCents int64
+	ID               string
+	Name             string
+	Icon             string
+	DotColor         string
+	LimitCents       int64
+	BalanceCents     int64
+	PaymentAccountID string
 }
 
 // Queries do detalhe de um cartão de crédito (tela de detalhe). Saldo derivado (centavos via
@@ -60,6 +62,7 @@ func (q *Queries) GetCardSummary(ctx context.Context, arg GetCardSummaryParams) 
 		&i.DotColor,
 		&i.LimitCents,
 		&i.BalanceCents,
+		&i.PaymentAccountID,
 	)
 	return i, err
 }

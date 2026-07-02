@@ -9,19 +9,20 @@ import (
 )
 
 type Account struct {
-	ID             pgtype.UUID
-	Name           string
-	AccountType    string
-	OpeningBalance pgtype.Numeric
-	Icon           string
-	Tone           string
-	DotColor       string
-	IsArchived     bool
-	CreatedAt      pgtype.Timestamptz
-	UpdatedAt      pgtype.Timestamptz
-	UserID         pgtype.UUID
-	Subtitle       pgtype.Text
-	CreditLimit    pgtype.Numeric
+	ID               pgtype.UUID
+	Name             string
+	AccountType      string
+	OpeningBalance   pgtype.Numeric
+	Icon             string
+	Tone             string
+	DotColor         string
+	IsArchived       bool
+	CreatedAt        pgtype.Timestamptz
+	UpdatedAt        pgtype.Timestamptz
+	UserID           pgtype.UUID
+	Subtitle         pgtype.Text
+	CreditLimit      pgtype.Numeric
+	PaymentAccountID pgtype.UUID
 }
 
 type Category struct {

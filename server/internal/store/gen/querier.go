@@ -22,6 +22,10 @@ type Querier interface {
 	// Registra uma compra (liquida na conta account_id). Só insere se o ativo é do usuário.
 	// ErrNoRows → ativo inválido. Quantidade NUMERIC (string no Go); preço em centavos → NUMERIC.
 	BuyTrade(ctx context.Context, arg BuyTradeParams) (string, error)
+	// Conta quantas contas de banco (checking/savings) ativas do usuário batem com o id. Usado pra
+	// validar a conta de pagamento vinculada a um cartão: 0 = inválida (inexistente, de outro usuário,
+	// arquivada, ou tipo não-banco). Só bancos podem pagar fatura de cartão.
+	CountEligiblePaymentAccount(ctx context.Context, arg CountEligiblePaymentAccountParams) (int64, error)
 	// Cria conta do usuário. Dinheiro entra em centavos (bigint) e vira NUMERIC no insert.
 	CreateAccount(ctx context.Context, arg CreateAccountParams) (string, error)
 	// Cria um ativo do usuário (preço atual em centavos → NUMERIC na borda). Devolve o novo id.
