@@ -17,6 +17,7 @@ const detail: CardDetail = {
   invoiceCents: 32000,
   availableCents: 118000,
   usedPercent: 21,
+  paymentAccountId: 'b1',
   months: [
     {
       month: '2026-06',
@@ -79,7 +80,7 @@ describe('CardDetailModal', () => {
     expect(h.onLancar).toHaveBeenCalledTimes(1);
 
     await user.press(screen.getByRole('button', { name: 'Pagar fatura' }));
-    expect(h.onPagar).toHaveBeenCalledWith(32000);
+    expect(h.onPagar).toHaveBeenCalledWith(32000, 'b1');
   });
 
   it('cartão sem lançamentos mostra o estado vazio', async () => {

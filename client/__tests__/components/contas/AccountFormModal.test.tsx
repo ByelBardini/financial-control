@@ -1,13 +1,31 @@
 import { screen, userEvent, waitFor } from '@testing-library/react-native';
 import * as api from '../../../src/api/accounts';
+import * as dashApi from '../../../src/api/dashboard';
 import { ApiError } from '../../../src/api/client';
 import { AccountFormModal } from '../../../src/components/contas/AccountFormModal';
 import { renderWithClient } from '../../_support/renderWithClient';
+import type { Account } from '../../../src/types/dashboard';
 import type { AccountDetail } from '../../../src/types/accounts';
 
 jest.mock('../../../src/api/accounts');
+jest.mock('../../../src/api/dashboard');
 
-beforeEach(() => jest.clearAllMocks());
+const bankAccounts: Account[] = [
+  {
+    id: 'b1',
+    name: 'Nubank',
+    accountType: 'checking',
+    balanceCents: 100000,
+    icon: 'account_balance',
+    tone: 'primary',
+    dotColor: '#d0bcff',
+  },
+];
+
+beforeEach(() => {
+  jest.clearAllMocks();
+  jest.mocked(dashApi.getAccounts).mockResolvedValue(bankAccounts);
+});
 
 const cardDetail: AccountDetail = {
   id: 'c1',
@@ -19,6 +37,7 @@ const cardDetail: AccountDetail = {
   tone: 'primary',
   dotColor: '#8a05be',
   creditLimitCents: 500000,
+  paymentAccountId: 'b1',
 };
 
 describe('AccountFormModal — criar', () => {

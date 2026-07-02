@@ -18,6 +18,7 @@ const base: AccountFormValues = {
   icon: 'account_balance',
   dotColor: '#d0bcff',
   tone: 'neutral',
+  paymentAccountId: '',
 };
 
 describe('validateAccountForm', () => {
@@ -28,6 +29,26 @@ describe('validateAccountForm', () => {
   it('cartão exige limite > 0', () => {
     const errs = validateAccountForm({ ...base, accountType: 'credit_card', creditLimitCents: 0 });
     expect(errs.creditLimit).toBeDefined();
+  });
+
+  it('cartão exige conta de pagamento (vínculo com banco)', () => {
+    const errs = validateAccountForm({
+      ...base,
+      accountType: 'credit_card',
+      creditLimitCents: 500000,
+      paymentAccountId: '',
+    });
+    expect(errs.paymentAccount).toBeDefined();
+  });
+
+  it('cartão com limite e conta de pagamento é válido', () => {
+    const errs = validateAccountForm({
+      ...base,
+      accountType: 'credit_card',
+      creditLimitCents: 500000,
+      paymentAccountId: 'b1',
+    });
+    expect(errs).toEqual({});
   });
 
   it('formulário válido não tem erros', () => {
@@ -49,9 +70,10 @@ describe('toNewAccountInput', () => {
     expect(out.tone).toBe('neutral');
     expect(out.subtitle).toBeUndefined();
     expect(out.creditLimitCents).toBeUndefined(); // checking ignora limite
+    expect(out.paymentAccountId).toBeUndefined(); // conta de pagamento é só p/ cartão
   });
 
-  it('inclui creditLimit e subtitle para cartão', () => {
+  it('inclui creditLimit, subtitle e conta de pagamento para cartão', () => {
     const out = toNewAccountInput({
       ...base,
       accountType: 'credit_card',
@@ -59,10 +81,12 @@ describe('toNewAccountInput', () => {
       dotColor: '#8a05be',
       subtitle: 'Final 4022',
       creditLimitCents: 500000,
+      paymentAccountId: 'b1',
     });
 
     expect(out.creditLimitCents).toBe(500000);
     expect(out.subtitle).toBe('Final 4022');
+    expect(out.paymentAccountId).toBe('b1');
   });
 
   it('zera o saldo inicial para cartão (cartão é só fatura, mesmo com valor no estado)', () => {
@@ -118,6 +142,7 @@ describe('detailToFormValues', () => {
       tone: 'primary',
       dotColor: '#8a05be',
       creditLimitCents: 500000,
+      paymentAccountId: 'b1',
     };
 
     const v = detailToFormValues(detail);
@@ -131,6 +156,7 @@ describe('detailToFormValues', () => {
       icon: 'credit_card',
       dotColor: '#8a05be',
       tone: 'primary',
+      paymentAccountId: 'b1',
     });
   });
 
