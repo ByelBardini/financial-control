@@ -134,7 +134,26 @@ postgres://financial:financial@localhost:5432/financial_control
 O server lê essa URL pela variável `DATABASE_URL` (veja `server/.env.example`).
 
 O schema é versionado por migrations com [goose](https://github.com/pressly/goose),
-em `server/db/migrations/` (veja o README de lá). A primeira migration — contas,
-categorias, transações e regras de recorrência — já existe e está aplicável. A
-conexão do Go com o Postgres ainda não está plugada — esse é o próximo passo
-(driver `pgx` + `sqlc` para as queries tipadas).
+em `server/db/migrations/` (veja o README de lá). A conexão do Go com o Postgres é
+via `pgx` + `sqlc` — queries tipadas em `server/db/queries/`, geradas em
+`server/internal/store/gen/`. Dados de exemplo em `server/db/seed.sql` (rodado à mão).
+
+### Testes de integração — banco dedicado (`_test`)
+
+> ⚠️ **`server/db/seed.sql` é destrutivo:** faz `TRUNCATE` das tabelas de dado do
+> banco em que roda. Os testes de integração o aplicam, então **exigem um banco
+> cujo nome termine em `_test`** — o helper `requireTestDB` **aborta** se você
+> apontar `DATABASE_URL` pro banco de dev, pra nunca apagar seus dados. `npm test`
+> e `npm run ci` **não** rodam a integração (arquivos com `//go:build integration`).
+
+Setup do banco de teste (uma vez) e execução:
+
+```bash
+# 1. cria o banco de teste e copia o schema + usuário padrão do dev
+docker exec financial-control-db psql -U financial -d postgres -c "CREATE DATABASE financial_control_test;"
+docker exec financial-control-db sh -c "pg_dump -U financial financial_control | psql -U financial -d financial_control_test"
+
+# 2. roda a suíte de integração apontando pro banco de teste (nunca o de dev)
+cd server && DATABASE_URL="postgres://financial:financial@localhost:5432/financial_control_test?sslmode=disable" \
+  go test -tags integration ./test/...
+```
