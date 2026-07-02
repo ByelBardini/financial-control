@@ -31,6 +31,7 @@ type AccountStore interface {
 	UpdateAccount(ctx context.Context, userID, id string, in store.AccountInput) error
 	ArchiveAccount(ctx context.Context, userID, id string) error
 	GetAccountByID(ctx context.Context, userID, id string) (store.AccountDetail, error)
+	IsBankAccountOwned(ctx context.Context, userID, id string) (bool, error)
 }
 
 // Service lê contas a partir do store.
