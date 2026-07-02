@@ -62,11 +62,41 @@ describe('TransferModal — pagar fatura', () => {
     const user = userEvent.setup();
 
     expect(await screen.findByRole('header', { name: 'Pagar fatura' })).toBeOnTheScreen();
-    expect(screen.getByRole('button', { name: 'Para: Nubank Cartão' })).toBeDisabled();
+    expect(await screen.findByRole('button', { name: 'Para: Nubank Cartão' })).toBeDisabled();
 
     // escolhe a origem (de onde sai o dinheiro)
     await user.press(screen.getByRole('button', { name: 'De: Conta de origem' }));
     await user.press(screen.getByRole('menuitem', { name: 'Nubank' }));
+
+    await user.press(screen.getByRole('button', { name: 'Transferir' }));
+
+    expect(transfersApi.createTransfer).toHaveBeenCalledWith(
+      expect.objectContaining({
+        originAccountId: 'a1',
+        destinationAccountId: 'card1',
+        amountCents: 32000,
+      }),
+    );
+    await waitFor(() => expect(onClose).toHaveBeenCalledTimes(1));
+  });
+
+  it('trava a origem na conta vinculada (sem escolha) quando lockedOriginId é dado', async () => {
+    jest.mocked(transfersApi.createTransfer).mockResolvedValue({} as never);
+    const onClose = jest.fn();
+    await renderWithClient(
+      <TransferModal
+        lockedDestinationId="card1"
+        lockedOriginId="a1"
+        defaultAmountCents={32000}
+        onClose={onClose}
+      />,
+    );
+    const user = userEvent.setup();
+
+    // Origem e destino travados na conta vinculada (Nubank) e no cartão — sem trocar nem escolher.
+    expect(await screen.findByRole('button', { name: 'De: Nubank' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Para: Nubank Cartão' })).toBeDisabled();
+    expect(screen.queryByRole('button', { name: 'Trocar origem e destino' })).toBeNull();
 
     await user.press(screen.getByRole('button', { name: 'Transferir' }));
 
@@ -89,7 +119,7 @@ describe('TransferModal — transferência livre', () => {
 
     expect(await screen.findByRole('header', { name: 'Transferir' })).toBeOnTheScreen();
 
-    await user.press(screen.getByRole('button', { name: 'De: Conta de origem' }));
+    await user.press(await screen.findByRole('button', { name: 'De: Conta de origem' }));
     await user.press(screen.getByRole('menuitem', { name: 'Nubank' }));
     await user.press(screen.getByRole('button', { name: 'Para: Conta de destino' }));
     await user.press(screen.getByRole('menuitem', { name: 'Nubank Cartão' }));

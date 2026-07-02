@@ -208,8 +208,10 @@ func seedContas(t *testing.T, ctx context.Context, dsn string) {
 	      VALUES ($1, $2, 'Alelo Refeição', 'voucher', 215.00, 'restaurant', 'secondary', '#9ddf2e')
 	      ON CONFLICT (id) DO NOTHING`, contasVoucherID, defaultUser)
 
-	exec(`INSERT INTO accounts (id, user_id, name, account_type, opening_balance, icon, tone, dot_color, credit_limit)
-	      VALUES ($1, $2, 'Nubank Cartão', 'credit_card', 0, 'credit_card', 'primary', '#8a05be', 5000.00)
+	// payment_account_id: a conta de banco (Nubank checking do seed) que paga a fatura — obrigatório
+	// em credit_card pela migration 00009 (card_payment_account_coherent).
+	exec(`INSERT INTO accounts (id, user_id, name, account_type, opening_balance, icon, tone, dot_color, credit_limit, payment_account_id)
+	      VALUES ($1, $2, 'Nubank Cartão', 'credit_card', 0, 'credit_card', 'primary', '#8a05be', 5000.00, 'a0000000-0000-0000-0000-000000000001')
 	      ON CONFLICT (id) DO NOTHING`, contasCardID, defaultUser)
 
 	// Fatura de 4200 no cartão → saldo -4200 (dívida) e panic alto.

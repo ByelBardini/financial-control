@@ -13,14 +13,15 @@ SELECT
     a.icon                                                                  AS icon,
     a.dot_color                                                             AS dot_color,
     (COALESCE(a.credit_limit, 0) * 100)::bigint                             AS limit_cents,
-    ((a.opening_balance + COALESCE(SUM(t.signed_amount), 0)) * 100)::bigint AS balance_cents
+    ((a.opening_balance + COALESCE(SUM(t.signed_amount), 0)) * 100)::bigint AS balance_cents,
+    (COALESCE(a.payment_account_id::text, ''))::text                        AS payment_account_id
 FROM accounts a
 LEFT JOIN transactions t ON t.account_id = a.id AND t.user_id = a.user_id
 WHERE a.id = sqlc.arg(card_id)
   AND a.user_id = sqlc.arg(user_id)
   AND a.account_type = 'credit_card'
   AND a.is_archived = false
-GROUP BY a.id, a.name, a.icon, a.dot_color, a.credit_limit, a.opening_balance;
+GROUP BY a.id, a.name, a.icon, a.dot_color, a.credit_limit, a.opening_balance, a.payment_account_id;
 
 -- name: ListCardEntries :many
 -- Lançamentos do cartão (escopado por user+conta), com o mês de competência (YYYY-MM) e a

@@ -14,7 +14,7 @@ type CardDetailModalProps = {
   onClose: () => void;
   onEdit: () => void;
   onLancar: () => void;
-  onPagar: (invoiceCents: number) => void;
+  onPagar: (invoiceCents: number, paymentAccountId: string) => void;
 };
 
 // Modal de DETALHE do cartão (ao tocar no card): cabeçalho (limite/fatura/disponível/% usado) +
@@ -102,7 +102,7 @@ export function CardDetailModal({
             </Text>
           </Pressable>
           <Pressable
-            onPress={() => onPagar(card.invoiceCents)}
+            onPress={() => onPagar(card.invoiceCents, card.paymentAccountId)}
             accessibilityRole="button"
             accessibilityLabel="Pagar fatura"
             className="min-h-11 flex-1 items-center justify-center rounded-full border border-outline-variant px-gutter"

@@ -49,6 +49,7 @@ export function mockContasApi(snapshot: ContasSnapshot = contasSnapshot) {
       invoiceCents: firstCard.invoiceCents,
       availableCents: firstCard.availableCents,
       usedPercent: firstCard.usedPercent,
+      paymentAccountId: '',
       months: [],
     });
   }

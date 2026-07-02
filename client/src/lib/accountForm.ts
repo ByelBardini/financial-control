@@ -61,6 +61,8 @@ export type AccountFormValues = {
   icon: IconName;
   dotColor: string;
   tone: Tone;
+  // Conta de banco que paga a fatura (só cartão). '' = nenhuma escolhida.
+  paymentAccountId: string;
 };
 
 // Valores iniciais pra um tipo (criação / ao trocar o tipo). tone fica neutro: a
@@ -76,24 +78,30 @@ export function initialValues(type: AccountType = 'checking'): AccountFormValues
     icon: meta.defaultIcon,
     dotColor: meta.defaultColor,
     tone: 'neutral',
+    paymentAccountId: '',
   };
 }
 
-export type AccountFormErrors = { name?: string; creditLimit?: string };
+export type AccountFormErrors = { name?: string; creditLimit?: string; paymentAccount?: string };
 
-// Validação do client (o server revalida). Cartão exige limite > 0 (senão o Raio-X
-// não faz sentido); nome obrigatório.
+// Validação do client (o server revalida). Cartão exige limite > 0 (senão o Raio-X não faz
+// sentido) e uma conta de banco vinculada (que paga a fatura); nome obrigatório.
 export function validateAccountForm(v: AccountFormValues): AccountFormErrors {
   const errors: AccountFormErrors = {};
   if (v.name.trim() === '') errors.name = 'Dá um nome pra essa conta.';
-  if (v.accountType === 'credit_card' && v.creditLimitCents <= 0) {
-    errors.creditLimit = 'Cartão precisa de um limite maior que zero.';
+  if (v.accountType === 'credit_card') {
+    if (v.creditLimitCents <= 0) errors.creditLimit = 'Cartão precisa de um limite maior que zero.';
+    if (v.paymentAccountId.trim() === '') {
+      errors.paymentAccount = 'Escolha a conta de banco que paga a fatura.';
+    }
   }
   return errors;
 }
 
-// Campos comuns ao create/update (limite só p/ cartão; subtitle vazio vira undefined).
+// Campos comuns ao create/update. Limite e conta de pagamento só p/ cartão; subtitle vazio
+// vira undefined. paymentAccountId só é enviado no cartão (o server rejeita fora dele).
 function sharedInput(v: AccountFormValues) {
+  const isCard = v.accountType === 'credit_card';
   return {
     name: v.name.trim(),
     accountType: v.accountType,
@@ -101,7 +109,8 @@ function sharedInput(v: AccountFormValues) {
     tone: v.tone,
     dotColor: v.dotColor,
     subtitle: v.subtitle.trim() ? v.subtitle.trim() : undefined,
-    creditLimitCents: v.accountType === 'credit_card' ? v.creditLimitCents : undefined,
+    creditLimitCents: isCard ? v.creditLimitCents : undefined,
+    paymentAccountId: isCard ? v.paymentAccountId : undefined,
   };
 }
 
@@ -128,5 +137,6 @@ export function detailToFormValues(d: AccountDetail): AccountFormValues {
     icon: d.icon,
     dotColor: d.dotColor,
     tone: d.tone,
+    paymentAccountId: d.paymentAccountId ?? '',
   };
 }

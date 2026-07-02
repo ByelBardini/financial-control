@@ -28,6 +28,11 @@ type fakeAccountStore struct {
 	getErr     error
 	gotID      string
 	gotInput   store.AccountInput
+
+	// Elegibilidade da conta de pagamento do cartão (IsBankAccountOwned).
+	bankOwned    bool
+	bankOwnedErr error
+	gotPaymentID string
 }
 
 func (f *fakeAccountStore) ListAccountsWithBalance(_ context.Context, userID string) ([]store.AccountRow, error) {
@@ -58,6 +63,12 @@ func (f *fakeAccountStore) GetAccountByID(_ context.Context, userID, id string) 
 	f.gotUserID = userID
 	f.gotID = id
 	return f.detail, f.getErr
+}
+
+func (f *fakeAccountStore) IsBankAccountOwned(_ context.Context, userID, id string) (bool, error) {
+	f.gotUserID = userID
+	f.gotPaymentID = id
+	return f.bankOwned, f.bankOwnedErr
 }
 
 // authed cria um GET já autenticado (userID no contexto, como o middleware faria).

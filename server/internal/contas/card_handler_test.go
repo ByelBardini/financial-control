@@ -24,7 +24,7 @@ func doCard(t *testing.T, h http.Handler, id string) *httptest.ResponseRecorder 
 
 func TestCardDetailHandlerJSON(t *testing.T) {
 	svc := contas.NewService(&fakeContasStore{
-		cardSummary: store.CardSummaryRow{ID: "c1", Name: "Nubank", Icon: "credit_card", DotColor: "#8a05be", LimitCents: 200000, BalanceCents: -12000},
+		cardSummary: store.CardSummaryRow{ID: "c1", Name: "Nubank", Icon: "credit_card", DotColor: "#8a05be", LimitCents: 200000, BalanceCents: -12000, PaymentAccountID: "b1"},
 		cardEntries: []store.CardEntryRow{{
 			ID: "e1", Month: "2026-06", OccurredOn: time.Date(2026, 6, 10, 0, 0, 0, 0, time.UTC),
 			Description: "Mercado", Direction: "expense", AmountCents: 12000, Kind: "standard",
@@ -35,7 +35,7 @@ func TestCardDetailHandlerJSON(t *testing.T) {
 	if rec.Code != http.StatusOK {
 		t.Fatalf("status = %d, quero 200", rec.Code)
 	}
-	const want = `{"id":"c1","name":"Nubank","icon":"credit_card","brandColor":"#8a05be","limitCents":200000,"invoiceCents":12000,"availableCents":188000,"usedPercent":6,"months":[{"month":"2026-06","label":"Junho/2026","chargesCents":12000,"paymentsCents":0,"netCents":12000,"entries":[{"id":"e1","occurredOn":"2026-06-10","description":"Mercado","category":"Alimentação","icon":"restaurant","direction":"outflow","amountCents":12000,"kind":"standard"}]}]}` + "\n"
+	const want = `{"id":"c1","name":"Nubank","icon":"credit_card","brandColor":"#8a05be","limitCents":200000,"invoiceCents":12000,"availableCents":188000,"usedPercent":6,"paymentAccountId":"b1","months":[{"month":"2026-06","label":"Junho/2026","chargesCents":12000,"paymentsCents":0,"netCents":12000,"entries":[{"id":"e1","occurredOn":"2026-06-10","description":"Mercado","category":"Alimentação","icon":"restaurant","direction":"outflow","amountCents":12000,"kind":"standard"}]}]}` + "\n"
 	if got := rec.Body.String(); got != want {
 		t.Fatalf("body =\n%q\nquero\n%q", got, want)
 	}

@@ -18,12 +18,13 @@ var ErrCardNotFound = errors.New("cartão não encontrado")
 // CardSummaryRow é o cabeçalho de um cartão: limite + saldo all-time (centavos). O service
 // deriva fatura/disponível/% usado disso (mesma matemática do creditCardView).
 type CardSummaryRow struct {
-	ID           string
-	Name         string
-	Icon         string
-	DotColor     string
-	LimitCents   int64
-	BalanceCents int64
+	ID               string
+	Name             string
+	Icon             string
+	DotColor         string
+	LimitCents       int64
+	BalanceCents     int64
+	PaymentAccountID string
 }
 
 // CardEntryRow é um lançamento do cartão com o mês de competência (YYYY-MM) e a categoria
@@ -59,12 +60,13 @@ func (s *Store) GetCardSummary(ctx context.Context, userID, cardID string) (Card
 		return CardSummaryRow{}, fmt.Errorf("store: resumo do cartão: %w", err)
 	}
 	return CardSummaryRow{
-		ID:           row.ID,
-		Name:         row.Name,
-		Icon:         row.Icon,
-		DotColor:     row.DotColor,
-		LimitCents:   row.LimitCents,
-		BalanceCents: row.BalanceCents,
+		ID:               row.ID,
+		Name:             row.Name,
+		Icon:             row.Icon,
+		DotColor:         row.DotColor,
+		LimitCents:       row.LimitCents,
+		BalanceCents:     row.BalanceCents,
+		PaymentAccountID: row.PaymentAccountID,
 	}, nil
 }
 

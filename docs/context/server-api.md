@@ -77,7 +77,7 @@ sempre em **centavos** (inteiro). **Toda rota abaixo exige `Authorization: Beare
 | GET | `/auth/me` | usuário da sessão atual (exige token) | implementado |
 | GET | `/accounts` | contas com saldo all-time (centavos) | implementado |
 | GET | `/accounts/{id}` | conta única (escopada por id+user) → **200** `AccountDetail`; **404** se não existe — usado pra pré-preencher a edição | implementado |
-| POST | `/accounts` | cria conta (body em centavos, **com** `openingBalanceCents` — exceto **`credit_card`**, que exige `openingBalanceCents = 0`: cartão não tem saldo, só fatura) → **201** + recurso; **400** se inválido | implementado |
+| POST | `/accounts` | cria conta (body em centavos, **com** `openingBalanceCents` — exceto **`credit_card`**, que exige `openingBalanceCents = 0`: cartão não tem saldo, só fatura). **`credit_card` exige `paymentAccountId`** (conta de banco `checking`/`savings` do usuário que paga a fatura); outros tipos não podem tê-lo → **201** + recurso; **400** se inválido | implementado |
 | PATCH | `/accounts/{id}` | edita conta (**sem** saldo — `opening_balance` nunca muda na edição) → **200** + recurso; **404** se não existe | implementado |
 | DELETE | `/accounts/{id}` | arquiva conta (soft-delete) → **204**; **404** se não existe | implementado |
 | GET | `/dashboard/summary` | resumo do mês: net/receitas/gastos + status/quip | implementado |
@@ -150,12 +150,12 @@ Valores `*Cents`/monetários são **int64 em centavos**.
 | DTO | Endpoint | Campos |
 |---|---|---|
 | `Account[]` | `/accounts` | `id`, `name`, `accountType` (checking/savings/cash/exchange/credit_card/voucher — o client usa p/ filtrar vales da transferência), `balanceCents`, `icon`, `tone`, `dotColor` |
-| `CreateAccountInput` (req) | `POST /accounts` | `name`, `accountType`, `openingBalanceCents` (**0 obrigatório p/ `credit_card`** — `!= 0` → 400 citando "saldo inicial"), `icon`, `tone`, `dotColor`, `subtitle?`, `creditLimitCents?` |
+| `CreateAccountInput` (req) | `POST /accounts` | `name`, `accountType`, `openingBalanceCents` (**0 obrigatório p/ `credit_card`** — `!= 0` → 400 citando "saldo inicial"), `icon`, `tone`, `dotColor`, `subtitle?`, `creditLimitCents?`, `paymentAccountId?` (**obrigatório p/ `credit_card`**: a conta de banco `checking`/`savings` do usuário que paga a fatura — ausente/vazio → 400; presente fora de cartão → 400; alvo que não é banco próprio → 400) |
 | `UpdateAccountInput` (req) | `PATCH /accounts/{id}` | igual ao Create **menos `openingBalanceCents`** (saldo nunca editável) |
-| `AccountDetail` | `GET/POST/PATCH /accounts` | `id`, `name`, `accountType`, `subtitle`, `balanceCents`, `icon`, `tone`, `dotColor`, `creditLimitCents` |
+| `AccountDetail` | `GET/POST/PATCH /accounts` | `id`, `name`, `accountType`, `subtitle`, `balanceCents`, `icon`, `tone`, `dotColor`, `creditLimitCents`, `paymentAccountId` (vazio quando não é cartão) |
 | `BankAccount[]` | `/contas/banks` | `id`, `name`, `subtitle`, `balanceCents`, `icon`, `brandColor` (= dot_color), `note`, `noteTone` |
 | `CreditCard[]` | `/contas/cards` | `id`, `name`, `invoiceCents` (fatura = saldo negativo), `limitCents`, `availableCents` (= limite − fatura, ≥ 0), `usedPercent` (0..100), `icon`, `brandColor` (= dot_color), `note`, `noteTone` |
-| `CardDetail` | `/contas/cards/{id}` | `id`, `name`, `icon`, `brandColor`, `limitCents`, `invoiceCents`, `availableCents`, `usedPercent` (cabeçalho = mesma matemática do `CreditCard`) + `months[]` (`InvoiceMonth`: `month` "YYYY-MM", `label` "Junho/2026", `chargesCents`, `paymentsCents`, `netCents` = charges − payments, `entries[]`); `InvoiceEntry`: `id`, `occurredOn`, `description`, `category`, `icon`, `direction` (inflow/outflow), `amountCents`, `kind` |
+| `CardDetail` | `/contas/cards/{id}` | `id`, `name`, `icon`, `brandColor`, `limitCents`, `invoiceCents`, `availableCents`, `usedPercent` (cabeçalho = mesma matemática do `CreditCard`) + `months[]` (`InvoiceMonth`: `month` "YYYY-MM", `label` "Junho/2026", `chargesCents`, `paymentsCents`, `netCents` = charges − payments, `entries[]`); `InvoiceEntry`: `id`, `occurredOn`, `description`, `category`, `icon`, `direction` (inflow/outflow), `amountCents`, `kind`. Traz também **`paymentAccountId`** (a conta de banco vinculada ao cartão) pro client travar a origem no "Pagar fatura" |
 | `Voucher[]` | `/contas/vouchers` | `id`, `name`, `valueCents`, `icon`, `status` (`ativo`/`estavel`/`critico`), `remainingPercent`, `note`, `noteTone` |
 | `CashWallet` | `/contas/cash` | `balanceCents`, `quip`, `confidenceLabel`, `confidencePercent` |
 | `PovertyXray` | `/contas/xray` | `title`, `rows[]` (`label`/`cents`/`tone`), `panic` (`percent`/`levelLabel`/`levelTone`/`lowLabel`/`highLabel`/`note`) |

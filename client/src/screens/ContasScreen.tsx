@@ -24,7 +24,7 @@ type ModalState =
   | { kind: 'editAccount'; id: string }
   | { kind: 'cardDetail'; id: string }
   | { kind: 'lancarFatura'; cardId: string }
-  | { kind: 'payInvoice'; cardId: string; invoiceCents: number }
+  | { kind: 'payInvoice'; cardId: string; invoiceCents: number; paymentAccountId: string }
   | { kind: 'transfer'; originId?: string };
 
 // Tela de Contas: escolhe o layout (desktop vs mobile), compartilha a máscara e é dona do estado
@@ -70,8 +70,8 @@ export function ContasScreen({ route = 'contas', onNavigate, onLogout }: ContasS
           onClose={close}
           onEdit={() => setModal({ kind: 'editAccount', id: modal.id })}
           onLancar={() => setModal({ kind: 'lancarFatura', cardId: modal.id })}
-          onPagar={(invoiceCents) =>
-            setModal({ kind: 'payInvoice', cardId: modal.id, invoiceCents })
+          onPagar={(invoiceCents, paymentAccountId) =>
+            setModal({ kind: 'payInvoice', cardId: modal.id, invoiceCents, paymentAccountId })
           }
         />
       ) : null}
@@ -81,6 +81,7 @@ export function ContasScreen({ route = 'contas', onNavigate, onLogout }: ContasS
       {modal?.kind === 'payInvoice' ? (
         <TransferModal
           lockedDestinationId={modal.cardId}
+          lockedOriginId={modal.paymentAccountId}
           defaultAmountCents={modal.invoiceCents}
           onClose={close}
         />

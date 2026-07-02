@@ -16,6 +16,7 @@ import (
 )
 
 // AccountDetail é a conta completa devolvida por GET/criar/editar (valores em centavos).
+// PaymentAccountID vazio = sem conta de pagamento vinculada (só cartão tem).
 type AccountDetail struct {
 	ID               string `json:"id"`
 	Name             string `json:"name"`
@@ -26,10 +27,12 @@ type AccountDetail struct {
 	Tone             string `json:"tone"`
 	DotColor         string `json:"dotColor"`
 	CreditLimitCents int64  `json:"creditLimitCents"`
+	PaymentAccountID string `json:"paymentAccountId"`
 }
 
 // CreateAccountInput é o corpo de criação (inclui o saldo inicial). Subtitle e
-// CreditLimitCents são opcionais (nil = ausente → NULL no banco).
+// CreditLimitCents são opcionais (nil = ausente → NULL no banco). PaymentAccountID é
+// obrigatório em credit_card (a conta de banco que paga a fatura) e proibido nos demais tipos.
 type CreateAccountInput struct {
 	Name                string  `json:"name"`
 	AccountType         string  `json:"accountType"`
@@ -39,6 +42,7 @@ type CreateAccountInput struct {
 	DotColor            string  `json:"dotColor"`
 	Subtitle            *string `json:"subtitle"`
 	CreditLimitCents    *int64  `json:"creditLimitCents"`
+	PaymentAccountID    *string `json:"paymentAccountId"`
 }
 
 // UpdateAccountInput é o corpo de edição. NÃO tem saldo: o opening_balance nunca é
@@ -51,6 +55,7 @@ type UpdateAccountInput struct {
 	DotColor         string  `json:"dotColor"`
 	Subtitle         *string `json:"subtitle"`
 	CreditLimitCents *int64  `json:"creditLimitCents"`
+	PaymentAccountID *string `json:"paymentAccountId"`
 }
 
 var (
@@ -68,9 +73,19 @@ var (
 // passar deixaria um opening_balance fantasma vazando no /contas/cards e no Raio-X.
 var errConvertToCard = errors.New("conversão inválida para cartão de crédito")
 
+// errPaymentAccountInvalid sinaliza uma conta de pagamento (vínculo do cartão) inválida: ausente
+// num cartão, presente numa conta não-cartão, ou apontando algo que não é uma conta de banco
+// (checking/savings) do próprio usuário. O handler a trata como 400.
+var errPaymentAccountInvalid = errors.New("conta de pagamento inválida")
+
+// blank diz se um *string opcional está ausente ou vazio (só espaços).
+func blank(s *string) bool {
+	return s == nil || strings.TrimSpace(*s) == ""
+}
+
 // validateAccountFields valida os campos comuns de criação/edição. Mensagem inclui o
 // valor ofensivo + a forma esperada (regra do CLAUDE.md) — o handler responde 400.
-func validateAccountFields(name, accountType, tone, dotColor, icon string, creditLimitCents *int64) error {
+func validateAccountFields(name, accountType, tone, dotColor, icon string, creditLimitCents *int64, paymentAccountID *string) error {
 	if strings.TrimSpace(name) == "" {
 		return errors.New("name vazio: informe um nome não-vazio")
 	}
@@ -94,6 +109,13 @@ func validateAccountFields(name, accountType, tone, dotColor, icon string, credi
 			return fmt.Errorf("creditLimitCents inválido (%d): não pode ser negativo", *creditLimitCents)
 		}
 	}
+	if accountType == "credit_card" {
+		if blank(paymentAccountID) {
+			return fmt.Errorf("%w: cartão de crédito exige paymentAccountId (a conta de banco que paga a fatura)", errPaymentAccountInvalid)
+		}
+	} else if !blank(paymentAccountID) {
+		return fmt.Errorf("%w: paymentAccountId só é válido para credit_card (accountType recebido %q)", errPaymentAccountInvalid, accountType)
+	}
 	return nil
 }
 
@@ -106,11 +128,11 @@ func (in CreateAccountInput) validate() error {
 	if in.OpeningBalanceCents < 0 {
 		return fmt.Errorf("openingBalanceCents inválido (%d): não pode ser negativo", in.OpeningBalanceCents)
 	}
-	return validateAccountFields(in.Name, in.AccountType, in.Tone, in.DotColor, in.Icon, in.CreditLimitCents)
+	return validateAccountFields(in.Name, in.AccountType, in.Tone, in.DotColor, in.Icon, in.CreditLimitCents, in.PaymentAccountID)
 }
 
 func (in UpdateAccountInput) validate() error {
-	return validateAccountFields(in.Name, in.AccountType, in.Tone, in.DotColor, in.Icon, in.CreditLimitCents)
+	return validateAccountFields(in.Name, in.AccountType, in.Tone, in.DotColor, in.Icon, in.CreditLimitCents, in.PaymentAccountID)
 }
 
 func (in CreateAccountInput) toStore() store.AccountInput {
@@ -123,6 +145,7 @@ func (in CreateAccountInput) toStore() store.AccountInput {
 		DotColor:            in.DotColor,
 		Subtitle:            in.Subtitle,
 		CreditLimitCents:    in.CreditLimitCents,
+		PaymentAccountID:    in.PaymentAccountID,
 	}
 }
 
@@ -136,16 +159,38 @@ func (in UpdateAccountInput) toStore() store.AccountInput {
 		DotColor:         in.DotColor,
 		Subtitle:         in.Subtitle,
 		CreditLimitCents: in.CreditLimitCents,
+		PaymentAccountID: in.PaymentAccountID,
 	}
 }
 
-// Create cria a conta do usuário e devolve o recurso (com saldo derivado).
+// Create cria a conta do usuário e devolve o recurso (com saldo derivado). Para cartão, valida
+// que a conta de pagamento vinculada é uma conta de banco (checking/savings) do próprio usuário.
 func (s *Service) Create(ctx context.Context, userID string, in CreateAccountInput) (AccountDetail, error) {
+	if err := s.ensurePaymentAccount(ctx, userID, in.AccountType, in.PaymentAccountID); err != nil {
+		return AccountDetail{}, err
+	}
 	id, err := s.store.CreateAccount(ctx, userID, in.toStore())
 	if err != nil {
 		return AccountDetail{}, fmt.Errorf("account: criar conta: %w", err)
 	}
 	return s.detail(ctx, userID, id)
+}
+
+// ensurePaymentAccount confirma que o vínculo do cartão aponta uma conta de banco do usuário.
+// Só roda em credit_card com paymentAccountId presente (a coerência de presença já passou na
+// validação de campos). errPaymentAccountInvalid (→ 400) quando o alvo não é banco/próprio.
+func (s *Service) ensurePaymentAccount(ctx context.Context, userID, accountType string, paymentAccountID *string) error {
+	if accountType != "credit_card" || blank(paymentAccountID) {
+		return nil
+	}
+	ok, err := s.store.IsBankAccountOwned(ctx, userID, *paymentAccountID)
+	if err != nil {
+		return fmt.Errorf("account: validar conta de pagamento: %w", err)
+	}
+	if !ok {
+		return fmt.Errorf("%w (%q): use uma conta de banco (checking/savings) sua", errPaymentAccountInvalid, *paymentAccountID)
+	}
+	return nil
 }
 
 // Update edita a conta (sem mexer no saldo). Rejeita converter uma conta existente em
@@ -158,6 +203,9 @@ func (s *Service) Update(ctx context.Context, userID, id string, in UpdateAccoun
 	}
 	if in.AccountType == "credit_card" && current.AccountType != "credit_card" {
 		return AccountDetail{}, fmt.Errorf("%w (tipo atual %q): cartão não tem saldo inicial; crie um cartão novo", errConvertToCard, current.AccountType)
+	}
+	if err := s.ensurePaymentAccount(ctx, userID, in.AccountType, in.PaymentAccountID); err != nil {
+		return AccountDetail{}, err
 	}
 	if err := s.store.UpdateAccount(ctx, userID, id, in.toStore()); err != nil {
 		return AccountDetail{}, fmt.Errorf("account: editar conta: %w", err)
@@ -193,6 +241,7 @@ func (s *Service) detail(ctx context.Context, userID, id string) (AccountDetail,
 		Tone:             row.Tone,
 		DotColor:         row.DotColor,
 		CreditLimitCents: row.CreditLimitCents,
+		PaymentAccountID: row.PaymentAccountID,
 	}, nil
 }
 
@@ -232,6 +281,8 @@ func writeAccountError(w http.ResponseWriter, err error, logTag, serverErrMsg st
 	case errors.Is(err, store.ErrAccountNotFound):
 		httpx.WriteError(w, http.StatusNotFound, "conta não encontrada")
 	case errors.Is(err, errConvertToCard):
+		httpx.WriteError(w, http.StatusBadRequest, err.Error())
+	case errors.Is(err, errPaymentAccountInvalid):
 		httpx.WriteError(w, http.StatusBadRequest, err.Error())
 	default:
 		log.Printf("%s: %v", logTag, err)
