@@ -18,17 +18,18 @@ func authedBody(method, target, userID, body string) *http.Request {
 	return req.WithContext(auth.WithUserID(req.Context(), userID))
 }
 
-const cartaoBody = `{"name":"Cartão Nubank","accountType":"credit_card","openingBalanceCents":0,"icon":"credit_card","tone":"primary","dotColor":"#8a05be","subtitle":"Final 4022","creditLimitCents":500000}`
+const cartaoBody = `{"name":"Cartão Nubank","accountType":"credit_card","openingBalanceCents":0,"icon":"credit_card","tone":"primary","dotColor":"#8a05be","subtitle":"Final 4022","creditLimitCents":500000,"paymentAccountId":"b1"}`
 
 var cartaoDetail = store.AccountDetail{
 	ID: "a9", Name: "Cartão Nubank", AccountType: "credit_card", Subtitle: "Final 4022",
 	BalanceCents: 0, Icon: "credit_card", Tone: "primary", DotColor: "#8a05be", CreditLimitCents: 500000,
+	PaymentAccountID: "b1",
 }
 
-const cartaoDetailJSON = `{"id":"a9","name":"Cartão Nubank","accountType":"credit_card","subtitle":"Final 4022","balanceCents":0,"icon":"credit_card","tone":"primary","dotColor":"#8a05be","creditLimitCents":500000}` + "\n"
+const cartaoDetailJSON = `{"id":"a9","name":"Cartão Nubank","accountType":"credit_card","subtitle":"Final 4022","balanceCents":0,"icon":"credit_card","tone":"primary","dotColor":"#8a05be","creditLimitCents":500000,"paymentAccountId":"b1"}` + "\n"
 
 func TestCreateHandlerCria201EMapeiaOpcionais(t *testing.T) {
-	fake := &fakeAccountStore{newID: "a9", detail: cartaoDetail}
+	fake := &fakeAccountStore{newID: "a9", detail: cartaoDetail, bankOwned: true}
 	rec := httptest.NewRecorder()
 	account.CreateHandler(account.NewService(fake)).ServeHTTP(rec, authedBody(http.MethodPost, "/accounts", "u-7", cartaoBody))
 
@@ -46,6 +47,59 @@ func TestCreateHandlerCria201EMapeiaOpcionais(t *testing.T) {
 	}
 	if fake.gotInput.Subtitle == nil || *fake.gotInput.Subtitle != "Final 4022" {
 		t.Errorf("subtitle mapeado = %v, quero Final 4022", fake.gotInput.Subtitle)
+	}
+	if fake.gotInput.PaymentAccountID == nil || *fake.gotInput.PaymentAccountID != "b1" {
+		t.Errorf("paymentAccountId mapeado = %v, quero b1", fake.gotInput.PaymentAccountID)
+	}
+	if fake.gotPaymentID != "b1" {
+		t.Errorf("validou conta de pagamento %q, quero b1", fake.gotPaymentID)
+	}
+}
+
+func TestCreateHandlerCartaoSemContaPagamento400(t *testing.T) {
+	body := `{"name":"Cartão","accountType":"credit_card","openingBalanceCents":0,"icon":"credit_card","tone":"primary","dotColor":"#8a05be","creditLimitCents":500000}`
+	fake := &fakeAccountStore{bankOwned: true}
+	rec := httptest.NewRecorder()
+	account.CreateHandler(account.NewService(fake)).ServeHTTP(rec, authedBody(http.MethodPost, "/accounts", "u-1", body))
+
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d, quero 400 (cartão exige conta de pagamento)", rec.Code)
+	}
+	if !strings.Contains(rec.Body.String(), "paymentAccountId") {
+		t.Errorf("erro = %q, deveria citar paymentAccountId", rec.Body.String())
+	}
+	if fake.gotInput.Name != "" {
+		t.Errorf("CreateAccount não devia ser chamado com corpo inválido (gotInput = %+v)", fake.gotInput)
+	}
+}
+
+func TestCreateHandlerContaPagamentoForaDeCartao400(t *testing.T) {
+	body := `{"name":"Conta","accountType":"checking","openingBalanceCents":0,"icon":"home","tone":"primary","dotColor":"#d0bcff","paymentAccountId":"b1"}`
+	rec := httptest.NewRecorder()
+	account.CreateHandler(account.NewService(&fakeAccountStore{})).ServeHTTP(rec, authedBody(http.MethodPost, "/accounts", "u-1", body))
+
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d, quero 400 (paymentAccountId só p/ cartão)", rec.Code)
+	}
+	if !strings.Contains(rec.Body.String(), "credit_card") {
+		t.Errorf("erro = %q, deveria explicar que paymentAccountId é só p/ credit_card", rec.Body.String())
+	}
+}
+
+func TestCreateHandlerContaPagamentoNaoBanco400(t *testing.T) {
+	// paymentAccountId presente, mas o alvo não é conta de banco do usuário (IsBankAccountOwned=false).
+	fake := &fakeAccountStore{bankOwned: false}
+	rec := httptest.NewRecorder()
+	account.CreateHandler(account.NewService(fake)).ServeHTTP(rec, authedBody(http.MethodPost, "/accounts", "u-1", cartaoBody))
+
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d, quero 400 (conta de pagamento não é banco do usuário)", rec.Code)
+	}
+	if !strings.Contains(rec.Body.String(), "banco") {
+		t.Errorf("erro = %q, deveria explicar que precisa ser conta de banco", rec.Body.String())
+	}
+	if fake.gotInput.Name != "" {
+		t.Errorf("CreateAccount não devia rodar com conta de pagamento inválida (gotInput = %+v)", fake.gotInput)
 	}
 }
 
@@ -117,7 +171,7 @@ func TestCreateHandlerSemUsuario401(t *testing.T) {
 }
 
 func TestUpdateHandlerEdita200(t *testing.T) {
-	fake := &fakeAccountStore{detail: cartaoDetail}
+	fake := &fakeAccountStore{detail: cartaoDetail, bankOwned: true}
 	req := authedBody(http.MethodPatch, "/accounts/a9", "u-7", cartaoBody)
 	req.SetPathValue("id", "a9")
 	rec := httptest.NewRecorder()
