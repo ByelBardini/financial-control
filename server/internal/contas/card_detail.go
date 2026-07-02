@@ -41,15 +41,16 @@ type InvoiceMonth struct {
 // CardDetail é a tela de detalhe de um cartão: cabeçalho (limite/fatura/disponível/% usado,
 // derivados do saldo all-time como no creditCardView) + faturas por mês (mais recente primeiro).
 type CardDetail struct {
-	ID             string         `json:"id"`
-	Name           string         `json:"name"`
-	Icon           string         `json:"icon"`
-	BrandColor     string         `json:"brandColor"`
-	LimitCents     int64          `json:"limitCents"`
-	InvoiceCents   int64          `json:"invoiceCents"`
-	AvailableCents int64          `json:"availableCents"`
-	UsedPercent    int            `json:"usedPercent"`
-	Months         []InvoiceMonth `json:"months"`
+	ID               string         `json:"id"`
+	Name             string         `json:"name"`
+	Icon             string         `json:"icon"`
+	BrandColor       string         `json:"brandColor"`
+	LimitCents       int64          `json:"limitCents"`
+	InvoiceCents     int64          `json:"invoiceCents"`
+	AvailableCents   int64          `json:"availableCents"`
+	UsedPercent      int            `json:"usedPercent"`
+	PaymentAccountID string         `json:"paymentAccountId"`
+	Months           []InvoiceMonth `json:"months"`
 }
 
 // cardInvoice deriva fatura (saldo negativo, em positivo), disponível (limite − fatura, ≥ 0) e
@@ -81,15 +82,16 @@ func (s *Service) CardDetail(ctx context.Context, userID, cardID string) (CardDe
 	}
 	invoice, available, used := cardInvoice(sum.BalanceCents, sum.LimitCents)
 	return CardDetail{
-		ID:             sum.ID,
-		Name:           sum.Name,
-		Icon:           sum.Icon,
-		BrandColor:     sum.DotColor,
-		LimitCents:     sum.LimitCents,
-		InvoiceCents:   invoice,
-		AvailableCents: available,
-		UsedPercent:    used,
-		Months:         groupInvoiceMonths(entries),
+		ID:               sum.ID,
+		Name:             sum.Name,
+		Icon:             sum.Icon,
+		BrandColor:       sum.DotColor,
+		LimitCents:       sum.LimitCents,
+		InvoiceCents:     invoice,
+		AvailableCents:   available,
+		UsedPercent:      used,
+		PaymentAccountID: sum.PaymentAccountID,
+		Months:           groupInvoiceMonths(entries),
 	}, nil
 }
 
