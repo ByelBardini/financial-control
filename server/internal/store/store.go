@@ -225,6 +225,7 @@ type TransactionDetailRow struct {
 }
 
 // AccountDetail é a conta completa (escopada por id+user) com saldo derivado, em centavos.
+// PaymentAccountID vazio = sem conta de pagamento vinculada (só cartão tem).
 type AccountDetail struct {
 	ID               string
 	Name             string
@@ -235,10 +236,11 @@ type AccountDetail struct {
 	Tone             string
 	DotColor         string
 	CreditLimitCents int64
+	PaymentAccountID string
 }
 
 // AccountInput são os campos graváveis de uma conta (create/update). Dinheiro em
-// centavos inteiros; Subtitle/CreditLimitCents nil = NULL no banco.
+// centavos inteiros; Subtitle/CreditLimitCents/PaymentAccountID nil = NULL no banco.
 type AccountInput struct {
 	Name                string
 	AccountType         string
@@ -248,6 +250,7 @@ type AccountInput struct {
 	DotColor            string
 	Subtitle            *string
 	CreditLimitCents    *int64
+	PaymentAccountID    *string
 }
 
 // UserCredentials é o usuário com o hash da senha — só pro login (FindUserByEmail).
@@ -845,6 +848,10 @@ func (s *Store) CreateAccount(ctx context.Context, userID string, in AccountInpu
 	if err != nil {
 		return "", err
 	}
+	pay, err := uuidArgN(in.PaymentAccountID)
+	if err != nil {
+		return "", err
+	}
 	id, err := s.q.CreateAccount(ctx, gen.CreateAccountParams{
 		UserID:              uid,
 		Name:                in.Name,
@@ -855,6 +862,7 @@ func (s *Store) CreateAccount(ctx context.Context, userID string, in AccountInpu
 		DotColor:            in.DotColor,
 		Subtitle:            textArg(in.Subtitle),
 		CreditLimitCents:    int8Arg(in.CreditLimitCents),
+		PaymentAccountID:    pay,
 	})
 	if err != nil {
 		return "", fmt.Errorf("store: criar conta: %w", err)
@@ -872,6 +880,10 @@ func (s *Store) UpdateAccount(ctx context.Context, userID, id string, in Account
 	if err != nil {
 		return ErrAccountNotFound
 	}
+	pay, err := uuidArgN(in.PaymentAccountID)
+	if err != nil {
+		return err
+	}
 	if _, err := s.q.UpdateAccount(ctx, gen.UpdateAccountParams{
 		Name:             in.Name,
 		AccountType:      in.AccountType,
@@ -880,6 +892,7 @@ func (s *Store) UpdateAccount(ctx context.Context, userID, id string, in Account
 		DotColor:         in.DotColor,
 		Subtitle:         textArg(in.Subtitle),
 		CreditLimitCents: int8Arg(in.CreditLimitCents),
+		PaymentAccountID: pay,
 		ID:               aid,
 		UserID:           uid,
 	}); err != nil {
@@ -889,6 +902,25 @@ func (s *Store) UpdateAccount(ctx context.Context, userID, id string, in Account
 		return fmt.Errorf("store: editar conta: %w", err)
 	}
 	return nil
+}
+
+// IsBankAccountOwned diz se id é uma conta de banco (checking/savings) ativa do usuário — a
+// elegibilidade de uma conta de pagamento de cartão. uuid malformado → false (não elegível),
+// nunca erro, pra o service devolver 400 limpo.
+func (s *Store) IsBankAccountOwned(ctx context.Context, userID, id string) (bool, error) {
+	uid, err := uuidArg(userID)
+	if err != nil {
+		return false, err
+	}
+	aid, err := uuidArg(id)
+	if err != nil {
+		return false, nil
+	}
+	n, err := s.q.CountEligiblePaymentAccount(ctx, gen.CountEligiblePaymentAccountParams{ID: aid, UserID: uid})
+	if err != nil {
+		return false, fmt.Errorf("store: checar conta de pagamento: %w", err)
+	}
+	return n > 0, nil
 }
 
 // ArchiveAccount faz soft-delete da conta (escopada por id+user). ErrAccountNotFound quando não existe.
@@ -937,6 +969,7 @@ func (s *Store) GetAccountByID(ctx context.Context, userID, id string) (AccountD
 		Tone:             row.Tone,
 		DotColor:         row.DotColor,
 		CreditLimitCents: row.CreditLimitCents,
+		PaymentAccountID: row.PaymentAccountID,
 	}, nil
 }
 
