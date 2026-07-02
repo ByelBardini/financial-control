@@ -82,6 +82,8 @@ export interface CardDetail {
   invoiceCents: number;
   availableCents: number;
   usedPercent: number;
+  // Conta de banco vinculada que paga a fatura — trava a origem no "Pagar fatura".
+  paymentAccountId: string;
   months: InvoiceMonth[];
 }
 

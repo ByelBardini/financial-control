@@ -13,6 +13,7 @@ import {
 type TransferModalProps = {
   onClose: () => void;
   lockedDestinationId?: string; // pagar fatura → trava o destino na conta do cartão
+  lockedOriginId?: string; // pagar fatura → trava a origem na conta de banco vinculada ao cartão
   defaultAmountCents?: number; // pagar fatura → valor sugerido = fatura atual
   defaultOriginId?: string; // tocar numa conta → pré-seleciona a origem (não trava)
 };
@@ -30,6 +31,7 @@ function todayISO(): string {
 export function TransferModal({
   onClose,
   lockedDestinationId,
+  lockedOriginId,
   defaultAmountCents,
   defaultOriginId,
 }: TransferModalProps) {
@@ -55,7 +57,7 @@ export function TransferModal({
 
     const initial: TransferFormValues = {
       ...initialTransferValues(todayISO()),
-      originAccountId: defaultOriginId ?? '',
+      originAccountId: lockedOriginId ?? defaultOriginId ?? '',
       destinationAccountId: lockedDestinationId ?? '',
       amountCents: defaultAmountCents ?? 0,
     };
@@ -64,6 +66,7 @@ export function TransferModal({
         initial={initial}
         accounts={accountsQ.data ?? []}
         lockDestination={lockedDestinationId != null}
+        lockOrigin={lockedOriginId != null}
         submitting={createMut.isPending}
         serverError={serverError}
         onSubmit={handleSubmit}

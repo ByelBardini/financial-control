@@ -27,6 +27,8 @@ import {
   useCreateAccount,
   useUpdateAccount,
 } from '../../hooks/useAccountMutations';
+import { useAccounts } from '../../hooks/useDashboardQueries';
+import type { SelectOption } from '../SelectField';
 
 type AccountFormModalProps = {
   mode: 'create' | 'edit';
@@ -55,6 +57,15 @@ export function AccountFormModal({ mode, accountId, onClose }: AccountFormModalP
   const updateMut = useUpdateAccount();
   const archiveMut = useArchiveAccount();
   const detail = useAccount(mode === 'edit' ? accountId : undefined);
+  const accounts = useAccounts();
+
+  // Contas de banco (checking/savings) elegíveis como conta de pagamento do cartão —
+  // exclui a própria conta na edição (um cartão não paga a si mesmo). Espelha a regra do
+  // server (só bancos podem pagar a fatura). Ver docs/context/client-app.md.
+  const paymentAccountOptions: SelectOption[] = (accounts.data ?? [])
+    .filter((a) => a.accountType === 'checking' || a.accountType === 'savings')
+    .filter((a) => a.id !== accountId)
+    .map((a) => ({ value: a.id, label: a.name, icon: a.icon, dotColor: a.dotColor }));
 
   const submitting = createMut.isPending || updateMut.isPending;
   const serverError = errorMessage(createMut.error ?? updateMut.error ?? archiveMut.error);
@@ -136,6 +147,7 @@ export function AccountFormModal({ mode, accountId, onClose }: AccountFormModalP
               <AccountForm
                 mode="create"
                 initial={initialValues('checking')}
+                paymentAccountOptions={paymentAccountOptions}
                 submitting={submitting}
                 serverError={serverError}
                 onSubmit={handleCreate}
@@ -155,6 +167,7 @@ export function AccountFormModal({ mode, accountId, onClose }: AccountFormModalP
       <AccountForm
         mode="edit"
         initial={detailToFormValues(detail.data)}
+        paymentAccountOptions={paymentAccountOptions}
         submitting={submitting}
         archiving={archiveMut.isPending}
         serverError={serverError}

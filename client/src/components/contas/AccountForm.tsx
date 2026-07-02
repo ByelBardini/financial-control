@@ -6,6 +6,7 @@ import { AccountTypeSelect } from './AccountTypeSelect';
 import { AppearancePicker } from './AppearancePicker';
 import { ArchiveAccountButton } from './ArchiveAccountButton';
 import { MoneyField } from './MoneyField';
+import { SelectField, type SelectOption } from '../SelectField';
 import {
   accountTypeMeta,
   validateAccountForm,
@@ -18,6 +19,8 @@ import type { AccountType } from '../../types/accounts';
 type AccountFormProps = {
   mode: 'create' | 'edit';
   initial: AccountFormValues;
+  // Contas de banco (checking/savings) elegíveis como conta de pagamento do cartão.
+  paymentAccountOptions: SelectOption[];
   submitting?: boolean;
   serverError?: string;
   onSubmit: (values: AccountFormValues) => void;
@@ -31,6 +34,7 @@ type AccountFormProps = {
 export function AccountForm({
   mode,
   initial,
+  paymentAccountOptions,
   submitting = false,
   serverError,
   onSubmit,
@@ -85,6 +89,23 @@ export function AccountForm({
           onChangeCents={(creditLimitCents) => patch({ creditLimitCents })}
           error={errors.creditLimit}
         />
+      ) : null}
+
+      {isCard ? (
+        paymentAccountOptions.length > 0 ? (
+          <SelectField
+            label="Conta de pagamento"
+            value={values.paymentAccountId}
+            options={paymentAccountOptions}
+            onChange={(paymentAccountId) => patch({ paymentAccountId })}
+            placeholder="Conta que paga a fatura"
+            error={errors.paymentAccount}
+          />
+        ) : (
+          <Text accessibilityRole="alert" className="text-label-sm text-error">
+            Cadastre uma conta de banco primeiro — o cartão precisa de uma conta pra pagar a fatura.
+          </Text>
+        )
       ) : null}
 
       <FormField

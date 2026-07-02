@@ -27,6 +27,7 @@ type TransferFormProps = {
   initial: TransferFormValues;
   accounts: AccountOption[];
   lockDestination?: boolean; // pagar fatura → destino fixo no cartão (sem troca)
+  lockOrigin?: boolean; // pagar fatura → origem fixa na conta vinculada ao cartão
   submitting?: boolean;
   serverError?: string;
   onSubmit: (values: TransferFormValues) => void;
@@ -39,6 +40,7 @@ export function TransferForm({
   initial,
   accounts,
   lockDestination = false,
+  lockOrigin = false,
   submitting = false,
   serverError,
   onSubmit,
@@ -94,6 +96,7 @@ export function TransferForm({
           options={originOptions}
           onChange={(originAccountId) => patch({ originAccountId })}
           placeholder="Conta de origem"
+          disabled={lockOrigin}
           error={errors.origin}
         />
 

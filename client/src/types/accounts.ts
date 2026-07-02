@@ -20,9 +20,12 @@ export interface AccountDetail {
   tone: Tone;
   dotColor: string;
   creditLimitCents: number;
+  // Conta de banco vinculada que paga a fatura (só cartão; vazio nas demais contas).
+  paymentAccountId?: string;
 }
 
 // Corpo de criação (inclui o saldo inicial). subtitle/creditLimitCents opcionais.
+// paymentAccountId é obrigatório p/ credit_card (a conta de banco que paga a fatura).
 export interface NewAccountInput {
   name: string;
   accountType: AccountType;
@@ -32,6 +35,7 @@ export interface NewAccountInput {
   dotColor: string;
   subtitle?: string;
   creditLimitCents?: number;
+  paymentAccountId?: string;
 }
 
 // Corpo de edição: igual ao de criação, porém SEM saldo (nunca editável).
@@ -43,4 +47,5 @@ export interface UpdateAccountInput {
   dotColor: string;
   subtitle?: string;
   creditLimitCents?: number;
+  paymentAccountId?: string;
 }
