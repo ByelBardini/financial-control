@@ -35,7 +35,7 @@ func TestCardDetailEndpointE2E(t *testing.T) {
 	token := login(t, srv.URL, "teste@teste.com", "12345")
 
 	// Cria o cartão (saldo inicial 0 obrigatório; limite 2000,00).
-	cardBody := `{"name":"Cartão Teste","accountType":"credit_card","openingBalanceCents":0,"icon":"credit_card","tone":"primary","dotColor":"#8a05be","creditLimitCents":200000}`
+	cardBody := `{"name":"Cartão Teste","accountType":"credit_card","openingBalanceCents":0,"icon":"credit_card","tone":"primary","dotColor":"#8a05be","creditLimitCents":200000,"paymentAccountId":"` + userANubankAcc + `"}`
 	var card struct {
 		ID string `json:"id"`
 	}

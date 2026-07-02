@@ -35,7 +35,7 @@ func TestCardInvoiceDebtE2E(t *testing.T) {
 	srv := newServer(t, st)
 	token := login(t, srv.URL, "teste@teste.com", "12345")
 
-	cardBody := `{"name":"Cartão Teste","accountType":"credit_card","openingBalanceCents":0,"icon":"credit_card","tone":"primary","dotColor":"#8a05be","creditLimitCents":300000}`
+	cardBody := `{"name":"Cartão Teste","accountType":"credit_card","openingBalanceCents":0,"icon":"credit_card","tone":"primary","dotColor":"#8a05be","creditLimitCents":300000,"paymentAccountId":"` + userANubankAcc + `"}`
 	var card struct {
 		ID string `json:"id"`
 	}

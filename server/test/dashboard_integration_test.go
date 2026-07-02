@@ -1,10 +1,14 @@
 //go:build integration
 
 // Estes testes batem no Postgres real e são DESTRUTIVOS (o seed faz TRUNCATE).
-// Por isso ficam atrás da build tag `integration` (opt-in explícito) e ainda
-// pulam se DATABASE_URL não estiver definido:
+// Por isso ficam atrás da build tag `integration` (opt-in explícito), pulam se
+// DATABASE_URL não estiver definido, e EXIGEM um banco dedicado cujo nome
+// termine em "_test" (applySeed → requireTestDB aborta senão) — assim rodar os
+// testes nunca apaga o banco de dev:
 //
-//	go test -tags integration ./test/...
+//	createdb financial_control_test   # uma vez; depois aplique as migrations nele
+//	DATABASE_URL=postgres://financial:financial@localhost:5432/financial_control_test?sslmode=disable \
+//	  go test -tags integration ./test/...
 package test
 
 import (
@@ -13,6 +17,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"os"
 	"strings"
 	"testing"
@@ -156,9 +161,31 @@ func findInvestment(inv []dashboard.Investment, name string) *dashboard.Investme
 	return nil
 }
 
+// requireTestDB aborta o teste se o dsn não apontar para um banco dedicado de
+// teste (nome terminando em "_test"). Blindagem contra rodar o seed destrutivo
+// (TRUNCATE) no banco de dev/prod — ver docs/context/gotchas.md.
+//
+//	requireTestDB(t, "postgres://u:p@host/financial_control_test") // ok, não aborta
+func requireTestDB(t *testing.T, dsn string) {
+	t.Helper()
+	u, err := url.Parse(dsn)
+	if err != nil {
+		t.Fatalf("requireTestDB: DATABASE_URL inválida (%q): %v", dsn, err)
+	}
+	db := strings.TrimPrefix(u.Path, "/")
+	if !strings.HasSuffix(db, "_test") {
+		t.Fatalf("requireTestDB: recusando rodar o seed destrutivo no banco %q — os "+
+			"testes de integração exigem um banco cujo nome termine em \"_test\" (ex.: "+
+			"financial_control_test). Aponte DATABASE_URL para o banco de teste, não o de dev.", db)
+	}
+}
+
 // applySeed roda o server/db/seed.sql (caminho relativo ao pacote test/).
+// O seed é DESTRUTIVO (TRUNCATE): requireTestDB garante que só rode num banco
+// dedicado de teste, nunca no de dev/prod.
 func applySeed(t *testing.T, ctx context.Context, dsn string) {
 	t.Helper()
+	requireTestDB(t, dsn)
 	sql, err := os.ReadFile("../db/seed.sql")
 	if err != nil {
 		t.Fatalf("lendo seed.sql: %v", err)
